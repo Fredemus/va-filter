@@ -31,7 +31,7 @@ enum EstimateSource {
     LinearVoutEstimate,  // use linear estimate of Vout
 }
 
-// this is a 4-pole filter with resonance, which is why there's 4 states and vouts
+// this is a 2-pole filter with resonance, which is why there's 2 states and vouts
 #[derive(Clone)]
 struct SVF {
     // Store a handle to the plugin's parameter object.
@@ -133,9 +133,8 @@ impl SVF {
             // v_t and i_s are constants to control the diode clipper's character
             let v_t = 4.;
             let i_s = 4.;
-            // TODO: tanh() might not be proper here. This is the diode clipper
+            // a2 is clipped with the inverse of the diode anti-saturator
             a[2] = (v_t * (est_source_a2 / i_s).asinh()) / est_source_a2;
-            // a[0] = ((est_source_a0).tanh()) / est_source_a0;
         }
         let est_source_rest = [
             (input
@@ -205,7 +204,7 @@ impl PluginParameters for FilterParameters {
         match index {
             0 => self.get_cutoff(),
             1 => self.get_res(),
-            2 => self.drive.get() / 5.,
+            2 => self.drive.get() / 16.,
             3 => self.get_mode(),
             _ => 0.0,
         }
@@ -291,6 +290,7 @@ impl Plugin for SVF {
             }
         }
     }
+    // lets the plugin host get access to the parameters
     fn get_parameter_object(&mut self) -> Arc<dyn PluginParameters> {
         Arc::clone(&self.params) as Arc<dyn PluginParameters>
     }
