@@ -13,8 +13,13 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
 use vst::buffer::AudioBuffer;
-use vst::plugin::{Category, Info, Plugin, PluginParameters};
+use vst::plugin::{Category, Info, Plugin, PluginParameters, HostCallback};
 use vst::util::AtomicFloat;
+
+mod editor;
+mod parameter;
+mod utils;
+
 enum _Mode {
     Lowpass,
     Highpass,
@@ -264,6 +269,13 @@ impl Default for SVF {
     }
 }
 impl Plugin for SVF {
+    fn new(_host: HostCallback) -> Self {
+        SVF {
+            vout: [0f32; 2],
+            s: [0f32; 2],
+            params: Arc::new(FilterParameters::default()),
+        }
+    }
     fn set_sample_rate(&mut self, rate: f32) {
         self.params.sample_rate.set(rate);
     }
