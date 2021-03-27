@@ -6,20 +6,26 @@
 //! Quality can be improved a lot by oversampling a bit.
 //! Damping feedback is antisaturated, so it doesn't disappear at high gains.
 
+// TODO: Potential better formula for resonance and cutoff: { let x : f32 = x.powf(slope); min * (1.0 - x) + max * x }
+// same principle seems to be usable for exponential things. See https://github.com/WeirdConstructor/HexoSynth/blob/master/src/dsp/mod.rs#L125-L134
+
 #[macro_use]
 extern crate vst;
 use std::f32::consts::PI;
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
 use vst::buffer::AudioBuffer;
-use vst::plugin::{Category, Info, Plugin, PluginParameters, HostCallback};
-use vst::util::AtomicFloat;
+use vst::editor::Editor;
+use vst::plugin::{Category, HostCallback, Info, Plugin, PluginParameters};
 
 mod editor;
+use editor::{EditorState, SVFPluginEditor};
 mod parameter;
+#[allow(dead_code)]
 mod utils;
-
+use utils::AtomicOps;
+mod filter_parameters;
+use filter_parameters::FilterParameters;
 enum _Mode {
     Lowpass,
     Highpass,
@@ -37,41 +43,18 @@ enum EstimateSource {
 }
 
 // this is a 2-pole filter with resonance, which is why there's 2 states and vouts
-#[derive(Clone)]
 struct SVF {
     // Store a handle to the plugin's parameter object.
     params: Arc<FilterParameters>,
+    // The object responsible for the gui
+    editor: Option<SVFPluginEditor>,
     // the output of the different filter stages
     vout: [f32; 2],
     // s is the "state" parameter. In an IIR it would be the last value from the filter
     // In this we find it by trapezoidal integration to avoid the unit delay
     s: [f32; 2],
 }
-struct FilterParameters {
-    // the "cutoff" parameter. Determines how heavy filtering is
-    cutoff: AtomicFloat,
-    g: AtomicFloat,
-    // needed to calculate cutoff.
-    sample_rate: AtomicFloat,
-    // makes a peak at cutoff
-    res: AtomicFloat,
-    // a drive parameter. Just used to increase the volume, which results in heavier distortion
-    drive: AtomicFloat,
-    // mode parameter. Chooses the correct output from the svf filter
-    mode: AtomicUsize,
-}
-impl Default for FilterParameters {
-    fn default() -> FilterParameters {
-        FilterParameters {
-            cutoff: AtomicFloat::new(1000.),
-            res: AtomicFloat::new(2.),
-            drive: AtomicFloat::new(0.),
-            sample_rate: AtomicFloat::new(44100.),
-            g: AtomicFloat::new(0.07135868),
-            mode: AtomicUsize::new(0),
-        }
-    }
-}
+
 // member methods for the struct
 #[allow(dead_code)]
 impl SVF {
@@ -114,7 +97,7 @@ impl SVF {
         self.vout[0] = g1 * self.s[0] + g2 * (input - self.s[1]);
         // self.vout[1] = (input - self.s[1]) * g3 + self.s[0] * g2 + self.s[1]; <- meant for parallel processing
         self.vout[1] = self.s[1] + g * self.vout[0];
-        match self.params.mode.load(Ordering::Relaxed) {
+        match self.params.mode.get() {
             0 => self.vout[1],
             1 => input - k * self.vout[0] - self.vout[1],
             2 => self.vout[0],
@@ -136,6 +119,8 @@ impl SVF {
         // employing fixed-pivot method
         if est_source_a2 != 0. {
             // v_t and i_s are constants to control the diode clipper's character
+            // just earballed em to be honest. Hard to figure out what they should be
+            // without knowing the circuit's operating voltage and temperature
             let v_t = 4.;
             let i_s = 4.;
             // a2 is clipped with the inverse of the diode anti-saturator
@@ -163,7 +148,7 @@ impl SVF {
         self.vout[0] = u.asinh();
         self.vout[1] = g * a[1] * self.vout[0] + self.s[1];
         // here, the output is chosen to give the specified type of filter
-        match self.params.mode.load(Ordering::Relaxed) {
+        match self.params.mode.get() {
             0 => self.vout[1],                            // lowpass
             1 => input - k * self.vout[0] - self.vout[1], // highpass
             2 => self.vout[0],                            // bandpass
@@ -186,10 +171,19 @@ impl FilterParameters {
     pub fn set_res(&self, value: f32) {
         // res is equivalent to 2 * zeta, or 1/Q-factor.
         // the specific formula is scaled so it feels natural to tweak the parameter
-        self.res.set(100. * (2f32.powf(-11. * value)))
+        let x = 2f32.powf(-11. * value);
+        let start = self.res.min;
+        let end = self.res.max;
+        self.res.set_normalized(start * (1. - x) + end * x);
+        // self.res.set(100. * (2f32.powf(-11. * value)))
     }
     pub fn get_res(&self) -> f32 {
-        -0.1311540946 * (0.01 * self.res.get()).ln()
+        let start = 2. / 0.1;
+        let end = 2. / 25.;
+        // TODO: Not completely sure if this is done right. Check if we end up with resonance in the range we expect
+        ((self.res.get_normalized() - start) / (end - start)).ln() * -0.1311540946
+
+        // -0.1311540946 * (0.01 * self.res.get()).ln()
     }
     // returns the value used to set cutoff. for get_parameter function
     pub fn get_cutoff(&self) -> f32 {
@@ -197,10 +191,10 @@ impl FilterParameters {
     }
     pub fn set_mode(&self, value: f32) {
         let val: usize = (value * 5.).round() as usize;
-        self.mode.store(val, Ordering::Relaxed);
+        self.mode.set(val);
     }
     fn get_mode(&self) -> f32 {
-        self.mode.load(Ordering::Relaxed) as f32 / 5.
+        self.mode.get() as f32 / 5.
     }
 }
 impl PluginParameters for FilterParameters {
@@ -209,7 +203,7 @@ impl PluginParameters for FilterParameters {
         match index {
             0 => self.get_cutoff(),
             1 => self.get_res(),
-            2 => self.drive.get() / 16.,
+            2 => self.drive.get_normalized(),
             3 => self.get_mode(),
             _ => 0.0,
         }
@@ -218,7 +212,7 @@ impl PluginParameters for FilterParameters {
         match index {
             0 => self.set_cutoff(value),
             1 => self.set_res(value),
-            2 => self.drive.set(value * 16.),
+            2 => self.drive.set_normalized(value),
             3 => self.set_mode(value),
             _ => (),
         }
@@ -236,7 +230,7 @@ impl PluginParameters for FilterParameters {
         match index {
             0 => "Hz".to_string(),
             1 => "%".to_string(),
-            2 => "dB".to_string(),
+            2 => "".to_string(),
             _ => "".to_string(),
         }
     }
@@ -246,8 +240,9 @@ impl PluginParameters for FilterParameters {
         match index {
             0 => format!("{:.0}", self.cutoff.get()),
             1 => format!("{:.3}", 2. / self.res.get()),
-            2 => format!("{:.2}", 20. * (self.drive.get() + 1.).log10()),
-            3 => match self.mode.load(Ordering::Relaxed) {
+            // 2 => format!("{:.2}", 20. * (self.drive.get() + 1.).log10()),
+            2 => self.drive.get_display(),
+            3 => match self.mode.get() {
                 0 => format!("Lowpass"),
                 1 => format!("Highpass"),
                 2 => format!("Bandpass"),
@@ -260,20 +255,34 @@ impl PluginParameters for FilterParameters {
     }
 }
 impl Default for SVF {
-    fn default() -> SVF {
-        SVF {
+    fn default() -> Self {
+        let params = Arc::new(FilterParameters::default());
+        Self {
             vout: [0f32; 2],
             s: [0f32; 2],
-            params: Arc::new(FilterParameters::default()),
+            params: params.clone(),
+            editor: Some(SVFPluginEditor {
+                is_open: false,
+                state: Arc::new(EditorState {
+                    params: params.clone(),
+                }),
+            }),
         }
     }
 }
 impl Plugin for SVF {
     fn new(_host: HostCallback) -> Self {
-        SVF {
+        let params = Arc::new(FilterParameters::default());
+        Self {
             vout: [0f32; 2],
             s: [0f32; 2],
-            params: Arc::new(FilterParameters::default()),
+            params: params.clone(),
+            editor: Some(SVFPluginEditor {
+                is_open: false,
+                state: Arc::new(EditorState {
+                    params: params.clone(),
+                }),
+            }),
         }
     }
     fn set_sample_rate(&mut self, rate: f32) {
@@ -300,6 +309,13 @@ impl Plugin for SVF {
                 // get the output sample by processing the input sample
                 *output_sample = self.tick_pivotal(*input_sample);
             }
+        }
+    }
+    fn get_editor(&mut self) -> Option<Box<dyn Editor>> {
+        if let Some(editor) = self.editor.take() {
+            Some(Box::new(editor) as Box<dyn Editor>)
+        } else {
+            None
         }
     }
     // lets the plugin host get access to the parameters

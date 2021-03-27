@@ -6,10 +6,9 @@ edition = "2018"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [lib]
-name = "svf_model"
+name = "svf_gui"
 crate-type = ["cdylib"]
 [dependencies]
-atomig = "0.1.0"
 vst = { git = "https://github.com/rust-dsp/rust-vst" }
 baseview = {git = "https://github.com/RustAudio/baseview", branch = "master"}
 imgui-baseview = {git = "https://github.com/BillyDM/imgui-baseview", branch = "main"}

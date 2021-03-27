@@ -1,4 +1,6 @@
+#[allow(dead_code)]
 use std::sync::atomic::{self, Ordering};
+// use std::ops::{Sub, Add, Mul, Div};
 pub trait AtomicOps {
     type Item: Copy;
     fn new(v: Self::Item) -> Self;
@@ -77,8 +79,7 @@ impl AtomicF64 {
     }
 
     /// Stores a value into the atomic float with relaxed ordering.
-    pub fn set(&
-self, v: f64) {
+    pub fn set(&self, v: f64) {
         self.0.store(v.to_bits(), Ordering::Relaxed)
     }
 }
