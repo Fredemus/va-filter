@@ -54,28 +54,80 @@ pub struct FilterParameters {
 // }
 
 impl Default for FilterParameters {
+    // todo: How do we make sure g gets set? Maybe bake g into cutoff and have display func show cutoff
     fn default() -> FilterParameters {
         let a = FilterParameters {
             sample_rate: AtomicF32::new(48000.),
-            cutoff: (Parameter::new("Cutoff", 20000., 0., 20000., |x| format!("{:.0} Hz", x), )),
+            cutoff: Parameter::new(
+                "Cutoff",
+                10000.,
+                0.,
+                20000.,
+                |x| format!("{:.0} Hz", x),
+                |x| (1.8f32.powf(10. * x - 10.)),
+                |x: f32| 1. + 0.17012975 * (x).ln(),
+            ),
             g: AtomicF32::new(0.),
-
-            res: (Parameter::new("Resonance", 2. / 0.707, 20., 0.001, |x| {
-                format!("{:.2}", 2. / x)
-            })),
-            drive: (Parameter::new("Drive", 0., 0., 20., |x: f32| {
-                format!("{:.2} dB", 20. * (x + 1.).log10())
-            })),
-            mode: (Parameter::new("Filter mode", 0, 0, 4, |x| match x {
-                0 => format!("Lowpass"),
-                1 => format!("Highpass"),
-                2 => format!("Bandpass"),
-                3 => format!("Notch"),
-                4 => format!("Peak"),
-                _ => format!("Peak"),
-            })),
+            // TODO: Res fucks up at low values, caused by the formula being dumb
+            res: (Parameter::new(
+                "Resonance",
+                2. / 0.707,
+                20.,
+                0.001,
+                |x| format!("{:.2}", 2. / x),
+                |x| 2f32.powf(-11. * x),
+                |x: f32| (x).ln() * -0.13115409,
+            )),
+            drive: (Parameter::new(
+                "Drive",
+                0.,
+                0.,
+                20.,
+                |x: f32| format!("{:.2} dB", 20. * (x + 1.).log10()),
+                |x| x,
+                |x| x,
+            )),
+            mode: (Parameter::new(
+                "Filter mode",
+                0,
+                0,
+                4,
+                |x| match x {
+                    0 => format!("Lowpass"),
+                    1 => format!("Highpass"),
+                    2 => format!("Bandpass"),
+                    3 => format!("Notch"),
+                    4 => format!("Peak"),
+                    _ => format!("Peak"),
+                },
+                |x| x,
+                |x| x,
+            )),
         };
         a.g.set((PI * a.cutoff.get() / (a.sample_rate.get())).tan());
-        return a;
+        a
     }
+}
+
+#[test]
+fn test_res_param() {
+    let params = FilterParameters::default();
+    let res = params.res;
+
+    res.set_normalized(0.0);
+    println!("res value: {}", res.get());
+    println!("display value: {}", res.get_display());
+    println!("param value: {}", res.get_normalized());
+    res.set_normalized(0.1);
+    println!("res value: {}", res.get());
+    println!("display value: {}", res.get_display());
+    println!("param value: {}", res.get_normalized());
+    res.set_normalized(0.5);
+    println!("res value: {}", res.get());
+    println!("display value: {}", res.get_display());
+    println!("param value: {}", res.get_normalized());
+    res.set_normalized(1.);
+    println!("res value: {}", res.get());
+    println!("display value: {}", res.get_display());
+    println!("param value: {}", res.get_normalized());
 }

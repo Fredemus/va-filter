@@ -2,7 +2,7 @@ use imgui::*;
 use imgui_knobs::*;
 
 use imgui_baseview::{HiDpiMode, ImguiWindow, RenderSettings, Settings};
-
+// use super::SVF;
 use crate::filter_parameters::FilterParameters;
 use crate::parameter::Parameter;
 use crate::utils::*;
@@ -58,7 +58,7 @@ pub fn make_knob(
     // let title = parameter.get_name();
     let title = parameter.get_name();
     let knob_id = &ImString::new(format!("##{}_KNOB_CONTORL_", title));
-    knob_title(ui, &ImString::new(title.clone().to_uppercase()), width);
+    knob_title(ui, &ImString::new(title.to_uppercase()), width);
     let cursor = ui.cursor_pos();
     ui.set_cursor_pos([cursor[0], cursor[1] + 5.0]);
     let mut val = parameter.get();
@@ -68,6 +68,8 @@ pub fn make_knob(
         &mut val,
         parameter.min,
         parameter.max,
+        // 0.,
+        // 1.,
         parameter.default,
         width * 0.5,
         true,
@@ -79,6 +81,7 @@ pub fn make_knob(
     if knob.value_changed {
         // TODO: FIXME: Something needs to happen here to change the parameter in the small window
         parameter.set(*knob.p_value);
+        // parameter.set_normalized(*knob.p_value);
         knob_title(ui, &ImString::new("value change happened"), width);
     }
 
@@ -195,7 +198,7 @@ impl Editor for SVFPluginEditor {
                     .movable(false);
                 w.build(&ui, || {
                     let text_style_color = ui.push_style_color(StyleColor::Text, TEXT);
-                    let graph_v_center = 225.0 + 25.0;
+                    let _graph_v_center = 225.0 + 25.0;
                     // {
                     //     let draw_list = ui.get_window_draw_list();
                     //     draw_list.add_rect_filled_multicolor(

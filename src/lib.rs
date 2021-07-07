@@ -9,6 +9,8 @@
 // TODO: Potential better formula for resonance and cutoff: { let x : f32 = x.powf(slope); min * (1.0 - x) + max * x }
 // same principle seems to be usable for exponential things. See https://github.com/WeirdConstructor/HexoSynth/blob/master/src/dsp/mod.rs#L125-L134
 
+//
+
 #[macro_use]
 extern crate vst;
 use std::f32::consts::PI;
@@ -181,13 +183,13 @@ impl FilterParameters {
         let start = 2. / 0.1;
         let end = 2. / 25.;
         // TODO: Not completely sure if this is done right. Check if we end up with resonance in the range we expect
-        ((self.res.get_normalized() - start) / (end - start)).ln() * -0.1311540946
+        ((self.res.get_normalized() - start) / (end - start)).ln() * -0.13115409
 
         // -0.1311540946 * (0.01 * self.res.get()).ln()
     }
     // returns the value used to set cutoff. for get_parameter function
     pub fn get_cutoff(&self) -> f32 {
-        1. + 0.1701297528 * (0.00005 * self.cutoff.get()).ln()
+        1. + 0.17012975 * (0.00005 * self.cutoff.get()).ln()
     }
     pub fn set_mode(&self, value: f32) {
         let val: usize = (value * 5.).round() as usize;
@@ -201,19 +203,19 @@ impl PluginParameters for FilterParameters {
     // get_parameter has to return the value used in set_parameter. Used for preset loading and such
     fn get_parameter(&self, index: i32) -> f32 {
         match index {
-            0 => self.get_cutoff(),
-            1 => self.get_res(),
+            0 => self.cutoff.get_normalized(),
+            1 => self.res.get_normalized(),
             2 => self.drive.get_normalized(),
-            3 => self.get_mode(),
+            3 => self.mode.get_normalized() as f32, // TODO: <- conversion to f32 after the fact might be a problem. Maybe normalized should always be f32 or something
             _ => 0.0,
         }
     }
     fn set_parameter(&self, index: i32, value: f32) {
         match index {
-            0 => self.set_cutoff(value),
-            1 => self.set_res(value),
+            0 => self.cutoff.set_normalized(value),
+            1 => self.res.set_normalized(value),
             2 => self.drive.set_normalized(value),
-            3 => self.set_mode(value),
+            3 => self.mode.set_normalized(value as usize), // TODO: Really, really starting to suspect normalized_value should always be f32
             _ => (),
         }
     }
@@ -223,14 +225,16 @@ impl PluginParameters for FilterParameters {
             1 => "resonance".to_string(),
             2 => "drive".to_string(),
             3 => "filter mode".to_string(),
+            4 => "dry/wet".to_string(),
             _ => "".to_string(),
         }
     }
     fn get_parameter_label(&self, index: i32) -> String {
         match index {
-            0 => "Hz".to_string(),
+            // 0 => "Hz".to_string(),
             1 => "%".to_string(),
-            2 => "".to_string(),
+            // 2 => "".to_string(),
+            // 4 => "%".to_string(),
             _ => "".to_string(),
         }
     }
@@ -238,18 +242,11 @@ impl PluginParameters for FilterParameters {
     // format it into a string that makes sense for the user.
     fn get_parameter_text(&self, index: i32) -> String {
         match index {
-            0 => format!("{:.0}", self.cutoff.get()),
-            1 => format!("{:.3}", 2. / self.res.get()),
+            0 => self.cutoff.get_display(),
+            1 => self.res.get_display(),
             // 2 => format!("{:.2}", 20. * (self.drive.get() + 1.).log10()),
             2 => self.drive.get_display(),
-            3 => match self.mode.get() {
-                0 => format!("Lowpass"),
-                1 => format!("Highpass"),
-                2 => format!("Bandpass"),
-                3 => format!("Notch"),
-                4 => format!("Peak"),
-                _ => format!("Peak"),
-            },
+            3 => self.mode.get_display(),
             _ => format!(""),
         }
     }
@@ -263,9 +260,7 @@ impl Default for SVF {
             params: params.clone(),
             editor: Some(SVFPluginEditor {
                 is_open: false,
-                state: Arc::new(EditorState {
-                    params: params.clone(),
-                }),
+                state: Arc::new(EditorState { params: params }),
             }),
         }
     }
@@ -279,9 +274,7 @@ impl Plugin for SVF {
             params: params.clone(),
             editor: Some(SVFPluginEditor {
                 is_open: false,
-                state: Arc::new(EditorState {
-                    params: params.clone(),
-                }),
+                state: Arc::new(EditorState { params }),
             }),
         }
     }

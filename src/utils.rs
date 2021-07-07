@@ -1,4 +1,4 @@
-#[allow(dead_code)]
+#![allow(dead_code)]
 use std::sync::atomic::{self, Ordering};
 // use std::ops::{Sub, Add, Mul, Div};
 pub trait AtomicOps {
