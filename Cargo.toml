@@ -10,8 +10,10 @@ name = "svf_gui"
 crate-type = ["cdylib"]
 [dependencies]
 vst = { git = "https://github.com/rust-dsp/rust-vst" }
-baseview = {git = "https://github.com/RustAudio/baseview", branch = "master"}
+baseview = { git = "https://github.com/RustAudio/baseview.git", rev = "d399c1275522ae75f5a82caadd904df2685c8660" }
 imgui-baseview = {git = "https://github.com/BillyDM/imgui-baseview", branch = "main"}
 imgui = "0.7"
-imgui-knobs = {git = "https://github.com/DGriffin91/imgui-rs-knobs", branch = "main"}
 raw-window-handle = "0.3"
+#imgui-knobs = {git = "https://github.com/DGriffin91/imgui-rs-knobs", branch = "main"}
+[dependencies.imgui-knobs]
+path = "../imgui-rs-knobs/"
