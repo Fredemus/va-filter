@@ -7,12 +7,12 @@ use crate::filter_parameters::FilterParameters;
 // use crate::filter_parameters::FilterParameters::PluginParameters;
 
 use crate::parameter::Parameter;
-use crate::vst::plugin::PluginParameters;
+use crate::vst::plugin::{PluginParameters, HostCallback};
+use vst::host::Host;
 use crate::utils::*;
 // for now just using the original parameter struct
 // use super::FilterParameters;
 use vst::editor::Editor;
-
 use baseview::{Size, WindowOpenOptions, WindowScalePolicy};
 
 use raw_window_handle::{HasRawWindowHandle, RawWindowHandle};
@@ -88,8 +88,10 @@ pub fn draw_knob(knob: &Knob, wiper_color: &ColorSet, track_color: &ColorSet) {
 //     w.pop(ui);
 //     draw_knob(&knob, wiper_color, track_color);
 // }
+
 pub struct EditorState {
     pub params: Arc<FilterParameters>,
+    pub host: Option<HostCallback>,
     // pub sample_rate: Arc<AtomicFloat>,
     // pub time: Arc<AtomicFloat>,
 }
@@ -110,7 +112,7 @@ impl EditorState {
         knob_title(ui, &ImString::new(title.to_uppercase()), width);
         let cursor = ui.cursor_pos();
         ui.set_cursor_pos([cursor[0], cursor[1] + 5.0]);
-        let mut val = parameter.get_normalized(); // TODO: This seems unsafe?? It just has a mutable ref to an f32, not an AtomicFloat
+        let mut val = parameter.get_normalized(); 
         let knob = Knob::new_custom_slope(
             ui,
             knob_id,
@@ -132,9 +134,17 @@ impl EditorState {
         if knob.value_changed {
             // TODO: FIXME: Something needs to happen here to change the parameter in the small window
             self.params.set_parameter(parameter_index, *knob.p_value);
-            // parameter.set_normalized(*knob.p_value);
-            // parameter.set_normalized(*knob.p_value);
-            // knob_title(ui, &ImString::new("value change happened"), width);
+            // if the filter is hosted, inform the host that gui has changed parameters
+            // Option around host could be removed if we don't want a standalone version
+            if let Some(host) = self.host {
+                // Todo: Is there a better way to end and begin edit?
+                // Also, it seems that automate sets the parameter (in Ableton at least)
+                // so 2 set_parameter calls seems wasteful, but without both, the parameters end up not-quite-right
+                host.begin_edit(parameter_index);
+                host.automate(parameter_index, *knob.p_value);
+                host.end_edit(parameter_index);
+
+            }
         }
     
         w.pop(ui);

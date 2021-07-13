@@ -252,13 +252,13 @@ impl Default for SVF {
             params: params.clone(),
             editor: Some(SVFPluginEditor {
                 is_open: false,
-                state: Arc::new(EditorState { params: params }),
+                state: Arc::new(EditorState { params: params, host: None }),
             }),
         }
     }
 }
 impl Plugin for SVF {
-    fn new(_host: HostCallback) -> Self {
+    fn new(host: HostCallback) -> Self {
         let params = Arc::new(FilterParameters::default());
         Self {
             vout: [0f32; 2],
@@ -266,7 +266,7 @@ impl Plugin for SVF {
             params: params.clone(),
             editor: Some(SVFPluginEditor {
                 is_open: false,
-                state: Arc::new(EditorState { params }),
+                state: Arc::new(EditorState { params, host: Some(host) }),
             }),
         }
     }
