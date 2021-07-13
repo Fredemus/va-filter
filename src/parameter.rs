@@ -42,7 +42,7 @@ where
         max: AtomicT::Item,
         display_func: fn(AtomicT::Item) -> String,
     ) -> Parameter<AtomicT> {
-        Parameter {
+        let a = Parameter {
             name: String::from(name),
             normalized_value: AtomicT::new(default),
             value: AtomicT::new(default),
@@ -52,7 +52,9 @@ where
             display_func,
             set_func: |x| x,
             get_func: |x| x,
-        }
+        };
+        a.normalized_value.set((a.get_func)(a.from_range(default)));
+        a
     }
     pub fn new(
         name: &str,
@@ -63,7 +65,7 @@ where
         set_func: fn(AtomicT::Item) -> AtomicT::Item,
         get_func: fn(AtomicT::Item) -> AtomicT::Item,
     ) -> Parameter<AtomicT> {
-        Parameter {
+        let a = Parameter {
             name: String::from(name),
             normalized_value: AtomicT::new(default),
             value: AtomicT::new(default),
@@ -73,7 +75,9 @@ where
             display_func,
             set_func,
             get_func,
-        }
+        };
+        a.normalized_value.set((a.get_func)(a.from_range(default)));
+        a
     }
 
     pub fn get(&self) -> AtomicT::Item {

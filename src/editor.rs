@@ -117,8 +117,7 @@ impl EditorState {
             &mut val,
             // 0.,
             // 1.,
-            // parameter.default, // TODO: THis needs to be default normalized_value, how do we get that?
-            ((parameter.set_func)(parameter.default) - parameter.min) / (parameter.max - parameter.min), // is this right? verify
+            (parameter.get_func)(parameter.from_range(parameter.default)),
             width * 0.5,
             true,
         );
