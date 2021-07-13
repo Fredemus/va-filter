@@ -20,9 +20,9 @@ pub struct Parameter<AtomicT: AtomicOps> {
     pub max: AtomicT::Item,
     display_func: fn(AtomicT::Item) -> String,
     // TODO: It might be very nice to have a set_func field like
-    set_func: fn(AtomicT::Item) -> AtomicT::Item,
+    pub set_func: fn(AtomicT::Item) -> AtomicT::Item,
     /// has to be the inverse of the set_func. Might make something to find it automatically
-    get_func: fn(AtomicT::Item) -> AtomicT::Item,
+    pub get_func: fn(AtomicT::Item) -> AtomicT::Item,
 }
 
 impl<AtomicT: AtomicOps> Parameter<AtomicT>
@@ -35,7 +35,7 @@ where
     AtomicT::Item: Div<Output = AtomicT::Item>,
 {
     /// this one assumes that you don't want a set function
-    pub fn new_no_setfunc(
+    pub fn _new_no_setfunc(
         name: &str,
         default: AtomicT::Item,
         min: AtomicT::Item,

@@ -9,7 +9,14 @@
 // TODO: Potential better formula for resonance and cutoff: { let x : f32 = x.powf(slope); min * (1.0 - x) + max * x }
 // same principle seems to be usable for exponential things. See https://github.com/WeirdConstructor/HexoSynth/blob/master/src/dsp/mod.rs#L125-L134
 
-//
+// ----- IMPORTANT TODOS -----
+// TODO: THE NOT UPDATING PARAMETER BUG IS BECAUSE SVF NEEDS TO 
+// HAVE A REF TO HOST AND CALL THE FUNCTION host.automate(index, value)
+// TODO: IT WOULD BE MUCH, MUCH SIMPLER (for cutoff at least, but potentially all time params)
+// IF KNOBS CALLED SET_PARAMETER(INDEX, VALUE), INSTEAD OF CALLING PARAMETER'S SET(VALUE)
+// potentially knobs need to be completely detached from max/min to avoid problems with time params?
+// just have them go off of normalized_value. Otherwise attack/release/etc will have to be in ms and we'll have an extra 1/fs
+// a bunch of places?
 
 #[macro_use]
 extern crate vst;
@@ -161,7 +168,7 @@ impl SVF {
     }
 }
 impl FilterParameters {
-    pub fn set_cutoff(&self, value: f32) {
+    pub fn _set_cutoff(&self, value: f32) {
         // cutoff formula gives us a natural feeling cutoff knob that spends more time in the low frequencies
         // this parameter is for viewing by the user
         self.cutoff.set(20000. * (1.8f32.powf(10. * value - 10.)));
@@ -170,26 +177,9 @@ impl FilterParameters {
         self.g
             .set((PI * self.cutoff.get() / (self.sample_rate.get())).tan());
     }
-    pub fn set_res(&self, value: f32) {
-        // res is equivalent to 2 * zeta, or 1/Q-factor.
-        // the specific formula is scaled so it feels natural to tweak the parameter
-        let x = 2f32.powf(-11. * value);
-        let start = self.res.min;
-        let end = self.res.max;
-        self.res.set_normalized(start * (1. - x) + end * x);
-        // self.res.set(100. * (2f32.powf(-11. * value)))
-    }
-    pub fn get_res(&self) -> f32 {
-        let start = 2. / 0.1;
-        let end = 2. / 25.;
-        // TODO: Not completely sure if this is done right. Check if we end up with resonance in the range we expect
-        ((self.res.get_normalized() - start) / (end - start)).ln() * -0.13115409
-
-        // -0.1311540946 * (0.01 * self.res.get()).ln()
-    }
-    // returns the value used to set cutoff. for get_parameter function
-    pub fn get_cutoff(&self) -> f32 {
-        1. + 0.17012975 * (0.00005 * self.cutoff.get()).ln()
+    pub fn update_g(&self) {
+        self.g
+            .set((PI * self.cutoff.get() / (self.sample_rate.get())).tan());
     }
     pub fn set_mode(&self, value: f32) {
         let val: usize = (value * 5.).round() as usize;
@@ -212,10 +202,12 @@ impl PluginParameters for FilterParameters {
     }
     fn set_parameter(&self, index: i32, value: f32) {
         match index {
-            0 => self.cutoff.set_normalized(value),
+            0 => { self.cutoff.set_normalized(value);
+                self.update_g(); 
+            },
             1 => self.res.set_normalized(value),
             2 => self.drive.set_normalized(value),
-            3 => self.mode.set_normalized(value as usize), // TODO: Really, really starting to suspect normalized_value should always be f32
+            3 => self.mode.set_normalized(value as usize), // TODO: Really, really starting to suspect normalized_value should always be f32. FIXME
             _ => (),
         }
     }
@@ -232,7 +224,7 @@ impl PluginParameters for FilterParameters {
     fn get_parameter_label(&self, index: i32) -> String {
         match index {
             // 0 => "Hz".to_string(),
-            1 => "%".to_string(),
+            // 1 => "%".to_string(),
             // 2 => "".to_string(),
             // 4 => "%".to_string(),
             _ => "".to_string(),

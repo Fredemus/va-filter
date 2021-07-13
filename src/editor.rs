@@ -4,7 +4,10 @@ use imgui_knobs::*;
 use imgui_baseview::{HiDpiMode, ImguiWindow, RenderSettings, Settings};
 // use super::SVF;
 use crate::filter_parameters::FilterParameters;
+// use crate::filter_parameters::FilterParameters::PluginParameters;
+
 use crate::parameter::Parameter;
+use crate::vst::plugin::PluginParameters;
 use crate::utils::*;
 // for now just using the original parameter struct
 // use super::FilterParameters;
@@ -20,7 +23,7 @@ const WINDOW_HEIGHT: usize = 256;
 const WINDOW_WIDTH_F: f32 = WINDOW_WIDTH as f32;
 const WINDOW_HEIGHT_F: f32 = WINDOW_HEIGHT as f32;
 const BLACK: [f32; 4] = [0.0, 0.0, 0.0, 1.0];
-const BG_COLOR: [f32; 4] = [0.21 * 1.4, 0.11 * 1.7, 0.25 * 1.4, 1.0];
+// const BG_COLOR: [f32; 4] = [0.21 * 1.4, 0.11 * 1.7, 0.25 * 1.4, 1.0];
 // const BG_COLOR_TRANSP: [f32; 4] = [0.21 * 1.4, 0.11 * 1.7, 0.25 * 1.4, 0.0];
 // const GREEN: [f32; 4] = [0.23, 0.68, 0.23, 1.0];
 // const RED: [f32; 4] = [0.98, 0.02, 0.22, 1.0];
@@ -45,49 +48,7 @@ pub fn draw_knob(knob: &Knob, wiper_color: &ColorSet, track_color: &ColorSet) {
     }
 }
 /// Meant for general knobs
-pub fn make_knob(
-    ui: &Ui,
-    parameter: &Parameter<AtomicF32>,
-    // parameter_index: i32,
-    wiper_color: &ColorSet,
-    track_color: &ColorSet,
-    title_fix: f32,
-) {
-    let width = ui.text_line_height() * 4.75;
-    let w = ui.push_item_width(width);
-    // let title = parameter.get_name();
-    let title = parameter.get_name();
-    let knob_id = &ImString::new(format!("##{}_KNOB_CONTORL_", title));
-    knob_title(ui, &ImString::new(title.to_uppercase()), width);
-    let cursor = ui.cursor_pos();
-    ui.set_cursor_pos([cursor[0], cursor[1] + 5.0]);
-    let mut val = parameter.get();
-    let knob = Knob::new(
-        ui,
-        knob_id,
-        &mut val,
-        parameter.min,
-        parameter.max,
-        // 0.,
-        // 1.,
-        parameter.default,
-        width * 0.5,
-        true,
-    );
-    let cursor = ui.cursor_pos();
-    ui.set_cursor_pos([cursor[0] + title_fix, cursor[1] - 10.0]);
-    knob_title(ui, &ImString::new(parameter.get_display()), width);
 
-    if knob.value_changed {
-        // TODO: FIXME: Something needs to happen here to change the parameter in the small window
-        parameter.set(*knob.p_value);
-        // parameter.set_normalized(*knob.p_value);
-        knob_title(ui, &ImString::new("value change happened"), width);
-    }
-
-    w.pop(ui);
-    draw_knob(&knob, wiper_color, track_color);
-}
 /// Meant for knobs that go through discrete steps. Nowhere close to done.
 // pub fn make_steppy_knob(
 //     ui: &Ui,
@@ -131,6 +92,55 @@ pub struct EditorState {
     pub params: Arc<FilterParameters>,
     // pub sample_rate: Arc<AtomicFloat>,
     // pub time: Arc<AtomicFloat>,
+}
+impl EditorState {
+    pub fn make_knob(&self,
+        ui: &Ui,
+        parameter: &Parameter<AtomicF32>,
+        parameter_index: i32,
+        wiper_color: &ColorSet,
+        track_color: &ColorSet,
+        title_fix: f32,
+    ) {
+        let width = ui.text_line_height() * 4.75;
+        let w = ui.push_item_width(width);
+        // let title = parameter.get_name();
+        let title = parameter.get_name();
+        let knob_id = &ImString::new(format!("##{}_KNOB_CONTORL_", title));
+        knob_title(ui, &ImString::new(title.to_uppercase()), width);
+        let cursor = ui.cursor_pos();
+        ui.set_cursor_pos([cursor[0], cursor[1] + 5.0]);
+        let mut val = parameter.get_normalized(); // TODO: This seems unsafe?? It just has a mutable ref to an f32, not an AtomicFloat
+        let knob = Knob::new_custom_slope(
+            ui,
+            knob_id,
+            &mut val,
+            // 0.,
+            // 1.,
+            // parameter.default, // TODO: THis needs to be default normalized_value, how do we get that?
+            ((parameter.set_func)(parameter.default) - parameter.min) / (parameter.max - parameter.min), // is this right? verify
+            width * 0.5,
+            true,
+        );
+        let cursor = ui.cursor_pos();
+        ui.set_cursor_pos([cursor[0] + title_fix, cursor[1] - 10.0]);
+        knob_title(ui, &ImString::new(parameter.get_display()), width);
+        // knob_title(ui, &ImString::new(parameter.get_normalized().to_string()), width); // for testing
+        // knob_title(ui, &ImString::new(knob.angle.to_string()), width); // for testing
+        // knob_title(ui, &ImString::new(format!("v:{:.1} a:{:.1}", parameter.get_normalized(), knob.angle)), width); // for testing
+
+    
+        if knob.value_changed {
+            // TODO: FIXME: Something needs to happen here to change the parameter in the small window
+            self.params.set_parameter(parameter_index, *knob.p_value);
+            // parameter.set_normalized(*knob.p_value);
+            // parameter.set_normalized(*knob.p_value);
+            // knob_title(ui, &ImString::new("value change happened"), width);
+        }
+    
+        w.pop(ui);
+        draw_knob(&knob, wiper_color, track_color);
+    }
 }
 pub struct SVFPluginEditor {
     pub is_open: bool,
@@ -239,18 +249,18 @@ impl Editor for SVFPluginEditor {
                     ui.set_column_width(0, width * 0.5);
 
                     ui.next_column();
-                    make_knob(ui, &params.cutoff, &highlight, &lowlight, 0.0);
+                    state.make_knob(ui, &params.cutoff, 0, &highlight, &lowlight, 0.0);
                     move_cursor(ui, 0.0, -113.0);
 
                     ui.next_column();
 
-                    make_knob(ui, &params.res, &highlight, &lowlight, 0.0);
+                    state.make_knob(ui, &params.res, 1, &highlight, &lowlight, 0.0);
                     ui.next_column();
 
-                    make_knob(ui, &params.drive, &highlight, &lowlight, 0.0);
+                    state.make_knob(ui, &params.drive, 2, &highlight, &lowlight, 0.0);
                     ui.next_column();
 
-                    // make_steppy_knob(ui, &params.mode, &highlight, &lowlight, 0.0);
+                    // make_steppy_knob(ui, &params.mode, 3, &highlight, &lowlight, 0.0);
                     ui.next_column();
 
                     ui.columns(1, im_str!("nocols"), false);

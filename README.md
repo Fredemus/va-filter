@@ -12,3 +12,4 @@ A nonlinear model of a state variable filter implemented as a VST in Rust
 * Steppy knob for adjusting the filter-type.
 
 * The quality of the filter can be improved by adding iterative calculations for the non-linear feedback.
+Potentially runge-kutta method? https://github.com/ddiakopoulos/MoogLadders/blob/master/src/RKSimulationModel.h 
