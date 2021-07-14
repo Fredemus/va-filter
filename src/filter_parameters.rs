@@ -1,4 +1,4 @@
-use super::parameter::Parameter;
+use super::parameter::{ParameterF32, ParameterUsize};
 use super::utils::*;
 use std::f32::consts::PI;
 
@@ -9,10 +9,10 @@ pub struct FilterParameters {
     pub g: AtomicF32,
     pub sample_rate: AtomicF32,
 
-    pub cutoff: Parameter<AtomicF32>,
-    pub res: Parameter<AtomicF32>,
-    pub drive: Parameter<AtomicF32>,
-    pub mode: Parameter<AtomicUsize>,
+    pub cutoff: ParameterF32,
+    pub res: ParameterF32,
+    pub drive: ParameterF32,
+    pub mode: ParameterUsize,
     // cutoff: Params,
     // res: Params,
     // drive: Params,
@@ -58,7 +58,7 @@ impl Default for FilterParameters {
     fn default() -> FilterParameters {
         let a = FilterParameters {
             sample_rate: AtomicF32::new(48000.),
-            cutoff: Parameter::new(
+            cutoff: ParameterF32::new(
                 "Cutoff",
                 10000.,
                 0.,
@@ -69,7 +69,7 @@ impl Default for FilterParameters {
             ),
             g: AtomicF32::new(0.),
             // TODO: Res fucks up at low values, caused by the formula being dumb
-            res: (Parameter::new(
+            res: (ParameterF32::new(
                 "Resonance",
                 2. / 0.707,
                 20.,
@@ -80,7 +80,7 @@ impl Default for FilterParameters {
                 // |x| 2f32.powf(-11. * x),
                 // |x: f32| (x).ln() * -0.13115409,
             )),
-            drive: (Parameter::new(
+            drive: (ParameterF32::new(
                 "Drive",
                 0.,
                 0.,
@@ -89,7 +89,7 @@ impl Default for FilterParameters {
                 |x| x,
                 |x| x,
             )),
-            mode: (Parameter::new(
+            mode: (ParameterUsize::new(
                 "Filter mode",
                 0,
                 0,

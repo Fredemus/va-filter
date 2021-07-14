@@ -168,26 +168,18 @@ impl SVF {
     }
 }
 impl FilterParameters {
-    pub fn _set_cutoff(&self, value: f32) {
-        // cutoff formula gives us a natural feeling cutoff knob that spends more time in the low frequencies
-        // this parameter is for viewing by the user
-        self.cutoff.set(20000. * (1.8f32.powf(10. * value - 10.)));
-        // bilinear transformation for g gives us a very accurate cutoff.
-        // this is the parameter that the filter actually uses
-        self.g
-            .set((PI * self.cutoff.get() / (self.sample_rate.get())).tan());
-    }
+
     pub fn update_g(&self) {
         self.g
             .set((PI * self.cutoff.get() / (self.sample_rate.get())).tan());
     }
-    pub fn set_mode(&self, value: f32) {
-        let val: usize = (value * 5.).round() as usize;
-        self.mode.set(val);
-    }
-    fn get_mode(&self) -> f32 {
-        self.mode.get() as f32 / 5.
-    }
+    // pub fn set_mode(&self, value: f32) {
+    //     let val: usize = (value * 5.).round() as usize;
+    //     self.mode.set(val);
+    // }
+    // fn get_mode(&self) -> f32 {
+    //     self.mode.get() as f32 / 5.
+    // }
 }
 impl PluginParameters for FilterParameters {
     // get_parameter has to return the value used in set_parameter. Used for preset loading and such
@@ -207,7 +199,7 @@ impl PluginParameters for FilterParameters {
             },
             1 => self.res.set_normalized(value),
             2 => self.drive.set_normalized(value),
-            3 => self.mode.set_normalized(value as usize), // TODO: Really, really starting to suspect normalized_value should always be f32. FIXME
+            3 => self.mode.set_normalized(value), // TODO: Really, really starting to suspect normalized_value should always be f32. FIXME
             _ => (),
         }
     }

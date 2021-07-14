@@ -1,7 +1,7 @@
 // use vst::util::AtomicFloat;
 // use atomig::{Atomic, Ordering,Atom};
 use crate::utils::*;
-use std::ops::{Add, Div, Mul, Sub};
+// use std::ops::{Add, Div, Mul, Sub};
 // pub fn to_range(bottom: f32, top: f32, x: f32) -> f32 {
 //     x * (top - bottom) + bottom
 // }
@@ -10,42 +10,35 @@ use std::ops::{Add, Div, Mul, Sub};
 //     (x - bottom) / (top - bottom)
 // }
 
-// TODO: Knobs don't work in the right way at all with set functions with a weird curve 
-pub struct Parameter<AtomicT: AtomicOps> {
+pub struct ParameterF32 {
     name: String,
-    normalized_value: AtomicT,
-    value: AtomicT,
-    pub default: AtomicT::Item,
-    pub min: AtomicT::Item,
-    pub max: AtomicT::Item,
-    display_func: fn(AtomicT::Item) -> String,
+    normalized_value: AtomicF32,
+    value: AtomicF32,
+    pub default: f32,
+    pub min: f32,
+    pub max: f32,
+    display_func: fn(f32) -> String,
     // TODO: It might be very nice to have a set_func field like
-    pub set_func: fn(AtomicT::Item) -> AtomicT::Item,
+    pub set_func: fn(f32) -> f32,
     /// has to be the inverse of the set_func. Might make something to find it automatically
-    pub get_func: fn(AtomicT::Item) -> AtomicT::Item,
+    pub get_func: fn(f32) -> f32,
 }
 
-impl<AtomicT: AtomicOps> Parameter<AtomicT>
+impl ParameterF32
 // <AtomicT as utils::AtomicOps>::Item
-where
-    AtomicT::Item: Copy,
-    AtomicT::Item: Sub<Output = AtomicT::Item>,
-    AtomicT::Item: Add<Output = AtomicT::Item>,
-    AtomicT::Item: Mul<Output = AtomicT::Item>,
-    AtomicT::Item: Div<Output = AtomicT::Item>,
 {
     /// this one assumes that you don't want a set function
     pub fn _new_no_setfunc(
         name: &str,
-        default: AtomicT::Item,
-        min: AtomicT::Item,
-        max: AtomicT::Item,
-        display_func: fn(AtomicT::Item) -> String,
-    ) -> Parameter<AtomicT> {
-        let a = Parameter {
+        default: f32,
+        min: f32,
+        max: f32,
+        display_func: fn(f32) -> String,
+    ) -> ParameterF32 {
+        let a = ParameterF32 {
             name: String::from(name),
-            normalized_value: AtomicT::new(default),
-            value: AtomicT::new(default),
+            normalized_value: AtomicF32::new(default),
+            value: AtomicF32::new(default),
             default,
             min,
             max,
@@ -58,17 +51,17 @@ where
     }
     pub fn new(
         name: &str,
-        default: AtomicT::Item,
-        min: AtomicT::Item,
-        max: AtomicT::Item,
-        display_func: fn(AtomicT::Item) -> String,
-        set_func: fn(AtomicT::Item) -> AtomicT::Item,
-        get_func: fn(AtomicT::Item) -> AtomicT::Item,
-    ) -> Parameter<AtomicT> {
-        let a = Parameter {
+        default: f32,
+        min: f32,
+        max: f32,
+        display_func: fn(f32) -> String,
+        set_func: fn(f32) -> f32,
+        get_func: fn(f32) -> f32,
+    ) -> ParameterF32 {
+        let a = ParameterF32 {
             name: String::from(name),
-            normalized_value: AtomicT::new(default),
-            value: AtomicT::new(default),
+            normalized_value: AtomicF32::new(default),
+            value: AtomicF32::new(default),
             default,
             min,
             max,
@@ -80,30 +73,17 @@ where
         a
     }
 
-    pub fn get(&self) -> AtomicT::Item {
+    pub fn get(&self) -> f32 {
         // let converted_to_normal = (self.get_func)(self.value.get());
         // converted_to_normal
         self.value.get()
     }
-    /// assumes you have applied the set function elsewhere. Probably shouldn't be used?
-    pub fn set(&self, x: AtomicT::Item) {
-        // TODO: The knob fucks up because set_func needs to applied *before* it's to_range'd, which the knob does. 
-        // current solution is dumb, but oh well
-        self.set_normalized(self.from_range(x));
-        // self.value.set((self.set_func)(x));
-        // self.normalized_value
-        //     .set(self.from_range((self.get_func)(x)));
-        
-        // let converted_to_useful = (self.set_func)(x);
-        // self.value.set(converted_to_useful);
-        // self.normalized_value.set(self.from_range(x));
-    }
-    pub fn get_normalized(&self) -> AtomicT::Item {
+    pub fn get_normalized(&self) -> f32 {
         // let converted_to_normal = (self.get_func)(self.value.get());
         // converted_to_normal
         self.normalized_value.get()
     }
-    pub fn set_normalized(&self, x: AtomicT::Item) {
+    pub fn set_normalized(&self, x: f32) {
         // setting normalized_value with number between 0 and 1
         self.normalized_value.set(x);
         // setting value with the set_function
@@ -118,19 +98,114 @@ where
     }
 
     // TODO: Do we need/want these?
-    pub fn to_range(&self, x: AtomicT::Item) -> AtomicT::Item {
+    pub fn to_range(&self, x: f32) -> f32 {
         x * (self.max - self.min) + self.min
     }
 
-    pub fn from_range(&self, x: AtomicT::Item) -> AtomicT::Item {
+    pub fn from_range(&self, x: f32) -> f32 {
         (x - self.min) / (self.max - self.min)
     }
 }
+pub struct ParameterUsize {
+    name: String,
+    normalized_value: AtomicF32,
+    value: AtomicUsize,
+    pub default: usize,
+    pub min: f32,
+    pub max: f32,
+    display_func: fn(usize) -> String,
+    // TODO: Usize maybe doesn't need a set and get_func
+    pub set_func: fn(f32) -> f32,
+    /// has to be the inverse of the set_func. Might make something to find it automatically
+    pub get_func: fn(f32) -> f32,
+}
 
+impl ParameterUsize
+// <AtomicT as utils::AtomicOps>::Item
+{
+    /// this one assumes that you don't want a set function
+    pub fn _new_no_setfunc(
+        name: &str,
+        default: usize,
+        min: usize,
+        max: usize,
+        display_func: fn(usize) -> String,
+    ) -> ParameterUsize {
+        let a = ParameterUsize {
+            name: String::from(name),
+            normalized_value: AtomicF32::new(0.),
+            value: AtomicUsize::new(default),
+            default,
+            min: min as f32,
+            max: max as f32,
+            display_func,
+            set_func: |x| x,
+            get_func: |x| x,
+        };
+        a.normalized_value.set((a.get_func)(a.from_range(default as f32)));
+        a
+    }
+    pub fn new(
+        name: &str,
+        default: usize,
+        min: usize,
+        max: usize,
+        display_func: fn(usize) -> String,
+        set_func: fn(f32) -> f32,
+        get_func: fn(f32) -> f32,
+    ) -> ParameterUsize {
+        let a = ParameterUsize {
+            name: String::from(name),
+            normalized_value: AtomicF32::new(0.),
+            value: AtomicUsize::new(default),
+            default,
+            min: min as f32,
+            max: max as f32,
+            display_func,
+            set_func,
+            get_func,
+        };
+        a.normalized_value.set((a.get_func)(a.from_range(default as f32)));
+        a
+    }
+
+    pub fn get(&self) -> usize {
+        // let converted_to_normal = (self.get_func)(self.value.get());
+        // converted_to_normal
+        self.value.get()
+    }
+    pub fn get_normalized(&self) -> f32 {
+        // let converted_to_normal = (self.get_func)(self.value.get());
+        // converted_to_normal
+        self.normalized_value.get()
+    }
+    pub fn set_normalized(&self, x: f32) {
+        // setting normalized_value with number between 0 and 1
+        self.normalized_value.set(x);
+        // setting value with the set_function
+        self.value.set(self.to_range((self.set_func)(x)) as usize);
+    }
+    pub fn get_display(&self) -> String {
+        (self.display_func)(self.value.get())
+    }
+
+    pub fn get_name(&self) -> String {
+        self.name.clone()
+    }
+
+    // TODO: Do we need/want these?
+    pub fn to_range(&self, x: f32) -> f32 {
+        x * (self.max - self.min) + self.min
+    }
+
+    pub fn from_range(&self, x: f32) -> f32 {
+        (x - self.min) / (self.max - self.min)
+    }
+}
 // testing if param is set correctly
 #[test]
 fn test_cutoff_param() {
-    let cutoff: Parameter<AtomicF32> = Parameter::new(
+    let cutoff: ParameterF32 = ParameterF32::new(
         "Cutoff",
         20000.,
         0.,
