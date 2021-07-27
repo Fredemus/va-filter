@@ -182,13 +182,12 @@ impl FilterParameters {
     // }
 }
 impl PluginParameters for FilterParameters {
-    // get_parameter has to return the value used in set_parameter. Used for preset loading and such
     fn get_parameter(&self, index: i32) -> f32 {
         match index {
             0 => self.cutoff.get_normalized(),
             1 => self.res.get_normalized(),
             2 => self.drive.get_normalized(),
-            3 => self.mode.get_normalized() as f32, // TODO: <- conversion to f32 after the fact might be a problem. Maybe normalized should always be f32 or something
+            3 => self.mode.get_normalized() as f32, 
             _ => 0.0,
         }
     }
@@ -199,7 +198,7 @@ impl PluginParameters for FilterParameters {
             },
             1 => self.res.set_normalized(value),
             2 => self.drive.set_normalized(value),
-            3 => self.mode.set_normalized(value), // TODO: Really, really starting to suspect normalized_value should always be f32. FIXME
+            3 => self.mode.set_normalized(value), 
             _ => (),
         }
     }

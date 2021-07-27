@@ -14,6 +14,7 @@ baseview = { git = "https://github.com/RustAudio/baseview.git", rev = "d399c1275
 imgui-baseview = {git = "https://github.com/BillyDM/imgui-baseview", branch = "main"}
 imgui = "0.7"
 raw-window-handle = "0.3"
+num = "0.4.0"
 #imgui-knobs = {git = "https://github.com/DGriffin91/imgui-rs-knobs", branch = "main"}
 [dependencies.imgui-knobs]
 path = "../imgui-rs-knobs/"

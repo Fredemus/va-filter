@@ -9,8 +9,8 @@ use crate::filter_parameters::FilterParameters;
 use crate::parameter::{ParameterF32, ParameterUsize};
 use crate::vst::plugin::{PluginParameters, HostCallback};
 use vst::host::Host;
-// for now just using the original parameter struct
-// use super::FilterParameters;
+mod plot;
+use crate::utils::AtomicOps;
 use vst::editor::Editor;
 use baseview::{Size, WindowOpenOptions, WindowScalePolicy};
 
@@ -18,7 +18,7 @@ use raw_window_handle::{HasRawWindowHandle, RawWindowHandle};
 use std::sync::Arc;
 
 const WINDOW_WIDTH: usize = 512;
-const WINDOW_HEIGHT: usize = 256;
+const WINDOW_HEIGHT: usize = 512;
 const WINDOW_WIDTH_F: f32 = WINDOW_WIDTH as f32;
 const WINDOW_HEIGHT_F: f32 = WINDOW_HEIGHT as f32;
 const BLACK: [f32; 4] = [0.0, 0.0, 0.0, 1.0];
@@ -51,6 +51,9 @@ pub fn draw_knob(knob: &Knob, wiper_color: &ColorSet, track_color: &ColorSet) {
 
 
 
+
+
+
 pub struct EditorState {
     pub params: Arc<FilterParameters>,
     pub host: Option<HostCallback>,
@@ -58,6 +61,35 @@ pub struct EditorState {
     // pub time: Arc<AtomicFloat>,
 }
 impl EditorState {
+    fn draw_bode_plot(&self, ui: &Ui, size: [f32; 2]) {
+        let draw_list = ui.get_window_draw_list();
+        let cursor = ui.cursor_screen_pos();
+        // draw a box with slightly different color?
+        
+        
+        let color = ui.style_color(StyleColor::PlotLinesHovered);
+        // let color = CYAN;
+        let amps = plot::get_bode_array(self.params.g.get(), self.params.res.get(), self.params.mode.get());
+        let length = amps.len();
+        let scale = (size[0] as f32 / length as f32) as f32;
+        let mut last = amps[0];
+        let v_center = size[1] / 2.0;
+        for i in 1..length {
+            let next = amps[i];
+            let fi = i as f32;
+            //draw line from i to i+1? how to get start/endpoints?
+            draw_list
+            .add_line(
+                [cursor[0] + fi * scale , cursor[1] + v_center - last],
+                [cursor[0] + fi * scale  + 1., cursor[1] + v_center - next],
+                color,
+            ).thickness(5.).build();
+            last = next;
+        }
+
+
+    }
+    // Todo: Potentially we can avoid passing in parameter reference and just use parameter_index to get stuff we need
     pub fn make_knob(&self,
         ui: &Ui,
         parameter: &ParameterF32,
@@ -89,8 +121,6 @@ impl EditorState {
         let cursor = ui.cursor_pos();
         ui.set_cursor_pos([cursor[0] + title_fix, cursor[1] - 10.0]);
         knob_title(ui, &ImString::new(parameter.get_display()), width);
-        // knob_title(ui, &ImString::new(parameter.get_normalized().to_string()), width); // for testing
-        // knob_title(ui, &ImString::new(knob.angle.to_string()), width); // for testing
         // knob_title(ui, &ImString::new(format!("v:{:.1} a:{:.1}", parameter.get_normalized(), knob.angle)), width); // for testing
 
         if knob.value_changed {
@@ -110,7 +140,7 @@ impl EditorState {
         w.pop(ui);
         draw_knob(&knob, wiper_color, track_color);
     }
-    /// Meant for knobs that go through discrete steps. Nowhere close to done.
+    /// Meant for knobs that go through discrete steps. 
     pub fn make_steppy_knob(&self,
         ui: &Ui,
         parameter: &ParameterUsize,
@@ -195,7 +225,7 @@ impl Editor for SVFPluginEditor {
 
         let settings = Settings {
             window: WindowOpenOptions {
-                title: String::from("imgui-baseview demo window"),
+                title: String::from("filter boy window"),
                 size: Size::new(WINDOW_WIDTH as f64, WINDOW_HEIGHT as f64),
                 scale: WindowScalePolicy::SystemScaleFactor,
             },
@@ -221,7 +251,7 @@ impl Editor for SVFPluginEditor {
                 //     editor_only.sample_data.consume();
                 // }
                 //ui.show_demo_window(run);
-                let w = Window::new(im_str!("Example 1: Basic sliders"))
+                let w = Window::new(im_str!("does this matter?"))
                     .size([WINDOW_WIDTH_F, WINDOW_HEIGHT_F], Condition::Appearing)
                     .position([0.0, 0.0], Condition::Appearing)
                     .draw_background(false)
@@ -284,9 +314,11 @@ impl Editor for SVFPluginEditor {
                     state.make_steppy_knob(ui, &params.mode, 3, &highlight, &lowlight, 0.0);
                     ui.next_column();
 
-                    ui.columns(1, im_str!("nocols"), false);
-
+                    
                     move_cursor(ui, 0.0, 84.0);
+
+                    ui.columns(1, im_str!("nocols"), false);
+                    state.draw_bode_plot(ui, [400., 200.]);
 
                     text_style_color.pop(ui);
                 });
