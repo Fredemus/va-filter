@@ -10,7 +10,6 @@ use crate::parameter::{ParameterF32, ParameterUsize};
 use crate::vst::plugin::{PluginParameters, HostCallback};
 use vst::host::Host;
 mod plot;
-use crate::utils::AtomicOps;
 use vst::editor::Editor;
 use baseview::{Size, WindowOpenOptions, WindowScalePolicy};
 
@@ -61,29 +60,43 @@ pub struct EditorState {
     // pub time: Arc<AtomicFloat>,
 }
 impl EditorState {
+    // TODO: When resonance gets really low, slope doesn't get gentler, it just looks like cutoff moves. Why??
     fn draw_bode_plot(&self, ui: &Ui, size: [f32; 2]) {
         let draw_list = ui.get_window_draw_list();
         let cursor = ui.cursor_screen_pos();
         // draw a box with slightly different color?
         
         
-        let color = ui.style_color(StyleColor::PlotLinesHovered);
-        // let color = CYAN;
-        let amps = plot::get_bode_array(self.params.g.get(), self.params.res.get(), self.params.mode.get());
+        // let color = ui.style_color(StyleColor::PlotLinesHovered);
+        let color = ORANGE;
+        let mut amps = plot::get_svf_bode(self.params.cutoff.get(), self.params.res.get(), self.params.mode.get(), true);
+        let maxmin = 25.;
+        // normalizing amplitudes
+        for x in &mut amps {
+            *x = (*x - (-maxmin))/ (maxmin - (-maxmin))
+        }
         let length = amps.len();
         let scale = (size[0] as f32 / length as f32) as f32;
-        let mut last = amps[0];
-        let v_center = size[1] / 2.0;
+        // let scale_y = size[1] / 2.; 
+        let scale_y = size[1]; 
+        let mut last = amps[0] * scale_y;
         for i in 1..length {
-            let next = amps[i];
+            // TODO: The scale might give problems with clipping out if resonance is higher than +12 dB
+            let next = amps[i] * scale_y;
+            
             let fi = i as f32;
-            //draw line from i to i+1? how to get start/endpoints?
-            draw_list
-            .add_line(
-                [cursor[0] + fi * scale , cursor[1] + v_center - last],
-                [cursor[0] + fi * scale  + 1., cursor[1] + v_center - next],
-                color,
-            ).thickness(5.).build();
+            // only draw values that are not stupid low
+            // TODO: can we just do last > 0.?
+            if last > 0. &&  next < scale_y {
+                //draw line from i to i+1? how to get start/endpoints?
+                draw_list
+                .add_line(
+                    [cursor[0] + fi * scale , cursor[1] - last],
+                    [cursor[0] + fi * scale  + 1., cursor[1] - next],
+                    color,
+                ).thickness(5.).build();    
+            }
+            
             last = next;
         }
 
@@ -315,10 +328,10 @@ impl Editor for SVFPluginEditor {
                     ui.next_column();
 
                     
-                    move_cursor(ui, 0.0, 84.0);
-
                     ui.columns(1, im_str!("nocols"), false);
-                    state.draw_bode_plot(ui, [400., 200.]);
+                    move_cursor(ui, (WINDOW_WIDTH_F - 400.) / 2., 400.);
+                    
+                    state.draw_bode_plot(ui, [400., 400.]);
 
                     text_style_color.pop(ui);
                 });

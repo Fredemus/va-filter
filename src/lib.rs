@@ -10,13 +10,8 @@
 // same principle seems to be usable for exponential things. See https://github.com/WeirdConstructor/HexoSynth/blob/master/src/dsp/mod.rs#L125-L134
 
 // ----- IMPORTANT TODOS -----
-// TODO: THE NOT UPDATING PARAMETER BUG IS BECAUSE SVF NEEDS TO 
-// HAVE A REF TO HOST AND CALL THE FUNCTION host.automate(index, value)
-// TODO: IT WOULD BE MUCH, MUCH SIMPLER (for cutoff at least, but potentially all time params)
-// IF KNOBS CALLED SET_PARAMETER(INDEX, VALUE), INSTEAD OF CALLING PARAMETER'S SET(VALUE)
-// potentially knobs need to be completely detached from max/min to avoid problems with time params?
-// just have them go off of normalized_value. Otherwise attack/release/etc will have to be in ms and we'll have an extra 1/fs
-// a bunch of places?
+// TODO: It seems like the resonance is wrong by a factor 2. Check what the diode clipper actually does to resonance
+
 
 #[macro_use]
 extern crate vst;

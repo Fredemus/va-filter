@@ -71,12 +71,12 @@ impl Default for FilterParameters {
             // TODO: Res fucks up at low values, caused by the formula being dumb
             res: (ParameterF32::new(
                 "Resonance",
-                2. / 0.707,
-                20.,
-                0.1,
-                |x| format!("{:.2}", 2. / x),
-                |x: f32| x.powf(0.1),
-                |x: f32| x.powi(10),
+                1. / 0.707,
+                10.,
+                0.05,
+                |x| format!("{:.2}", 1. / x),
+                |x: f32| x.powf(0.2),
+                |x: f32| x.powi(5),
                 // |x| 2f32.powf(-11. * x),
                 // |x: f32| (x).ln() * -0.13115409,
             )),
