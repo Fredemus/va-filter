@@ -69,8 +69,8 @@ impl EditorState {
         
         // let color = ui.style_color(StyleColor::PlotLinesHovered);
         let color = ORANGE;
-        let mut amps = plot::get_svf_bode(self.params.cutoff.get(), self.params.res.get(), self.params.mode.get(), true);
-        let maxmin = 25.;
+        let mut amps = plot::get_svf_bode(self.params.cutoff.get(), self.params.res.get(), self.params.mode.get());
+        let maxmin = 30.;
         // normalizing amplitudes
         for x in &mut amps {
             *x = (*x - (-maxmin))/ (maxmin - (-maxmin))
@@ -85,10 +85,9 @@ impl EditorState {
             let next = amps[i] * scale_y;
             
             let fi = i as f32;
-            // only draw values that are not stupid low
-            // TODO: can we just do last > 0.?
+            // only draw values that are within bounds
             if last > 0. &&  next < scale_y {
-                //draw line from i to i+1? how to get start/endpoints?
+                //draw line from i to i+1 
                 draw_list
                 .add_line(
                     [cursor[0] + fi * scale , cursor[1] - last],
