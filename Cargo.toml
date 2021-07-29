@@ -5,10 +5,16 @@ authors = ["Fredemus <frederik.halkjaer1@gmail.com>"]
 edition = "2018"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
+[lib]
+name = "svf_gui"
+crate-type = ["cdylib"]
 [dependencies]
 vst = { git = "https://github.com/rust-dsp/rust-vst" }
-
-[lib]
-name = "svf_model"
-crate-type = ["cdylib"]
+baseview = { git = "https://github.com/RustAudio/baseview.git", rev = "d399c1275522ae75f5a82caadd904df2685c8660" }
+imgui-baseview = {git = "https://github.com/BillyDM/imgui-baseview", branch = "main"}
+imgui = "0.7"
+raw-window-handle = "0.3"
+num = "0.4.0"
+#imgui-knobs = {git = "https://github.com/DGriffin91/imgui-rs-knobs", branch = "main"}
+[dependencies.imgui-knobs]
+path = "../imgui-rs-knobs/"
