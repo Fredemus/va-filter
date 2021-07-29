@@ -142,7 +142,8 @@ impl ParameterUsize
             set_func: |x| x,
             get_func: |x| x,
         };
-        a.normalized_value.set((a.get_func)(a.from_range(default as f32)));
+        a.normalized_value
+            .set((a.get_func)(a.from_range(default as f32)));
         a
     }
     pub fn new(
@@ -165,7 +166,8 @@ impl ParameterUsize
             set_func,
             get_func,
         };
-        a.normalized_value.set((a.get_func)(a.from_range(default as f32)));
+        a.normalized_value
+            .set((a.get_func)(a.from_range(default as f32)));
         a
     }
 

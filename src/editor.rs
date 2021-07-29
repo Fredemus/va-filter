@@ -1,17 +1,16 @@
+// colorhexa.com is nice for looking for colors
 use imgui::*;
 use imgui_knobs::*;
 
-use imgui_baseview::{HiDpiMode, ImguiWindow, RenderSettings, Settings};
-// use super::SVF;
 use crate::filter_parameters::FilterParameters;
-// use crate::filter_parameters::FilterParameters::PluginParameters;
+use imgui_baseview::{HiDpiMode, ImguiWindow, RenderSettings, Settings};
 
 use crate::parameter::{ParameterF32, ParameterUsize};
-use crate::vst::plugin::{PluginParameters, HostCallback};
+use crate::vst::plugin::{HostCallback, PluginParameters};
 use vst::host::Host;
 mod plot;
-use vst::editor::Editor;
 use baseview::{Size, WindowOpenOptions, WindowScalePolicy};
+use vst::editor::Editor;
 
 use raw_window_handle::{HasRawWindowHandle, RawWindowHandle};
 use std::sync::Arc;
@@ -22,15 +21,15 @@ const WINDOW_WIDTH_F: f32 = WINDOW_WIDTH as f32;
 const WINDOW_HEIGHT_F: f32 = WINDOW_HEIGHT as f32;
 const BLACK: [f32; 4] = [0.0, 0.0, 0.0, 1.0];
 const CYAN: [f32; 4] = [0.1, 1.0, 1.0, 0.8];
+const GREY: [f32; 4] = [0.1, 0.1, 0.1, 0.6];
+// const SOLID_GREY: [f32; 4] = [GREY[0], GREY[1], GREY[2], 1.0];
 // const BG_COLOR: [f32; 4] = [0.21 * 1.4, 0.11 * 1.7, 0.25 * 1.4, 1.0];
 // const BG_COLOR_TRANSP: [f32; 4] = [0.21 * 1.4, 0.11 * 1.7, 0.25 * 1.4, 0.0];
 // const GREEN: [f32; 4] = [0.23, 0.68, 0.23, 1.0];
 // const RED: [f32; 4] = [0.98, 0.02, 0.22, 1.0];
 const ORANGE: [f32; 4] = [1.0, 0.58, 0.0, 1.0];
 const ORANGE_HOVERED: [f32; 4] = [1.0, 0.68, 0.1, 1.0];
-// const WAVEFORM_LINES: [f32; 4] = [1.0, 1.0, 1.0, 0.2];
 const TEXT: [f32; 4] = [1.0, 1.0, 1.0, 0.75];
-// const DB_LINES: [f32; 4] = [1.0, 1.0, 1.0, 0.15];
 
 pub fn draw_knob(knob: &Knob, wiper_color: &ColorSet, track_color: &ColorSet) {
     knob.draw_arc(
@@ -46,63 +45,77 @@ pub fn draw_knob(knob: &Knob, wiper_color: &ColorSet, track_color: &ColorSet) {
         knob.draw_arc(0.8, 0.21, knob.angle_min, knob.angle, wiper_color, 16, 2);
     }
 }
-
-
-
-
-
-
-
+/// keeps track of parameters and enables contact with the host
 pub struct EditorState {
     pub params: Arc<FilterParameters>,
     pub host: Option<HostCallback>,
-    // pub sample_rate: Arc<AtomicFloat>,
-    // pub time: Arc<AtomicFloat>,
 }
 impl EditorState {
     // TODO: When resonance gets really low, slope doesn't get gentler, it just looks like cutoff moves. Why??
     fn draw_bode_plot(&self, ui: &Ui, size: [f32; 2]) {
         let draw_list = ui.get_window_draw_list();
         let cursor = ui.cursor_screen_pos();
-        // draw a box with slightly different color?
-        
-        
-        // let color = ui.style_color(StyleColor::PlotLinesHovered);
+        // adding a background
+        draw_list
+            .add_rect(
+                [cursor[0], cursor[1] - size[1]],
+                [cursor[0] + size[0], cursor[1]],
+                GREY,
+            )
+            .filled(true)
+            .thickness(5.)
+            .build();
+
         let color = ORANGE;
-        let mut amps = plot::get_svf_bode(self.params.cutoff.get(), self.params.res.get(), self.params.mode.get());
+        let mut amps = plot::get_svf_bode(
+            self.params.cutoff.get(),
+            self.params.res.get(),
+            self.params.mode.get(),
+        );
         let maxmin = 30.;
         // normalizing amplitudes
         for x in &mut amps {
-            *x = (*x - (-maxmin))/ (maxmin - (-maxmin))
+            *x = (*x - (-maxmin)) / (maxmin - (-maxmin))
         }
         let length = amps.len();
-        let scale = (size[0] as f32 / length as f32) as f32;
-        // let scale_y = size[1] / 2.; 
-        let scale_y = size[1]; 
+        let scale = (size[0] / length as f32) as f32;
+        // let scale_y = size[1] / 2.;
+        let scale_y = size[1];
         let mut last = amps[0] * scale_y;
         for i in 1..length {
             // TODO: The scale might give problems with clipping out if resonance is higher than +12 dB
             let next = amps[i] * scale_y;
-            
+
             let fi = i as f32;
             // only draw values that are within bounds
-            if last > 0. &&  next < scale_y {
-                //draw line from i to i+1 
+            if last > 0. && next < scale_y {
+                //draw line from i to i+1
                 draw_list
-                .add_line(
-                    [cursor[0] + fi * scale , cursor[1] - last],
-                    [cursor[0] + fi * scale  + 1., cursor[1] - next],
-                    color,
-                ).thickness(5.).build();    
+                    .add_line(
+                        [cursor[0] + fi * scale, cursor[1] - last],
+                        [cursor[0] + fi * scale + 1., cursor[1] - next],
+                        color,
+                    )
+                    .thickness(5.)
+                    .build();
             }
-            
+
             last = next;
         }
-
-
+        // adding a frame that covers up some weird stuff with end lines
+        draw_list
+            .add_rect(
+                [cursor[0], cursor[1] - size[1]],
+                [cursor[0] + size[0], cursor[1]],
+                BLACK,
+            )
+            .filled(false)
+            .thickness(8.)
+            .build();
     }
     // Todo: Potentially we can avoid passing in parameter reference and just use parameter_index to get stuff we need
-    pub fn make_knob(&self,
+    pub fn make_knob(
+        &self,
         ui: &Ui,
         parameter: &ParameterF32,
         parameter_index: i32,
@@ -118,7 +131,7 @@ impl EditorState {
         knob_title(ui, &ImString::new(title.to_uppercase()), width);
         let cursor = ui.cursor_pos();
         ui.set_cursor_pos([cursor[0], cursor[1] + 5.0]);
-        let mut val = parameter.get_normalized(); 
+        let mut val = parameter.get_normalized();
         let knob = Knob::new_custom_slope(
             ui,
             knob_id,
@@ -128,7 +141,7 @@ impl EditorState {
             (parameter.get_func)(parameter.from_range(parameter.default)),
             width * 0.5,
             true,
-            200.
+            200.,
         );
         let cursor = ui.cursor_pos();
         ui.set_cursor_pos([cursor[0] + title_fix, cursor[1] - 10.0]);
@@ -148,12 +161,13 @@ impl EditorState {
                 host.end_edit(parameter_index);
             }
         }
-    
+
         w.pop(ui);
         draw_knob(&knob, wiper_color, track_color);
     }
-    /// Meant for knobs that go through discrete steps. 
-    pub fn make_steppy_knob(&self,
+    /// Meant for knobs that go through discrete steps.
+    pub fn make_steppy_knob(
+        &self,
         ui: &Ui,
         parameter: &ParameterUsize,
         parameter_index: i32,
@@ -169,7 +183,7 @@ impl EditorState {
         knob_title(ui, &ImString::new(title.clone().to_uppercase()), width);
         let cursor = ui.cursor_pos();
         ui.set_cursor_pos([cursor[0], cursor[1] + 5.0]);
-        let mut val = parameter.get_normalized(); 
+        let mut val = parameter.get_normalized();
         let knob = Knob::new_custom_slope(
             ui,
             knob_id,
@@ -179,7 +193,7 @@ impl EditorState {
             (parameter.get_func)(parameter.from_range(parameter.default as f32)),
             width * 0.5,
             true,
-            200.
+            200.,
         );
         let cursor = ui.cursor_pos();
         ui.set_cursor_pos([cursor[0] + title_fix, cursor[1] - 10.0]);
@@ -196,13 +210,17 @@ impl EditorState {
                 host.begin_edit(parameter_index);
                 host.automate(parameter_index, *knob.p_value);
                 host.end_edit(parameter_index);
-
             }
         }
-
         w.pop(ui);
         // TODO: Proper colors pls
-        draw_stepped_knob(&knob, (parameter.max - parameter.min + 1.) as u32,  wiper_color, track_color, &ColorSet::from(CYAN));
+        draw_stepped_knob(
+            &knob,
+            (parameter.max - parameter.min + 1.) as u32,
+            wiper_color,
+            track_color,
+            &ColorSet::from(CYAN),
+        );
     }
 }
 pub struct SVFPluginEditor {
@@ -271,30 +289,7 @@ impl Editor for SVFPluginEditor {
                     .movable(false);
                 w.build(&ui, || {
                     let text_style_color = ui.push_style_color(StyleColor::Text, TEXT);
-                    let _graph_v_center = 225.0 + 25.0;
-                    // {
-                    //     let draw_list = ui.get_window_draw_list();
-                    //     draw_list.add_rect_filled_multicolor(
-                    //         [0.0, 0.0],
-                    //         [WINDOW_WIDTH_F, 200.0],
-                    //         BLACK,
-                    //         BLACK,
-                    //         BG_COLOR,
-                    //         BG_COLOR,
-                    //     );
-                    //     draw_list
-                    //         .add_rect([0.0, 200.0], [WINDOW_WIDTH_F, WINDOW_HEIGHT_F], BG_COLOR)
-                    //         .filled(true)
-                    //         .build();
-                    //     draw_list
-                    //         .add_rect(
-                    //             [0.0, graph_v_center - 92.0],
-                    //             [WINDOW_WIDTH_F, graph_v_center + 92.0],
-                    //             [0.0, 0.0, 0.0, 0.65],
-                    //         )
-                    //         .filled(true)
-                    //         .build();
-                    // }
+
                     ui.set_cursor_pos([0.0, 25.0]);
 
                     let highlight = ColorSet::new(ORANGE, ORANGE_HOVERED, ORANGE_HOVERED);
@@ -326,11 +321,12 @@ impl Editor for SVFPluginEditor {
                     state.make_steppy_knob(ui, &params.mode, 3, &highlight, &lowlight, 0.0);
                     ui.next_column();
 
-                    
                     ui.columns(1, im_str!("nocols"), false);
-                    move_cursor(ui, (WINDOW_WIDTH_F - 400.) / 2., 400.);
-                    
-                    state.draw_bode_plot(ui, [400., 400.]);
+                    // move_cursor(ui, (WINDOW_WIDTH_F - 400.) / 2., 333.);
+                    // TODO: I would love if this cursor pos could come from knob size or smth
+                    ui.set_cursor_pos([(WINDOW_WIDTH_F - 400.) / 2., WINDOW_HEIGHT_F - 4.]);
+
+                    state.draw_bode_plot(ui, [400., 335.]);
 
                     text_style_color.pop(ui);
                 });

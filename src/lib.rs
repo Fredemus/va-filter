@@ -6,13 +6,6 @@
 //! Quality can be improved a lot by oversampling a bit.
 //! Damping feedback is antisaturated, so it doesn't disappear at high gains.
 
-// TODO: Potential better formula for resonance and cutoff: { let x : f32 = x.powf(slope); min * (1.0 - x) + max * x }
-// same principle seems to be usable for exponential things. See https://github.com/WeirdConstructor/HexoSynth/blob/master/src/dsp/mod.rs#L125-L134
-
-// ----- IMPORTANT TODOS -----
-// TODO: It seems like the resonance is wrong by a factor 2. Check what the diode clipper actually does to resonance
-
-
 #[macro_use]
 extern crate vst;
 use std::f32::consts::PI;
@@ -106,7 +99,7 @@ impl SVF {
             1 => input - k * self.vout[0] - self.vout[1],
             2 => self.vout[0],
             3 => input - k * self.vout[0],
-            //3 => input - 2. * k * self.vout[1], // <- allpass
+            // 4 => input - 2. * k * self.vout[1], // <- allpass
             _ => input - 2. * self.vout[1] - k * self.vout[0],
         }
     }
@@ -158,12 +151,12 @@ impl SVF {
             2 => self.vout[0],                            // bandpass
             3 => input - k * self.vout[0],                // notch
             //3 => input - 2. * k * self.vout[1], // allpass
-            _ => input - 2. * self.vout[1] - k * self.vout[0], // peak
+            4 => input - 2. * self.vout[1] - k * self.vout[0], // peak
+            _ => k * self.vout[0],                             // bandpass (normalized peak gain)
         }
     }
 }
 impl FilterParameters {
-
     pub fn update_g(&self) {
         self.g
             .set((PI * self.cutoff.get() / (self.sample_rate.get())).tan());
@@ -182,18 +175,19 @@ impl PluginParameters for FilterParameters {
             0 => self.cutoff.get_normalized(),
             1 => self.res.get_normalized(),
             2 => self.drive.get_normalized(),
-            3 => self.mode.get_normalized() as f32, 
+            3 => self.mode.get_normalized() as f32,
             _ => 0.0,
         }
     }
     fn set_parameter(&self, index: i32, value: f32) {
         match index {
-            0 => { self.cutoff.set_normalized(value);
-                self.update_g(); 
-            },
+            0 => {
+                self.cutoff.set_normalized(value);
+                self.update_g();
+            }
             1 => self.res.set_normalized(value),
             2 => self.drive.set_normalized(value),
-            3 => self.mode.set_normalized(value), 
+            3 => self.mode.set_normalized(value),
             _ => (),
         }
     }
@@ -238,7 +232,10 @@ impl Default for SVF {
             params: params.clone(),
             editor: Some(SVFPluginEditor {
                 is_open: false,
-                state: Arc::new(EditorState { params: params, host: None }),
+                state: Arc::new(EditorState {
+                    params: params,
+                    host: None,
+                }),
             }),
         }
     }
@@ -252,7 +249,10 @@ impl Plugin for SVF {
             params: params.clone(),
             editor: Some(SVFPluginEditor {
                 is_open: false,
-                state: Arc::new(EditorState { params, host: Some(host) }),
+                state: Arc::new(EditorState {
+                    params,
+                    host: Some(host),
+                }),
             }),
         }
     }
