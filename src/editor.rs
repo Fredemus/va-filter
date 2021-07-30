@@ -132,7 +132,7 @@ impl EditorState {
         let cursor = ui.cursor_pos();
         ui.set_cursor_pos([cursor[0], cursor[1] + 5.0]);
         let mut val = parameter.get_normalized();
-        let knob = Knob::new_custom_slope(
+        let knob = Knob::new(
             ui,
             knob_id,
             &mut val,
@@ -141,7 +141,6 @@ impl EditorState {
             (parameter.get_func)(parameter.from_range(parameter.default)),
             width * 0.5,
             true,
-            200.,
         );
         let cursor = ui.cursor_pos();
         ui.set_cursor_pos([cursor[0] + title_fix, cursor[1] - 10.0]);
@@ -184,7 +183,7 @@ impl EditorState {
         let cursor = ui.cursor_pos();
         ui.set_cursor_pos([cursor[0], cursor[1] + 5.0]);
         let mut val = parameter.get_normalized();
-        let knob = Knob::new_custom_slope(
+        let knob = Knob::new(
             ui,
             knob_id,
             &mut val,
@@ -193,7 +192,6 @@ impl EditorState {
             (parameter.get_func)(parameter.from_range(parameter.default as f32)),
             width * 0.5,
             true,
-            200.,
         );
         let cursor = ui.cursor_pos();
         ui.set_cursor_pos([cursor[0] + title_fix, cursor[1] - 10.0]);

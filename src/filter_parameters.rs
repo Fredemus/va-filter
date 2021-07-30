@@ -67,7 +67,7 @@ impl Default for FilterParameters {
                 |x| (1.8f32.powf(10. * x - 10.)),
                 |x: f32| 1. + 0.17012975 * (x).ln(),
             ),
-            g: AtomicF32::new(0.),
+            g: AtomicF32::new((PI * 10000. / 48000.).tan()),
             // TODO: Res fucks up at low values, caused by the formula being dumb
             res: (ParameterF32::new(
                 "Resonance",
