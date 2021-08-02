@@ -6,7 +6,7 @@
 //! Quality can be improved a lot by oversampling a bit.
 //! Damping feedback is antisaturated, so it doesn't disappear at high gains.
 
-// TODO: 
+// TODO:
 // look into successive over-relaxation, Gauss–Seidel method, just making a runge-kutta solver
 // Brent's method seems the most promising so far. Could potentially replace inverse quadratic with newton's
 // or possibly just a broyden method fallback, can't be bothered working much more on this lol: http://fabcol.free.fr/pdf/lectnotes5.pdf
@@ -209,17 +209,16 @@ impl SVF {
             // factored out of the derivatives
             // let bigboy = (v_est[0] * k + sinh_v_est0 - input - v_est[0] + v_est[1]).cosh().powi(2);
             let bigboy = 1. / (1. - fb_line * fb_line);
-            // since the thing that happens at j[0][0] is that it goes towards -1 at low values 
-            // (everything else than bigboy becomes really small), if it ever is NaN (overflow), we just set it to -1 
+            // since the thing that happens at j[0][0] is that it goes towards -1 at low values
+            // (everything else than bigboy becomes really small), if it ever is NaN (overflow), we just set it to -1
             if bigboy.is_infinite() {
                 // println!("bigboy is inf");
                 jacobian[0][0] = -1.;
                 jacobian[0][1] = 0.;
-            }
-            else {
+            } else {
                 // jacobian[0][0] = (-bigboy - (g * (k - 1. + (v_est[0]).cosh()))) / bigboy;
                 // Note: If you replace sinh or tanh with an approximation, sinh_v_est0/tanh_v_est0 needs to be change to dy/dx (sinh(x))
-                jacobian[0][0] = (-bigboy - (g * (k - 1. + sinh_v_est0/tanh_v_est0 ))) / bigboy;
+                jacobian[0][0] = (-bigboy - (g * (k - 1. + sinh_v_est0 / tanh_v_est0))) / bigboy;
                 jacobian[0][1] = -(g / bigboy);
             }
             // jacobian[1][0] = g * (v_est[0].cosh().powi(2));
@@ -302,16 +301,15 @@ impl SVF {
             // factored out of the derivatives
             let bigboy = 1. / (1. - fb_line * fb_line);
 
-            // since the thing that happens at j[0][0] is that it goes towards -1 at low values 
-            // (everything else than bigboy becomes really small), if it ever is NaN (overflow), we just set it to -1 
+            // since the thing that happens at j[0][0] is that it goes towards -1 at low values
+            // (everything else than bigboy becomes really small), if it ever is NaN (overflow), we just set it to -1
             if bigboy.is_infinite() {
                 // println!("bigboy is inf");
                 jacobian[0][0] = -1.;
                 jacobian[0][1] = 0.;
-            }
-            else {
+            } else {
                 // jacobian[0][0] = (-bigboy - (g * (k - 1. + (v_est[0]).cosh()))) / bigboy;
-                jacobian[0][0] = (-bigboy - (g * (k - 1. + (v_est[0] / 1.5).cosh() ))) / bigboy;
+                jacobian[0][0] = (-bigboy - (g * (k - 1. + (v_est[0] / 1.5).cosh()))) / bigboy;
                 jacobian[0][1] = -(g / bigboy);
             }
             jacobian[1][0] = g * (1. - tanh_v_est0.powi(2));
@@ -357,8 +355,7 @@ impl SVF {
     #[inline]
     pub fn run_svf(&mut self, g: f32, tanh_v_est0: f32, fb_line: f32) -> [f32; 2] {
         let mut out: [f32; 2] = [1.; 2];
-        out[0] =
-            g * fb_line + self.s[0];
+        out[0] = g * fb_line + self.s[0];
         out[1] = g * tanh_v_est0 + self.s[1];
 
         out
@@ -552,7 +549,7 @@ fn newton_test_sine() {
     let len = 1000;
     let amplitude = 25.;
     // saving samples to wav file
-    for t in (0 .. len).map(|x| x as f32 / 48000.) {
+    for t in (0..len).map(|x| x as f32 / 48000.) {
         let _sample = plugin.tick_newton(amplitude * (t * 440.0 * 2.0 * PI).sin());
         // let amplitude = i16::MAX as f32;
         // writer.write_sample((sample * amplitude) as i16).unwrap();
@@ -576,7 +573,7 @@ fn newton_test_noise() {
     let len = 1000;
     let amplitude = 25.;
     // saving samples to wav file
-    for _t in (0 .. len).map(|x| x as f32 / 48000.) {
+    for _t in (0..len).map(|x| x as f32 / 48000.) {
         let _sample = plugin.tick_newton(rng.gen_range(-amplitude..amplitude));
         // let amplitude = i16::MAX as f32;
         // writer.write_sample((sample * amplitude) as i16).unwrap();
@@ -616,7 +613,7 @@ fn matrix_test() {
 }
 #[test]
 fn dumbtest() {
-    let a : f32 = 1. / 0.; 
-    println!("{}", -a/a);
+    let a: f32 = 1. / 0.;
+    println!("{}", -a / a);
     println!("{}", a);
 }

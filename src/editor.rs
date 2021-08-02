@@ -1,7 +1,7 @@
 // colorhexa.com is nice for looking for colors
 // TODO: Instead of knobs beginning and ending changes on knob.value_changed, changes should be "grouped together"
 // somehow, maybe by use of ui.is_item_active()?
-// hmm, it seems our behavior (with regards to undoing at least) is the same as big boy problems, so not sure if it's an issue? 
+// hmm, it seems our behavior (with regards to undoing at least) is the same as big boy problems, so not sure if it's an issue?
 
 use imgui::*;
 use imgui_knobs::*;
