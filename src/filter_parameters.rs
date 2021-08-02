@@ -84,7 +84,7 @@ impl Default for FilterParameters {
                 "Drive",
                 0.,
                 0.,
-                20.,
+                15.,
                 |x: f32| format!("{:.2} dB", 20. * (x + 1.).log10()),
                 |x| x.powi(2),
                 |x| x.sqrt(),
