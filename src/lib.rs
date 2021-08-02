@@ -6,6 +6,11 @@
 //! Quality can be improved a lot by oversampling a bit.
 //! Damping feedback is antisaturated, so it doesn't disappear at high gains.
 
+// TODO: 
+// look into successive over-relaxation, Gauss–Seidel method, just making a runge-kutta solver
+// Brent's method seems the most promising so far. Could potentially replace inverse quadratic with newton's
+
+
 #[macro_use]
 extern crate vst;
 use std::f32::consts::PI;
@@ -65,7 +70,7 @@ impl SVF {
         if estimate == EstimateSource::LinearStateEstimate
             || estimate == EstimateSource::LinearVoutEstimate
         {
-            self.run_svf_linear(input * (self.params.drive.get() + 1.));
+            self.run_svf_linear(input);
         }
         match estimate {
             EstimateSource::State => self.s[n],
@@ -164,85 +169,6 @@ impl SVF {
             _ => k * self.vout[0],                             // bandpass (normalized peak gain)
         }
     }
-    pub fn run_svf_newton(&mut self, input: f32) -> f32 {
-        // ---------- setup ----------
-        // load in g and k from parameters
-        let g = self.params.g.get();
-        let k = self.params.res.get();
-        // a[n] is the fixed-pivot approximation for whatever is being processed nonlinearly
-        let mut v_est: [f32; 2];
-        let est_type = EstimateSource::LinearVoutEstimate;
-
-        // getting initial estimate. Could potentially be done with the fixed_pivot filter
-        v_est = [
-            self.get_estimate(0, est_type, input),
-            self.get_estimate(1, est_type, input),
-        ];
-        println!("estimate: {:?}", v_est);
-        // trying to get fixed_pivot as estimate
-        self.run_svf_pivotal(input);
-        v_est = [self.vout[0], self.vout[1]];
-        let filter_out = self.run_svf(input, v_est);
-        let mut residue = [filter_out[0] - v_est[0], filter_out[1] - v_est[1]];
-        let max_error = 0.001;
-        println!("input: {:?}", input);
-        println!("estimate: {:?}", v_est);
-        println!("residue: {:?}", residue);
-        while residue[0].abs() > max_error || residue[1].abs() > max_error {
-            // TODO: not sure why this can't start out as uninitialized
-            // let mut jacobian_derivative: [[f32; 2]; 2] = [[1.; 2]; 2];
-            let mut jacobian_inv: [[f32; 2]; 2] = [[1.; 2]; 2];
-            // factored out of the derivative
-            let bigboy = -g
-                * (1.
-                    - (-input + (k - 1.) * v_est[0] + v_est[0].sinh() + v_est[1])
-                        .tanh()
-                        .powi(2));
-
-            // there's a 0 in row 0 column 0 that makes it pretty easy to find the inverse jacobian right away
-            jacobian_inv[0][0] = 0.;
-            jacobian_inv[0][1] = -1. / ((v_est[0].tanh().powi(2) - 1.) * g);
-            jacobian_inv[1][0] = 1.
-                / (((input - ((k - 1.) * v_est[0] + v_est[0].sinh()) + v_est[0])
-                    .tanh()
-                    .powi(2)
-                    - 1.)
-                    * -g);
-            jacobian_inv[1][1] = (k - 1. + v_est[0].cosh()) / ((v_est[0].tanh().powi(2) - 1.) * g);
-            println!("jacobian inv: {:?}", jacobian_inv);
-
-            // multiplying jacobian and residue together
-            let minusboy = [
-                jacobian_inv[0][0] * residue[0] + jacobian_inv[0][1] * residue[1],
-                jacobian_inv[1][0] * residue[0] + jacobian_inv[1][1] * residue[1],
-            ];
-            v_est[0] = v_est[0] - minusboy[0];
-            v_est[1] = v_est[1] - minusboy[1];
-
-            // recompute filter
-            let filter_out = self.run_svf(input, v_est);
-            residue = [filter_out[0] - v_est[0], filter_out[1] - v_est[1]];
-            println!("minusboy: {:?}", minusboy);
-            println!("estimate: {:?}", v_est);
-            println!("residue: {:?}", residue);
-        }
-        // when newton's method is done, we have some good estimates for vout
-        println!("---- success? ----");
-
-        self.vout[0] = v_est[0];
-        self.vout[1] = v_est[1];
-
-        // here, the output is chosen to give the specified type of filter
-        match self.params.mode.get() {
-            0 => self.vout[1],                            // lowpass
-            1 => input - k * self.vout[0] - self.vout[1], // highpass
-            2 => self.vout[0],                            // bandpass
-            3 => input - k * self.vout[0],                // notch
-            //3 => input - 2. * k * self.vout[1], // allpass
-            4 => input - 2. * self.vout[1] - k * self.vout[0], // peak
-            _ => k * self.vout[0],                             // bandpass (normalized peak gain)
-        }
-    }
     // trying to avoid having to invert the matrix
     pub fn run_svf_newton2(&mut self, input: f32) -> f32 {
         // ---------- setup ----------
@@ -251,24 +177,29 @@ impl SVF {
         let k = self.params.res.get();
         // a[n] is the fixed-pivot approximation for whatever is being processed nonlinearly
         let mut v_est: [f32; 2];
-        // let est_type = EstimateSource::LinearVoutEstimate;
-        let est_type = EstimateSource::State;
+        let est_type = EstimateSource::LinearVoutEstimate;
+        // let est_type = EstimateSource::State;
 
         // getting initial estimate. Could potentially be done with the fixed_pivot filter
         v_est = [
             self.get_estimate(0, est_type, input),
             self.get_estimate(1, est_type, input),
         ];
+        let mut sinh_v_est0 = v_est[0].sinh();
+        let mut tanh_v_est0 = v_est[0].tanh();
         println!("estimate: {:?}", v_est);
+        println!("input: {:?}", input);
         // using fixed_pivot as estimate
         // self.run_svf_pivotal(input);
         // v_est = [self.vout[0], self.vout[1]];
-        let filter_out = self.run_svf(input, v_est);
+        let mut filter_out = self.run_svf(input, v_est , tanh_v_est0, sinh_v_est0);
         let mut residue = [filter_out[0] - v_est[0], filter_out[1] - v_est[1]];
+
+        println!("residue: {:?}", residue);
         let max_error = 0.00001;
         let mut n_iterations = 0;
         while residue[0].abs() > max_error || residue[1].abs() > max_error {
-            if n_iterations > 100 {
+            if n_iterations > 10 {
                 // panic!("infinite loop mayhaps?");
                 println!("infinite loop mayhaps?");
                 break;
@@ -276,14 +207,30 @@ impl SVF {
             // TODO: not sure why this can't start out as uninitialized
             let mut jacobian: [[f32; 2]; 2] = [[1.; 2]; 2];
             // factored out of the derivatives
-            let bigboy = (v_est[0] * k + v_est[0].sinh() - input - v_est[0] + v_est[1])
+            let bigboy = (v_est[0] * k + sinh_v_est0 - input - v_est[0] + v_est[1])
                 .cosh()
                 .powi(2);
 
-            jacobian[0][0] = (-bigboy - (g * (k - 1. + (v_est[0]).cosh()))) / bigboy;
-            jacobian[0][1] = -(g / bigboy);
-            jacobian[1][0] = g / (v_est[0].cosh().powi(2));
+            // since the thing that happens at j[0][0] is that it goes towards -1 at low values 
+            // (everything else than bigboy becomes really small), if it ever is NaN (overflow), we just set it to -1 
+            if bigboy.is_infinite() {
+                // println!("bigboy is inf");
+                // println!("parts of bigboy: {}", ( v_est[0].sinh() ));
+                // println!("parts of bigboy: {}", (v_est[0] * k - input - v_est[0] + v_est[1]));
+                // println!(" bigboy / bigboy: {}", bigboy/bigboy);
+                jacobian[0][0] = -1.;
+                jacobian[0][1] = 0.;
+            }
+            else {
+                // jacobian[0][0] = (-bigboy - (g * (k - 1. + (v_est[0]).cosh()))) / bigboy;
+                jacobian[0][0] = (-bigboy - (g * (k - 1. + sinh_v_est0/tanh_v_est0 ))) / bigboy;
+                jacobian[0][1] = -(g / bigboy);
+            }
+            
+            // jacobian[1][0] = g * (v_est[0].cosh().powi(2));
+            jacobian[1][0] = g * (1. - tanh_v_est0.powi(2));
             jacobian[1][1] = -1.;
+
             println!("jacobian: {:?}", jacobian);
 
             // v_est[0] = (jacobian[1][0] * v_est[0] - residue[1]) / jacobian[1][0];
@@ -297,16 +244,18 @@ impl SVF {
                 + jacobian[0][0] * v_est[1]
                 - jacobian[1][0] * residue[0])
                 / (jacobian[0][1] * jacobian[1][0] + jacobian[0][0]);
-
+            sinh_v_est0 = v_est[0].sinh();
+            tanh_v_est0 = v_est[0].tanh();
             // recompute filter
-            let filter_out = self.run_svf(input, v_est);
+            filter_out = self.run_svf(input, v_est , tanh_v_est0, sinh_v_est0);
             residue = [filter_out[0] - v_est[0], filter_out[1] - v_est[1]];
-            println!("estimate: {:?}", v_est);
-            println!("residue: {:?}", residue);
+            // println!("estimate: {:?}", v_est);
+            // println!("residue: {:?}", residue);
             n_iterations += 1;
         }
         // when newton's method is done, we have some good estimates for vout
-        println!("---- success? ----");
+        println!("---- success ----");
+        println!("n_iterations: {}", n_iterations);
 
         self.vout[0] = v_est[0];
         self.vout[1] = v_est[1];
@@ -323,14 +272,14 @@ impl SVF {
         }
     }
     /// helper function for newton's method
-    pub fn run_svf(&mut self, input: f32, v_est: [f32; 2]) -> [f32; 2] {
+    pub fn run_svf(&mut self, input: f32, v_est: [f32; 2], tanh_v_est0: f32, sinh_v_est0: f32) -> [f32; 2] {
         let g = self.params.g.get();
         let k = self.params.res.get();
         let mut out: [f32; 2] = [1.; 2];
 
         out[0] =
-            g * (input - ((k - 1.) * v_est[0] + v_est[0].sinh()) - v_est[1]).tanh() + self.s[0];
-        out[1] = g * v_est[0].tanh() + self.s[1];
+            g * (input - ((k - 1.) * v_est[0] + sinh_v_est0) - v_est[1]).tanh() + self.s[0];
+        out[1] = g * tanh_v_est0 + self.s[1];
 
         out
     }
@@ -519,6 +468,52 @@ fn newton_test() {
     }
 }
 #[test]
+fn newton_test_sine() {
+    let mut plugin = SVF::default();
+
+    // println!("g: {}", plugin.params.g.get());
+    plugin.params.set_parameter(0, 1.);
+    plugin.params.set_parameter(1, 1.);
+    // println!("g: {}", plugin.params.g.get());
+    let len = 1000;
+    let amplitude = 25.;
+    // saving samples to wav file
+    for t in (0 .. len).map(|x| x as f32 / 48000.) {
+        let _sample = plugin.tick_newton(amplitude * (t * 440.0 * 2.0 * PI).sin());
+        // let amplitude = i16::MAX as f32;
+        // writer.write_sample((sample * amplitude) as i16).unwrap();
+    }
+    // for _i in 0..len {
+    //     plugin.tick_newton(input_sample);
+
+    //     input_sample = 0.;
+    // }
+}
+#[test]
+fn newton_test_noise() {
+    use rand::Rng;
+    let mut plugin = SVF::default();
+    let mut rng = rand::thread_rng();
+    plugin.params.sample_rate.set(48000. * 2.);
+    // println!("g: {}", plugin.params.g.get());
+    plugin.params.set_parameter(0, 1.);
+    plugin.params.set_parameter(1, 1.);
+    // println!("g: {}", plugin.params.g.get());
+    let len = 1000;
+    let amplitude = 25.;
+    // saving samples to wav file
+    for _t in (0 .. len).map(|x| x as f32 / 48000.) {
+        let _sample = plugin.tick_newton(rng.gen_range(-amplitude..amplitude));
+        // let amplitude = i16::MAX as f32;
+        // writer.write_sample((sample * amplitude) as i16).unwrap();
+    }
+    // for _i in 0..len {
+    //     plugin.tick_newton(input_sample);
+
+    //     input_sample = 0.;
+    // }
+}
+#[test]
 fn matrix_test() {
     let mut jacobian_inv: [[f32; 2]; 2] = [[1.; 2]; 2];
 
@@ -544,4 +539,10 @@ fn matrix_test() {
         jacobian_inv[1][0] * residue[0] + jacobian_inv[1][1] * residue[1],
     ];
     println!("minusboy: {:?}", minusboy);
+}
+#[test]
+fn dumbtest() {
+    let a : f32 = 1. / 0.; 
+    println!("{}", -a/a);
+    println!("{}", a);
 }
