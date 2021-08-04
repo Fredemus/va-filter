@@ -4,18 +4,23 @@ use num::complex::Complex;
 use std::f32::consts::PI;
 
 pub fn lin_to_db(gain: f32) -> f32 {
-    gain.log(10.0) * 20.0
+    gain.log10() * 20.0
+}
+
+/// really cheap tan, works well enough in range [0, 0.5 * pi], but gets a bit inaccurate close to the upper bound
+pub fn _cheap_tan(x: f32) -> f32 {
+    (-0.66666667 * x.powi(3) + x) / (1. - 0.4 * x.powi(2))
 }
 
 pub fn get_svf_bode(cutoff: f32, k: f32, mode: usize) -> Vec<f32> {
-    // bilinear transform, sample rate of 1
+    // bilinear transform
     // bogus sample rate of 44100, since it just changes the plot's max value and 22050 seems reasonable
     let g = (PI * cutoff / 44100.).tan();
     // resolution of bodeplot
     let len = 1000;
 
     let mut array = vec![Complex::new(1., 0.); len];
-    let mut frequencies = vec![1.; len]; // frequency has to be in range [0, pi/2] for some reason?
+    let mut frequencies = vec![1.; len]; // frequency has to be in range [0, pi/2] because that's the range of g from the BLT
     let base: f32 = 10.;
     for i in 0..len {
         frequencies[i] = base.powf((i + 1) as f32 / (len as f32) * 3. - 3.) * PI / 2.;
@@ -74,9 +79,7 @@ fn test_cutoff_value() {
     // println!("{:?}", amplitudes.iter().max().unwrap());
     let len = 1000;
 
-    let mut frequencies = vec![1.; len]; //? probably normalized angular frequency, that is from 0 to 2 pi
-                                         // TODO: Frequency should be spaced not-linearly
-                                         // offset to skip the stupid low frequencies. 15 means first value is 9.63 Hz
+    let mut frequencies = vec![1.; len];
     let base: f32 = 10.;
     for i in 0..len {
         frequencies[i] = base.powf((i + 1) as f32 / (len as f32) * 3. - 3.) * PI / 2.;
@@ -88,4 +91,8 @@ fn test_cutoff_value() {
 
     println!("current lowest: {}", frequencies[0]);
     println!("current highest: {}", frequencies[999]);
+}
+#[test]
+fn db_print() {
+    println!("{}", lin_to_db(16.));
 }

@@ -1,4 +1,8 @@
 // colorhexa.com is nice for looking for colors
+// TODO: Instead of knobs beginning and ending changes on knob.value_changed, changes should be "grouped together"
+// somehow, maybe by use of ui.is_item_active()?
+// hmm, it seems our behavior (with regards to undoing at least) is the same as big boy problems, so not sure if it's an issue?
+
 use imgui::*;
 use imgui_knobs::*;
 
@@ -127,12 +131,12 @@ impl EditorState {
         let w = ui.push_item_width(width);
         // let title = parameter.get_name();
         let title = parameter.get_name();
-        let knob_id = &ImString::new(format!("##{}_KNOB_CONTORL_", title));
+        let knob_id = &ImString::new(format!("##{}_KNOB_CONTROL_", title));
         knob_title(ui, &ImString::new(title.to_uppercase()), width);
         let cursor = ui.cursor_pos();
         ui.set_cursor_pos([cursor[0], cursor[1] + 5.0]);
         let mut val = parameter.get_normalized();
-        let knob = Knob::new_custom_slope(
+        let knob = Knob::new(
             ui,
             knob_id,
             &mut val,
@@ -141,7 +145,6 @@ impl EditorState {
             (parameter.get_func)(parameter.from_range(parameter.default)),
             width * 0.5,
             true,
-            200.,
         );
         let cursor = ui.cursor_pos();
         ui.set_cursor_pos([cursor[0] + title_fix, cursor[1] - 10.0]);
@@ -184,7 +187,7 @@ impl EditorState {
         let cursor = ui.cursor_pos();
         ui.set_cursor_pos([cursor[0], cursor[1] + 5.0]);
         let mut val = parameter.get_normalized();
-        let knob = Knob::new_custom_slope(
+        let knob = Knob::new(
             ui,
             knob_id,
             &mut val,
@@ -193,7 +196,6 @@ impl EditorState {
             (parameter.get_func)(parameter.from_range(parameter.default as f32)),
             width * 0.5,
             true,
-            200.,
         );
         let cursor = ui.cursor_pos();
         ui.set_cursor_pos([cursor[0] + title_fix, cursor[1] - 10.0]);
