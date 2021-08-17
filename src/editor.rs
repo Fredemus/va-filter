@@ -2,11 +2,11 @@
 // TODO: Instead of knobs beginning and ending changes on knob.value_changed, changes should be "grouped together"
 // somehow, maybe by use of ui.is_item_active()?
 // hmm, it seems our behavior (with regards to undoing at least) is the same as big boy problems, so not sure if it's an issue?
-
 use imgui::*;
 use imgui_knobs::*;
 
 use crate::filter_parameters::FilterParameters;
+use crate::utils::AtomicOps;
 use imgui_baseview::{HiDpiMode, ImguiWindow, RenderSettings, Settings};
 
 use crate::parameter::{ParameterF32, ParameterUsize};
@@ -75,6 +75,7 @@ impl EditorState {
             self.params.cutoff.get(),
             self.params.res.get(),
             self.params.mode.get(),
+            self.params.filter_type.get(),
         );
         let maxmin = 30.;
         // normalizing amplitudes
@@ -215,7 +216,6 @@ impl EditorState {
             }
         }
         w.pop(ui);
-        // TODO: Proper colors pls
         draw_stepped_knob(
             &knob,
             (parameter.max - parameter.min + 1.) as u32,

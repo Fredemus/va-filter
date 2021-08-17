@@ -12,7 +12,7 @@ pub fn _cheap_tan(x: f32) -> f32 {
     (-0.66666667 * x.powi(3) + x) / (1. - 0.4 * x.powi(2))
 }
 
-pub fn get_svf_bode(cutoff: f32, k: f32, mode: usize) -> Vec<f32> {
+pub fn get_svf_bode(cutoff: f32, res: f32, mode: usize, filter_type: usize) -> Vec<f32> {
     // bilinear transform
     // bogus sample rate of 44100, since it just changes the plot's max value and 22050 seems reasonable
     let g = (PI * cutoff / 44100.).tan();
@@ -27,45 +27,67 @@ pub fn get_svf_bode(cutoff: f32, k: f32, mode: usize) -> Vec<f32> {
     }
     let j = Complex::new(0., 1.);
     let mut curr_s: Complex<f32>;
-    match mode {
+    match filter_type {
+        // state variable filter
         0 => {
-            // lowpass
-            for i in 0..len {
-                curr_s = frequencies[i] * j;
-                array[i] = g.powi(2) / ((curr_s).powi(2) + k * g * curr_s + g.powi(2));
+            let k = res * (0.05 - 10.) + 10.;
+            match mode {
+                0 => {
+                    // lowpass
+                    for i in 0..len {
+                        curr_s = frequencies[i] * j;
+                        array[i] = g.powi(2) / ((curr_s).powi(2) + k * g * curr_s + g.powi(2));
+                    }
+                }
+                1 => {
+                    // highpass
+                    for i in 0..len {
+                        curr_s = frequencies[i] * j;
+                        array[i] = curr_s.powi(2) / ((curr_s).powi(2) + k * g * curr_s + g.powi(2));
+                    }
+                }
+                2 => {
+                    // bandpass
+                    for i in 0..len {
+                        curr_s = frequencies[i] * j;
+                        array[i] = (g * curr_s) / ((curr_s).powi(2) + k * g * curr_s + g.powi(2));
+                    }
+                }
+                3 => {
+                    // notch
+                    for i in 0..len {
+                        curr_s = frequencies[i] * j;
+                        array[i] = (g.powi(2) + curr_s.powi(2))
+                            / ((curr_s).powi(2) + k * g * curr_s + g.powi(2));
+                    }
+                }
+                5 => {
+                    // bandpass (constant peak gain)
+                    for i in 0..len {
+                        curr_s = frequencies[i] * j;
+                        array[i] =
+                            (g * curr_s * k) / ((curr_s).powi(2) + k * g * curr_s + g.powi(2));
+                    }
+                }
+                _ => (),
             }
         }
+        // transistor ladder filter
+        // TODO: transfer func is unfinished. Where does g go?
         1 => {
-            // highpass
+            let k = res * (3.8 - 0.5) - 0.5;
             for i in 0..len {
                 curr_s = frequencies[i] * j;
-                array[i] = curr_s.powi(2) / ((curr_s).powi(2) + k * g * curr_s + g.powi(2));
-            }
-        }
-        2 => {
-            // bandpass
-            for i in 0..len {
-                curr_s = frequencies[i] * j;
-                array[i] = (g * curr_s) / ((curr_s).powi(2) + k * g * curr_s + g.powi(2));
-            }
-        }
-        3 => {
-            // notch
-            for i in 0..len {
-                curr_s = frequencies[i] * j;
-                array[i] =
-                    (g.powi(2) + curr_s.powi(2)) / ((curr_s).powi(2) + k * g * curr_s + g.powi(2));
-            }
-        }
-        5 => {
-            // bandpass (constant peak gain)
-            for i in 0..len {
-                curr_s = frequencies[i] * j;
-                array[i] = (g * curr_s * k) / ((curr_s).powi(2) + k * g * curr_s + g.powi(2));
+                // potentially this should have 1 + k as numerator
+                array[i] = (1.) / (k + (1. + curr_s/g).powi(mode as i32 + 1));
             }
         }
         _ => (),
     }
+
+    // TODO: Finish plotting of moog filter
+    // Make sure k is equivalent between the 2 filters
+
     let mut amplitudes = vec![1.; len];
     for i in 0..len {
         amplitudes[i] = lin_to_db(array[i].norm());
@@ -75,7 +97,7 @@ pub fn get_svf_bode(cutoff: f32, k: f32, mode: usize) -> Vec<f32> {
 
 #[test]
 fn test_cutoff_value() {
-    let amplitudes = get_svf_bode(25.1425, 1. / 0.707, 3);
+    let amplitudes = get_svf_bode(25.1425, 1. / 0.707, 3, 0);
     // println!("{:?}", amplitudes.iter().max().unwrap());
     let len = 1000;
 
@@ -94,5 +116,5 @@ fn test_cutoff_value() {
 }
 #[test]
 fn db_print() {
-    println!("{}", lin_to_db(16.));
+    println!("{}", lin_to_db(15.8490));
 }
