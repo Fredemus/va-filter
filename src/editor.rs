@@ -55,7 +55,6 @@ pub struct EditorState {
     pub host: Option<HostCallback>,
 }
 impl EditorState {
-    // TODO: When resonance gets really low, slope doesn't get gentler, it just looks like cutoff moves. Why??
     fn draw_bode_plot(&self, ui: &Ui, size: [f32; 2]) {
         let draw_list = ui.get_window_draw_list();
         let cursor = ui.cursor_screen_pos();
@@ -71,13 +70,13 @@ impl EditorState {
             .build();
 
         let color = ORANGE;
-        let mut amps = plot::get_svf_bode(
+        let mut amps = plot::get_filter_bode(
             self.params.cutoff.get(),
             self.params.res.get(),
             self.params.mode.get(),
             self.params.filter_type.get(),
         );
-        let maxmin = 30.;
+        let maxmin = 40.;
         // normalizing amplitudes
         for x in &mut amps {
             *x = (*x - (-maxmin)) / (maxmin - (-maxmin))
@@ -88,7 +87,7 @@ impl EditorState {
         let scale_y = size[1];
         let mut last = amps[0] * scale_y;
         for i in 1..length {
-            // TODO: The scale might give problems with clipping out if resonance is higher than +12 dB
+            // The scale might give problems with clipping out if resonance is higher than +12 dB
             let next = amps[i] * scale_y;
 
             let fi = i as f32;

@@ -32,7 +32,8 @@ pub struct LadderFilter {
 #[allow(dead_code)]
 impl LadderFilter {
     pub fn set_k(&mut self, k: f32) {
-        self.transformed_k = k * (3.8 - 0.5) - 0.5;
+        // self.transformed_k = k * (3.6 + 0.2) - 0.2;
+        self.transformed_k = k.powi(2) * 3.8 - 0.2;
     }
     fn get_estimate(&mut self, n: usize, estimate: EstimateSource, input: f32) -> f32 {
         // if we ask for an estimate based on the linear filter, we have to run it
@@ -150,41 +151,34 @@ impl LadderFilter {
             g * (tanh_y2_est - tanh_y3_est) + self.s[2] - v_est[2],
             g * (tanh_y3_est - tanh_y4_est) + self.s[3] - v_est[3],
         ];
-        println!("residue: {:?}", residue);
-        println!("vest: {:?}", v_est);
+        // println!("residue: {:?}", residue);
+        // println!("vest: {:?}", v_est);
         let max_error = 0.00001;
         let mut n_iterations = 0;
         while (residue[0].abs() > max_error
             || residue[1].abs() > max_error
             || residue[2].abs() > max_error
             || residue[3].abs() > max_error)
-            // && n_iterations < 9
+            && n_iterations < 9
         {
-            if n_iterations > 10 {
-                // break;
-                panic!("filter doesn't converge");
-            }
+            // if n_iterations > 10 {
+            //     break;
+                // panic!("filter doesn't converge");
+            // }
             // jacobian matrix
             let mut j: [[f32; 4]; 4] = [[0.; 4]; 4];
 
-            // j[0][0] = -g * (1. - tanh_y1_est * tanh_y1_est) - 1.;
-            // j[0][3] = -g * k * (1. - tanh_input * tanh_input);
-            // j[1][0] = g * (1. - tanh_y1_est * tanh_y1_est);
-            // j[1][1] = -g * (1. - tanh_y2_est * tanh_y2_est) - 1.;
-            // j[2][1] = g * (1. - tanh_y2_est * tanh_y2_est);
-            // j[2][2] = -g * (1. - tanh_y3_est * tanh_y3_est) - 1.;
-            // j[3][2] = g * (1. - tanh_y3_est * tanh_y3_est);
-            // j[3][3] = -g * (1. - tanh_y4_est * tanh_y4_est) - 1.;
-            j[0][0] = g * (-1. + tanh_y1_est * tanh_y1_est) - 1.;
-            j[0][3] = -g * k * (1. - tanh_input * tanh_input);
             j[1][0] = g * (1. - tanh_y1_est * tanh_y1_est);
-            j[1][1] = g * (-1. + tanh_y2_est * tanh_y2_est) - 1.;
+            j[0][0] = -j[1][0] - 1.;
+            j[0][3] = -g * k * (1. - tanh_input * tanh_input);
             j[2][1] = g * (1. - tanh_y2_est * tanh_y2_est);
-            j[2][2] = g * (-1. + tanh_y3_est * tanh_y3_est) - 1.;
+            j[1][1] = -j[2][1] - 1.;
             j[3][2] = g * (1. - tanh_y3_est * tanh_y3_est);
-            j[3][3] = g * (-1. + tanh_y4_est * tanh_y4_est) - 1.;
-            // TODO: It seems like v_est[0] never changes
+            j[2][2] = -j[3][2] - 1.;
+            j[3][3] = -g * (1. - tanh_y4_est * tanh_y4_est) - 1.;
+
             // this one is disgustingly huge, but couldn't find a way to avoid that. Look into inverting matrix
+            // maybe try replacing j_m_n with the expressions and simplify in maple?
             temp[0] = (((j[2][2] * residue[3] - j[3][2] * residue[2]) * j[1][1]
                 + j[2][1] * j[3][2] * (-j[1][0] * v_est[0] + residue[1]))
                 * j[0][3]
@@ -194,6 +188,7 @@ impl LadderFilter {
             temp[1] = (j[1][0] * v_est[0] - j[1][0] * temp[0] + j[1][1] * v_est[1] - residue[1]) / (j[1][1]);
             temp[2] = (j[2][1] * v_est[1] - j[2][1] * temp[1] + j[2][2] * v_est[2] - residue[2]) / (j[2][2]);
             temp[3] = (j[3][2] * v_est[2] - j[3][2] * temp[2] + j[3][3] * v_est[3] - residue[3]) / (j[3][3]);
+
             v_est = temp;
             tanh_input = (input - k * v_est[3]).tanh();
             tanh_y1_est = v_est[0].tanh();
@@ -207,13 +202,9 @@ impl LadderFilter {
                 g * (tanh_y2_est - tanh_y3_est) + self.s[2] - v_est[2],
                 g * (tanh_y3_est - tanh_y4_est) + self.s[3] - v_est[3],
             ];
-            // println!("jacobian: {:?}", j);
-            println!("vest: {:?}", v_est);
-            println!("residue: {:?}", residue);
-
             n_iterations += 1;
         }
-        println!("------- n iterations: {}", n_iterations);
+        // println!("n iterations: {}", n_iterations);
         self.vout = v_est;
         return self.vout[self.params.mode.get()];
     }
@@ -223,7 +214,7 @@ impl LadderFilter {
         let out = self.run_filter_newton(input * (self.params.drive.get() + 1.));
         // update ic1eq and ic2eq for next sample
         self.update_state();
-        out
+        out * (1. + self.transformed_k)
     }
     // performs a complete filter process (newton-raphson method)
     pub fn tick_pivotal(&mut self, input: f32) -> f32 {
@@ -245,7 +236,9 @@ pub struct SVF {
 impl SVF {
     // transform resonance parameter into something more useful for the filter
     pub fn set_k(&mut self, k: f32) {
-        self.transformed_k = k * (0.05 - 10.) + 10.;
+        // the .powf(2) could be avoided by moving to q instead of k/zeta,
+        // but that means we can't go for self-resonance if we want
+        self.transformed_k = k.powf(0.2) * (0.05 - 10.) + 10.;
     }
     // the state needs to be updated after each process. Found by trapezoidal integration
     #[inline]
@@ -542,14 +535,14 @@ fn newton_test_sine() {
     // plugin.params.set_parameter(0, 1.);
     // plugin.params.set_parameter(1, 1.);
     // println!("g: {}", plugin.params.g.get());
-    plugin.set_k(0.4);
+    plugin.set_k(0.6);
 
     let len = 1000;
-    let amplitude = 1.;
+    let amplitude = 10.;
     // saving samples to wav file
     for t in (0..len).map(|x| x as f32 / 48000.) {
         let _sample = plugin.tick_newton(amplitude * (t * 440.0 * 2.0 * 3.14159265).sin());
-        println!("got here");
+        // println!("got here");
         // let amplitude = i16::MAX as f32;
         // writer.write_sample((sample * amplitude) as i16).unwrap();
     }
