@@ -27,14 +27,9 @@ pub struct LadderFilter {
     pub params: Arc<FilterParameters>,
     vout: [f32; 4],
     s: [f32; 4],
-    transformed_k: f32,
 }
 #[allow(dead_code)]
 impl LadderFilter {
-    pub fn set_k(&mut self, k: f32) {
-        // self.transformed_k = k * (3.6 + 0.2) - 0.2;
-        self.transformed_k = k.powi(2) * 3.8 - 0.2;
-    }
     fn get_estimate(&mut self, n: usize, estimate: EstimateSource, input: f32) -> f32 {
         // if we ask for an estimate based on the linear filter, we have to run it
         if estimate == EstimateSource::LinearStateEstimate
@@ -57,13 +52,11 @@ impl LadderFilter {
         self.s[3] = 2. * self.vout[3] - self.s[3];
     }
     // nonlinear ladder filter function with distortion.
-    // TODO: This one clips in a somewhat weird way i think?
-    // seemingly, input should be (input - k * y3_est)
     fn run_filter_pivotal(&mut self, input: f32) -> f32 {
         let mut a: [f32; 5] = [1.; 5];
         // let base = [input, self.s[0], self.s[1], self.s[2], self.s[3]];
         let g = self.params.g.get();
-        let k = self.transformed_k;
+        let k = self.params.k_ladder.get();
         let base = [
             input - k * self.s[3],
             // input, // <- old base[0]
@@ -100,13 +93,13 @@ impl LadderFilter {
         self.vout[1] = g1 * (g * a[2] * self.vout[0] + self.s[1]);
         self.vout[2] = g2 * (g * a[3] * self.vout[1] + self.s[2]);
 
-        return self.vout[self.params.mode.get()];
+        return self.vout[self.params.slope.get()];
     }
     // linear version without distortion
     fn run_filter_linear(&mut self, input: f32) -> f32 {
         // denominators of solutions of individual stages. Simplifies the math a bit
         let g = self.params.g.get();
-        let k = self.transformed_k;
+        let k = self.params.k_ladder.get();
         let g0 = 1. / (1. + g);
         let g1 = g * g0 * g0;
         let g2 = g * g1 * g0;
@@ -119,13 +112,13 @@ impl LadderFilter {
         self.vout[0] = g0 * (g * (input - k * self.vout[3]) + self.s[0]);
         self.vout[1] = g0 * (g * self.vout[0] + self.s[1]);
         self.vout[2] = g0 * (g * self.vout[1] + self.s[2]);
-        return self.vout[self.params.mode.get()];
+        return self.vout[self.params.slope.get()];
     }
     fn run_filter_newton(&mut self, input: f32) -> f32 {
         // ---------- setup ----------
         // load in g and k from parameters
         let g = self.params.g.get();
-        let k = self.transformed_k;
+        let k = self.params.k_ladder.get();
         // a[n] is the fixed-pivot approximation for whatever is being processed nonlinearly
         let mut v_est: [f32; 4];
         let mut temp: [f32; 4] = [0.; 4];
@@ -163,7 +156,7 @@ impl LadderFilter {
         {
             // if n_iterations > 10 {
             //     break;
-                // panic!("filter doesn't converge");
+            // panic!("filter doesn't converge");
             // }
             // jacobian matrix
             let mut j: [[f32; 4]; 4] = [[0.; 4]; 4];
@@ -185,9 +178,12 @@ impl LadderFilter {
                 + j[1][1] * j[2][2] * j[3][3] * (j[0][0] * v_est[0] - residue[0]))
                 / (j[0][0] * j[1][1] * j[2][2] * j[3][3] - j[0][3] * j[1][0] * j[2][1] * j[3][2]);
 
-            temp[1] = (j[1][0] * v_est[0] - j[1][0] * temp[0] + j[1][1] * v_est[1] - residue[1]) / (j[1][1]);
-            temp[2] = (j[2][1] * v_est[1] - j[2][1] * temp[1] + j[2][2] * v_est[2] - residue[2]) / (j[2][2]);
-            temp[3] = (j[3][2] * v_est[2] - j[3][2] * temp[2] + j[3][3] * v_est[3] - residue[3]) / (j[3][3]);
+            temp[1] = (j[1][0] * v_est[0] - j[1][0] * temp[0] + j[1][1] * v_est[1] - residue[1])
+                / (j[1][1]);
+            temp[2] = (j[2][1] * v_est[1] - j[2][1] * temp[1] + j[2][2] * v_est[2] - residue[2])
+                / (j[2][2]);
+            temp[3] = (j[3][2] * v_est[2] - j[3][2] * temp[2] + j[3][3] * v_est[3] - residue[3])
+                / (j[3][3]);
 
             v_est = temp;
             tanh_input = (input - k * v_est[3]).tanh();
@@ -206,7 +202,7 @@ impl LadderFilter {
         }
         // println!("n iterations: {}", n_iterations);
         self.vout = v_est;
-        return self.vout[self.params.mode.get()];
+        return self.vout[self.params.slope.get()];
     }
     // performs a complete filter process (newton-raphson method)
     pub fn tick_newton(&mut self, input: f32) -> f32 {
@@ -214,7 +210,7 @@ impl LadderFilter {
         let out = self.run_filter_newton(input * (self.params.drive.get() + 1.));
         // update ic1eq and ic2eq for next sample
         self.update_state();
-        out * (1. + self.transformed_k)
+        out * (1. + self.params.k_ladder.get())
     }
     // performs a complete filter process (newton-raphson method)
     pub fn tick_pivotal(&mut self, input: f32) -> f32 {
@@ -230,16 +226,9 @@ pub struct SVF {
     pub params: Arc<FilterParameters>,
     vout: [f32; 2],
     s: [f32; 2],
-    transformed_k: f32,
 }
 #[allow(dead_code)]
 impl SVF {
-    // transform resonance parameter into something more useful for the filter
-    pub fn set_k(&mut self, k: f32) {
-        // the .powf(2) could be avoided by moving to q instead of k/zeta,
-        // but that means we can't go for self-resonance if we want
-        self.transformed_k = k.powf(0.2) * (0.05 - 10.) + 10.;
-    }
     // the state needs to be updated after each process. Found by trapezoidal integration
     #[inline]
     fn update_state(&mut self) {
@@ -281,7 +270,7 @@ impl SVF {
         let g = self.params.g.get();
         // declaring some constants that simplifies the math a bit
         // let k = self.params.res.get();
-        let k = self.transformed_k;
+        let k = self.params.zeta.get();
         let g1 = 1. / (1. + g * (g + k));
         let g2 = g * g1;
         // let g3 = g * g2;
@@ -296,7 +285,7 @@ impl SVF {
         // load in g and k from parameters
         let g = self.params.g.get();
         // let k = self.params.res.get();
-        let k = self.transformed_k;
+        let k = self.params.zeta.get();
         // a[n] is the fixed-pivot approximation for whatever is being processed nonlinearly
         let mut a = [1.; 3];
         let est_type = EstimateSource::State;
@@ -342,7 +331,7 @@ impl SVF {
         // load in g and k from parameters
         let g = self.params.g.get();
         // potentially useful knowledge: filter starts self-oscillating at about k = -0.001
-        let k = self.transformed_k;
+        let k = self.params.zeta.get();
         // let k = self.params.res.get();
         // a[n] is the fixed-pivot approximation for whatever is being processed nonlinearly
         let mut v_est: [f32; 2];
@@ -451,7 +440,6 @@ impl Default for SVF {
             params: Arc::new(FilterParameters::default()),
             vout: [0.; 2],
             s: [0.; 2],
-            transformed_k: 0.,
         }
     }
 }
@@ -461,7 +449,6 @@ impl Default for LadderFilter {
             params: Arc::new(FilterParameters::default()),
             vout: [0.; 4],
             s: [0.; 4],
-            transformed_k: 0.,
         }
     }
 }
@@ -498,8 +485,7 @@ fn newton_svf_test() {
     let mut plugin = SVF::default();
 
     println!("g: {}", plugin.params.g.get());
-    
-    
+
     let len = 1;
     let mut input_sample = 0.;
     // saving samples to wav file
@@ -514,16 +500,16 @@ fn newton_ladder_test() {
     let mut plugin = LadderFilter::default();
 
     println!("g: {}", plugin.params.g.get());
+    plugin.params.set_resonances();
     // let k = plugin.params.res.get();
-    plugin.set_k(0.153);
-    println!("reso: {}", plugin.transformed_k);
+    println!("reso: {}", plugin.params.k_ladder.get());
     plugin.params.mode.set_normalized(0.6);
     println!("mode: {}", plugin.params.mode.get());
     let len = 100;
     let mut input_sample = 1.;
     // saving samples to wav file
     for _i in 0..len {
-        println!("{}",plugin.tick_newton(input_sample));
+        println!("{}", plugin.tick_newton(input_sample));
         input_sample = 0.;
     }
 }
@@ -535,7 +521,6 @@ fn newton_test_sine() {
     // plugin.params.set_parameter(0, 1.);
     // plugin.params.set_parameter(1, 1.);
     // println!("g: {}", plugin.params.g.get());
-    plugin.set_k(0.6);
 
     let len = 1000;
     let amplitude = 10.;

@@ -11,6 +11,9 @@ pub struct FilterParameters {
 
     pub cutoff: ParameterF32,
     pub res: ParameterF32,
+    pub zeta: AtomicF32,
+    pub k_ladder: AtomicF32,
+
     pub drive: ParameterF32,
     pub mode: ParameterUsize,
     pub slope: ParameterUsize,
@@ -19,6 +22,14 @@ pub struct FilterParameters {
     // res: Params,
     // drive: Params,
     // mode: Params,
+}
+impl FilterParameters {
+    // transform resonance parameter into something more useful for the filter
+    pub fn set_resonances(&self) {
+        let res = self.res.get_normalized();
+        self.zeta.set(5. - 4.9 * res);
+        self.k_ladder.set(res.powi(2) * 3.8 - 0.2);
+    }
 }
 // use std::ops::Index;
 // pub enum Params {
@@ -121,8 +132,8 @@ impl Default for FilterParameters {
                 |x| x,
             )),
             slope: (ParameterUsize::new(
-                "Filter mode",
-                4,
+                "Filter slope",
+                3,
                 0,
                 3,
                 |x| match x {
@@ -135,8 +146,11 @@ impl Default for FilterParameters {
                 |x| x,
                 |x| x,
             )),
+            k_ladder: AtomicF32::new(0.),
+            zeta: AtomicF32::new(0.),
         };
         a.g.set((PI * a.cutoff.get() / (a.sample_rate.get())).tan());
+        a.set_resonances();
         a
     }
 }

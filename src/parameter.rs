@@ -9,7 +9,7 @@ use crate::utils::*;
 // pub fn from_range(bottom: f32, top: f32, x: f32) -> f32 {
 //     (x - bottom) / (top - bottom)
 // }
-
+// draw_knob functions could be made simpler if parameter structs had the parameter_index saved
 pub struct ParameterF32 {
     name: String,
     normalized_value: AtomicF32,
@@ -18,7 +18,6 @@ pub struct ParameterF32 {
     pub min: f32,
     pub max: f32,
     display_func: fn(f32) -> String,
-    // TODO: It might be very nice to have a set_func field like
     pub set_func: fn(f32) -> f32,
     /// has to be the inverse of the set_func. Might make something to find it automatically
     pub get_func: fn(f32) -> f32,

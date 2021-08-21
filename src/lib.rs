@@ -12,12 +12,6 @@
 // or possibly just a broyden method fallback, can't be bothered working much more on this lol: http://fabcol.free.fr/pdf/lectnotes5.pdf
 // check if it's well-behaved without the pivotal guess, and how to make pivotal more similar to newton?
 
-// TODO: maybe resonance can be fixed by just having it as a parameter going between 0..1 and translating it in the filters?
-// Filter mode knob needs to get redone when filter type changes. How the hell do you do that?
-// decide on gain comping ladder or not
-// maybe a gain coefficient can bring the filters closer to the same amplitude
-// swap bandpass and notch?
-
 #[macro_use]
 extern crate vst;
 use filter::{LadderFilter, SVF};
@@ -48,8 +42,7 @@ struct VST {
     ladder: filter::LadderFilter,
     svf: filter::SVF,
 }
-impl VST {
-}
+impl VST {}
 impl FilterParameters {
     pub fn update_g(&self) {
         self.g
@@ -62,8 +55,9 @@ impl PluginParameters for FilterParameters {
             0 => self.cutoff.get_normalized(),
             1 => self.res.get_normalized(),
             2 => self.drive.get_normalized(),
-            3 => self.mode.get_normalized() as f32,
-            4 => self.filter_type.get() as f32,
+            3 => self.filter_type.get() as f32,
+            4 => self.mode.get_normalized() as f32,
+            5 => self.slope.get_normalized() as f32,
             _ => 0.0,
         }
     }
@@ -73,13 +67,17 @@ impl PluginParameters for FilterParameters {
                 self.cutoff.set_normalized(value);
                 self.update_g();
             }
-            1 => self.res.set_normalized(value),
+            1 => {
+                self.res.set_normalized(value);
+                self.set_resonances();
+            }
             2 => self.drive.set_normalized(value),
-            3 => self.mode.set_normalized(value),
-            // TODO: this won't work with more than 2 filter modes, make proper param
-            4 => {
+            // TODO: filter_type won't work with more than 2 filter modes, make proper param
+            3 => {
                 self.filter_type.set(value as usize);
             }
+            4 => self.mode.set_normalized(value),
+            5 => self.slope.set_normalized(value),
             _ => (),
         }
     }
@@ -88,8 +86,9 @@ impl PluginParameters for FilterParameters {
             0 => "cutoff".to_string(),
             1 => "resonance".to_string(),
             2 => "drive".to_string(),
-            3 => "filter mode".to_string(),
-            4 => "filter type".to_string(),
+            3 => "filter type".to_string(),
+            4 => "filter mode".to_string(),
+            5 => "filter slope".to_string(),
             _ => "".to_string(),
         }
     }
@@ -100,11 +99,12 @@ impl PluginParameters for FilterParameters {
             0 => self.cutoff.get_display(),
             1 => self.res.get_display(),
             2 => self.drive.get_display(),
-            3 => self.mode.get_display(),
-            4 => match self.filter_type.get() {
-                0 => "State variable filter".to_string(),
-                _ => "Transistor ladder filter".to_string(),
+            3 => match self.filter_type.get() {
+                0 => "State variable".to_string(),
+                _ => "Transistor ladder".to_string(),
             },
+            4 => self.mode.get_display(),
+            5 => self.slope.get_display(),
             _ => format!(""),
         }
     }
@@ -161,7 +161,7 @@ impl Plugin for VST {
             inputs: 1,
             outputs: 1,
             category: Category::Effect,
-            parameters: 5,
+            parameters: 6,
             ..Default::default()
         }
     }
@@ -171,10 +171,6 @@ impl Plugin for VST {
         // split the buffer into input and output
         if self.params.filter_type.get() == 0 {
             for (input_buffer, output_buffer) in buffer.zip() {
-                // TODO: set_k should probably be called in parameter somehow
-                // maybe move the transformed_k's into FilterParameters and make them f32?
-                // that way they only get set when the parameter changes
-                self.svf.set_k(self.params.res.get());
                 // iterate through each sample in the input and output buffer
                 for (input_sample, output_sample) in input_buffer.iter().zip(output_buffer) {
                     // get the output sample by processing the input sample
@@ -185,8 +181,6 @@ impl Plugin for VST {
             }
         } else {
             for (input_buffer, output_buffer) in buffer.zip() {
-                // TODO: set_k should probably be called in parameter somehow
-                self.ladder.set_k(self.params.res.get());
                 // iterate through each sample in the input and output buffer
                 for (input_sample, output_sample) in input_buffer.iter().zip(output_buffer) {
                     // get the output sample by processing the input sample
@@ -213,8 +207,7 @@ plugin_main!(VST);
 fn dumbtest() {
     if true && 0 < 9 {
         println!("stuff makes sense");
-    }
-    else {
+    } else {
         println!("????")
     }
 }

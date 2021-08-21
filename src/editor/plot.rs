@@ -13,7 +13,7 @@ pub fn _cheap_tan(x: f32) -> f32 {
     (-0.66666667 * x.powi(3) + x) / (1. - 0.4 * x.powi(2))
 }
 
-pub fn get_filter_bode(cutoff: f32, res: f32, mode: usize, filter_type: usize) -> Vec<f32> {
+pub fn get_filter_bode(cutoff: f32, k: f32, mode: usize, filter_type: usize) -> Vec<f32> {
     // bilinear transform
     // bogus sample rate of 44100, since it just changes the plot's max value and 22050 seems reasonable
     let g = (PI * cutoff / 44100.).tan();
@@ -31,7 +31,7 @@ pub fn get_filter_bode(cutoff: f32, res: f32, mode: usize, filter_type: usize) -
     match filter_type {
         // state variable filter
         0 => {
-            let k = res.powf(0.2) * (0.05 - 10.) + 10.;
+            // let k = res.powf(0.2) * (0.05 - 10.) + 10.;
             match mode {
                 0 => {
                     // lowpass
@@ -75,13 +75,14 @@ pub fn get_filter_bode(cutoff: f32, res: f32, mode: usize, filter_type: usize) -
         }
         // transistor ladder filter
         1 => {
-            let k = res.powi(2) * (3.8) - 0.2;
+            // let k = res.powi(2) * (3.8) - 0.2;
             for i in 0..len {
                 curr_s = frequencies[i] * j;
                 // TODO: the transfer func is not right for 1-3 pole mode. Math it out properly
                 // potentially this should have 1 + k as numerator
                 // could potentially be optimized, i think
-                array[i] = ((1. + k) * (1. + curr_s/g).powi(3 - mode as i32)) / (k + (1. + curr_s/g).powi(4));
+                array[i] = ((1. + k) * (1. + curr_s / g).powi(3 - mode as i32))
+                    / (k + (1. + curr_s / g).powi(4));
             }
         }
         _ => (),
@@ -96,7 +97,7 @@ pub fn get_filter_bode(cutoff: f32, res: f32, mode: usize, filter_type: usize) -
 
 #[test]
 fn test_cutoff_value() {
-    let amplitudes = get_filter_bode(25.1425 *2., 1. / 0.707, 3, 0);
+    let amplitudes = get_filter_bode(25.1425 * 2., 1. / 0.707, 3, 0);
     // println!("{:?}", amplitudes.iter().max().unwrap());
     let len = 1000;
 
@@ -132,11 +133,14 @@ fn test_ladder_value() {
     println!("amps: {:?}", &amplitudes[min_idx..max_idx]);
     println!("freqs: {:?}", &frequencies[min_idx..max_idx]);
 
-    println!("highest amp: {}", amplitudes.into_iter().reduce(f32::max).unwrap());
+    println!(
+        "highest amp: {}",
+        amplitudes.into_iter().reduce(f32::max).unwrap()
+    );
     println!("current lowest: {}", frequencies[0]);
     println!("current highest: {}", frequencies[999]);
 }
 #[test]
 fn db_print() {
-    println!("{}", lin_to_db(20./0.00001));
+    println!("{}", lin_to_db(20. / 0.00001));
 }

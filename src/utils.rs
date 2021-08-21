@@ -44,7 +44,26 @@ impl AtomicOps for AtomicUsize {
         self.0.store(v, Ordering::Relaxed)
     }
 }
+/// Simple wrapper over `AtomicBool` with relaxed ordering.
+pub struct AtomicBool(atomic::AtomicBool);
+#[allow(dead_code)]
+impl AtomicOps for AtomicBool {
+    type Item = bool;
+    /// Create a new atomic 8-bit integer with initial value `v`.
+    fn new(v: bool) -> AtomicBool {
+        AtomicBool(atomic::AtomicBool::new(v))
+    }
 
+    /// Loads a value from the atomic integer with relaxed ordering.
+    fn get(&self) -> bool {
+        self.0.load(Ordering::Relaxed)
+    }
+
+    /// Stores a value into the atomic integer with relaxed ordering.
+    fn set(&self, v: bool) {
+        self.0.store(v, Ordering::Relaxed)
+    }
+}
 /// Simple wrapper over `AtomicI8` with relaxed ordering.
 pub struct AtomicI8(atomic::AtomicI8);
 

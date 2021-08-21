@@ -70,12 +70,23 @@ impl EditorState {
             .build();
 
         let color = ORANGE;
-        let mut amps = plot::get_filter_bode(
-            self.params.cutoff.get(),
-            self.params.res.get(),
-            self.params.mode.get(),
-            self.params.filter_type.get(),
-        );
+        let mut amps: Vec<f32>;
+        if self.params.filter_type.get() == 0 {
+            amps = plot::get_filter_bode(
+                self.params.cutoff.get(),
+                self.params.zeta.get(),
+                self.params.mode.get(),
+                self.params.filter_type.get(),
+            );
+        } else {
+            amps = plot::get_filter_bode(
+                self.params.cutoff.get(),
+                self.params.k_ladder.get(),
+                self.params.slope.get(),
+                self.params.filter_type.get(),
+            );
+        };
+
         let maxmin = 40.;
         // normalizing amplitudes
         for x in &mut amps {
@@ -318,8 +329,11 @@ impl Editor for SVFPluginEditor {
 
                     state.make_knob(ui, &params.drive, 2, &highlight, &lowlight, 0.0);
                     ui.next_column();
-
-                    state.make_steppy_knob(ui, &params.mode, 3, &highlight, &lowlight, 0.0);
+                    if params.filter_type.get() == 0 {
+                        state.make_steppy_knob(ui, &params.mode, 4, &highlight, &lowlight, 0.0);
+                    } else {
+                        state.make_steppy_knob(ui, &params.slope, 5, &highlight, &lowlight, 0.0);
+                    }
                     ui.next_column();
 
                     ui.columns(1, im_str!("nocols"), false);
@@ -382,3 +396,19 @@ unsafe impl HasRawWindowHandle for VstParent {
         })
     }
 }
+
+// not sure how to do this, but would be extremely useful
+// #[test]
+// fn spawn_gui() {
+//     let params = Arc::new(filter_parameters::FilterParameters::default());
+//     let editor = SVFPluginEditor {
+//         is_open: false,
+//         state: Arc::new(EditorState {
+//             params: params,
+//             host: None,
+//         }),
+//     };
+//     // something like spawning a window with imgui, then getting its hwnd and then using that to call editor:: open?
+//     editor.open();
+
+// }
