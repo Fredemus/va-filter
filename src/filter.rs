@@ -354,31 +354,20 @@ impl SVF {
         let max_error = 0.00001;
         let mut n_iterations = 0;
         while residue[0].abs() > max_error || residue[1].abs() > max_error {
-            if n_iterations > 10 {
+            // terminate if error doesn't improve after 10 iterations
+            if n_iterations > 9 {
                 // panic!("infinite loop mayhaps?");
                 // println!("infinite loop mayhaps?");
                 break;
             }
             // TODO: not sure why this can't start out as uninitialized
             let mut jacobian: [[f32; 2]; 2] = [[-1.; 2]; 2];
-            // factored out of the derivatives
-            // let bigboy = (v_est[0] * k + sinh_v_est0 - input - v_est[0] + v_est[1]).cosh().powi(2);
-            let bigboy = 1. / (1. - fb_line * fb_line);
-            // since the thing that happens at j[0][0] is that it goes towards -1 at low values
-            // (everything else than bigboy becomes really small), if it ever is NaN (overflow), we just set it to -1
-            if bigboy.is_infinite() {
-                // println!("bigboy is inf");
-                jacobian[0][0] = -1.;
-                jacobian[0][1] = 0.;
-            } else {
-                // jacobian[0][0] = (-bigboy - (g * (k - 1. + (v_est[0]).cosh()))) / bigboy;
-                // Note: If you replace sinh or tanh with an approximation, sinh_v_est0/tanh_v_est0 needs to be change to dy/dx (sinh(x))
-                jacobian[0][0] = (-bigboy - (g * (k - 1. + sinh_v_est0 / tanh_v_est0))) / bigboy;
-                jacobian[0][1] = -(g / bigboy);
-            }
-            // jacobian[1][0] = g * (v_est[0].cosh().powi(2));
+            
+            let new_bigboy = 1. - fb_line * fb_line;
+
+            jacobian[0][0] = -g * new_bigboy * (k - 1. + sinh_v_est0 / tanh_v_est0) - 1.;
+            jacobian[0][1] = -g * new_bigboy;
             jacobian[1][0] = g * (1. - tanh_v_est0 * tanh_v_est0);
-            // jacobian[1][1] = -1.;
 
             v_est[0] = (jacobian[0][1] * jacobian[1][0] * v_est[0] + jacobian[0][0] * v_est[0]
                 - jacobian[0][1] * residue[1]
@@ -396,6 +385,7 @@ impl SVF {
             residue = self.run_helper_svf(g, tanh_v_est0, fb_line, v_est);
             n_iterations += 1;
         }
+        // println!("n iters: {}", n_iterations);
         // when newton's method is done, we have some good estimates for vout
         self.vout = v_est;
 
@@ -515,15 +505,16 @@ fn newton_ladder_test() {
 }
 #[test]
 fn newton_test_sine() {
-    let mut plugin = LadderFilter::default();
+    let mut plugin = SVF::default();
 
     // println!("g: {}", plugin.params.g.get());
-    // plugin.params.set_parameter(0, 1.);
+    use crate::vst::plugin::PluginParameters;
+    plugin.params.set_parameter(0, 1.);
     // plugin.params.set_parameter(1, 1.);
     // println!("g: {}", plugin.params.g.get());
 
     let len = 1000;
-    let amplitude = 10.;
+    let amplitude = 25.;
     // saving samples to wav file
     for t in (0..len).map(|x| x as f32 / 48000.) {
         let _sample = plugin.tick_newton(amplitude * (t * 440.0 * 2.0 * 3.14159265).sin());
