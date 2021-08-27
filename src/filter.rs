@@ -335,7 +335,7 @@ impl SVF {
         // let k = self.params.res.get();
         // a[n] is the fixed-pivot approximation for whatever is being processed nonlinearly
         let mut v_est: [f32; 2];
-        let est_type = EstimateSource::LinearVoutEstimate;
+        let est_type = EstimateSource::State;
         // let est_type = EstimateSource::State;
 
         // getting initial estimate. Could potentially be done with the fixed_pivot filter
@@ -344,7 +344,8 @@ impl SVF {
             self.get_estimate(1, est_type, input),
         ];
         let mut sinh_v_est0 = v_est[0].sinh();
-        let mut tanh_v_est0 = v_est[0].tanh();
+        let mut cosh_v_est0 = v_est[0].cosh();
+        let mut tanh_v_est0 = sinh_v_est0 / cosh_v_est0;
         let mut fb_line = (input - ((k - 1.) * v_est[0] + sinh_v_est0) - v_est[1]).tanh();
         // using fixed_pivot as estimate
         // self.run_svf_pivotal(input);
@@ -357,15 +358,16 @@ impl SVF {
             // terminate if error doesn't improve after 10 iterations
             if n_iterations > 9 {
                 // panic!("infinite loop mayhaps?");
-                // println!("infinite loop mayhaps?");
                 break;
             }
             // TODO: not sure why this can't start out as uninitialized
             let mut jacobian: [[f32; 2]; 2] = [[-1.; 2]; 2];
             
             let new_bigboy = 1. - fb_line * fb_line;
-
-            jacobian[0][0] = -g * new_bigboy * (k - 1. + sinh_v_est0 / tanh_v_est0) - 1.;
+            // TODO: Very likely, the division by tanh_v_est0 causes j[0][0] to go to inf when tanh_v_est0 is 0
+            // maybe just bite the bullet and calc cosh_vest0?
+            // tanh = sinh / cosh should be safe (overflow problems?), and could be used to get tanh_v_est0
+            jacobian[0][0] = -g * new_bigboy * (k - 1. + cosh_v_est0) - 1.;
             jacobian[0][1] = -g * new_bigboy;
             jacobian[1][0] = g * (1. - tanh_v_est0 * tanh_v_est0);
 
@@ -379,16 +381,15 @@ impl SVF {
                 - jacobian[1][0] * residue[0])
                 / (jacobian[0][1] * jacobian[1][0] + jacobian[0][0]);
             sinh_v_est0 = v_est[0].sinh();
-            tanh_v_est0 = v_est[0].tanh();
+            cosh_v_est0 = v_est[0].cosh();
+            tanh_v_est0 = sinh_v_est0 / cosh_v_est0;
             fb_line = (input - ((k - 1.) * v_est[0] + sinh_v_est0) - v_est[1]).tanh();
             // recompute filter
             residue = self.run_helper_svf(g, tanh_v_est0, fb_line, v_est);
             n_iterations += 1;
         }
-        // println!("n iters: {}", n_iterations);
         // when newton's method is done, we have some good estimates for vout
         self.vout = v_est;
-
         // here, the output is chosen to give the specified type of filter
         self.get_output(input, k)
     }
