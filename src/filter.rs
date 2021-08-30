@@ -3,13 +3,12 @@ use crate::utils::AtomicOps;
 use std::sync::Arc;
 use packed_simd::f32x4;
 // TODO: Flatten jacobian matrices
+
 /// cheap tanh, potentially useful for optimization. 
-// need to have its generated overtones checked, and its derivative found
 // from a quick look it looks extremely good, max error of ~0.0002 or .02%
 // the error of 1 - tanh_levien^2 as the derivative is about .06%, so maybe this could easily be substituted?
-// still need to actually profile improvement
 #[inline]
-pub fn _tanh_levien(x: f32) -> f32 {
+pub fn tanh_levien(x: f32x4) -> f32x4 {
     let x2 = x * x;
     let x3 = x2 * x;
     let x5 = x3 * x2;
@@ -133,11 +132,11 @@ impl LadderFilter {
             self.get_estimate(2, est_type, input),
             self.get_estimate(3, est_type, input),
         ];
-        let mut tanh_input = (input - k * v_est[3]).tanh();
-        let mut tanh_y1_est = v_est[0].tanh();
-        let mut tanh_y2_est = v_est[1].tanh();
-        let mut tanh_y3_est = v_est[2].tanh();
-        let mut tanh_y4_est = v_est[3].tanh();
+        let mut tanh_input = tanh_levien(input - k * v_est[3]);
+        let mut tanh_y1_est = tanh_levien(v_est[0]);
+        let mut tanh_y2_est = tanh_levien(v_est[1]);
+        let mut tanh_y3_est = tanh_levien(v_est[2]);
+        let mut tanh_y4_est = tanh_levien(v_est[3]);
         let mut residue = [
             g * (tanh_input - tanh_y1_est) + self.s[0] - v_est[0],
             g * (tanh_y1_est - tanh_y2_est) + self.s[1] - v_est[1],
@@ -153,11 +152,10 @@ impl LadderFilter {
 
         }
         // f32x4.lt(max_error) returns a mask. 
-        // Need to verify that the empty lanes never end up having error
-        while (residue[0].abs().lt(max_error).any()
-            || residue[1].abs().lt(max_error).any()
-            || residue[2].abs().lt(max_error).any()
-            || residue[3].abs().lt(max_error).any())
+        while (residue[0].abs().gt(max_error).any()
+            || residue[1].abs().gt(max_error).any()
+            || residue[2].abs().gt(max_error).any()
+            || residue[3].abs().gt(max_error).any())
             && n_iterations < 9
         {
             // if n_iterations > 10 {
@@ -176,7 +174,7 @@ impl LadderFilter {
             let j33 = -g * (1. - tanh_y4_est * tanh_y4_est) - 1.;
 
             // this one is disgustingly huge, but couldn't find a way to avoid that. Look into inverting matrix
-            // maybe try replacing j_m_n with the expressions and simplify in maple?
+            // maybe try replacing j_m_n with the expressions and simplify in maple? <- didn't help
             temp[0] = (((j22 * residue[3] - j32 * residue[2]) * j11
                 + j21 * j32 * (-j10 * v_est[0] + residue[1]))
                 * j03
@@ -191,11 +189,11 @@ impl LadderFilter {
                 / (j33);
 
             v_est = temp;
-            tanh_input = (input - k * v_est[3]).tanh();
-            tanh_y1_est = v_est[0].tanh();
-            tanh_y2_est = v_est[1].tanh();
-            tanh_y3_est = v_est[2].tanh();
-            tanh_y4_est = v_est[3].tanh();
+            tanh_input = tanh_levien(input - k * v_est[3]);
+            tanh_y1_est = tanh_levien(v_est[0]);
+            tanh_y2_est = tanh_levien(v_est[1]);
+            tanh_y3_est = tanh_levien(v_est[2]);
+            tanh_y4_est = tanh_levien(v_est[3]);
 
             residue = [
                 g * (tanh_input - tanh_y1_est) + self.s[0] - v_est[0],
@@ -295,7 +293,7 @@ impl SVF {
         let mut cosh_v_est0 = simd_cosh(v_est[0]);
 
         let mut tanh_v_est0 = sinh_v_est0 / cosh_v_est0;
-        let mut fb_line = (input - ((k - 1.) * v_est[0] + sinh_v_est0) - v_est[1]).tanh();
+        let mut fb_line = tanh_levien(input - ((k - 1.) * v_est[0] + sinh_v_est0) - v_est[1]);
         // using fixed_pivot as estimate
         // self.run_svf_pivotal(input);
         // v_est = [self.vout[0], self.vout[1]];
@@ -306,7 +304,7 @@ impl SVF {
 
         let max_error = f32x4::splat(0.00001);
         let mut n_iterations = 0;
-        while residue[0].abs().lt(max_error).any() || residue[0].abs().lt(max_error).any() {
+        while (residue[0].abs().gt(max_error).any() || residue[0].abs().gt(max_error).any()) && n_iterations < 9 {
             // terminate if error doesn't improve after 10 iterations
             if n_iterations > 9 {
                 // panic!("infinite loop mayhaps?");
