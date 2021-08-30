@@ -6,15 +6,20 @@
 //! Quality can be improved a lot by oversampling a bit.
 //! Damping feedback is antisaturated, so it doesn't disappear at high gains.
 
-// TODO:
 // look into successive over-relaxation, Gauss–Seidel method, just making a runge-kutta solver
 // Brent's method seems the most promising so far. Could potentially replace inverse quadratic with newton's
 // or possibly just a broyden method fallback, can't be bothered working much more on this lol: http://fabcol.free.fr/pdf/lectnotes5.pdf
 // check if it's well-behaved without the pivotal guess, and how to make pivotal more similar to newton?
 
+// TODO: 
+// The simd-ified filters are for some reason much slower (not sure if twice as slow, which would be break-even point)
+// Benchmark them and the non-simd filters
+
+
 #[macro_use]
 extern crate vst;
 use filter::{LadderFilter, SVF};
+use packed_simd::f32x4;
 use std::f32::consts::PI;
 use std::sync::Arc;
 use vst::buffer::AudioBuffer;
@@ -169,22 +174,42 @@ impl Plugin for VST {
     // buffer consists of both input and output buffers
     fn process(&mut self, buffer: &mut AudioBuffer<f32>) {
         // split the buffer into input and output
+        // potentially the duplications of code could be hidden away with process_buffer functions
         if self.params.filter_type.get() == 0 {
             for (input_buffer, output_buffer) in buffer.zip() {
                 // iterate through each sample in the input and output buffer
                 for (input_sample, output_sample) in input_buffer.iter().zip(output_buffer) {
                     // get the output sample by processing the input sample
-                    // *output_sample = self.tick_pivotal(*input_sample);
-                    // *output_sample = self.ladder.tick_newton(*input_sample);
-                    *output_sample = self.svf.tick_newton(*input_sample);
+                    let frame = f32x4::new(*input_sample, 0.0, 0.0, 0.0);
+                    // would be nice to align this, but doesn't seem possible with #[repr(align)].
+                    // ah well. not much of a perf penalty for unaligned writes these days.
+                    let processed = self.svf.tick_newton(frame);
+
+                    let mut frame_out = [0.0f32; 4];
+                    unsafe {
+                        processed.write_to_slice_unaligned_unchecked(&mut frame_out);
+                    }
+                    // get the output sample by processing the input sample
+                    *output_sample = frame_out[0];
                 }
             }
         } else {
             for (input_buffer, output_buffer) in buffer.zip() {
                 // iterate through each sample in the input and output buffer
                 for (input_sample, output_sample) in input_buffer.iter().zip(output_buffer) {
+
+                    // let frame = f32x4::new(input[0][i], input[1][i], 0.0, 0.0);
+                    let frame = f32x4::new(*input_sample, 0.0, 0.0, 0.0);
+                    // would be nice to align this, but doesn't seem possible with #[repr(align)].
+                    // ah well. not much of a perf penalty for unaligned writes these days.
+                    let processed = self.ladder.tick_newton(frame);
+
+                    let mut frame_out = [0.0f32; 4];
+                    unsafe {
+                        processed.write_to_slice_unaligned_unchecked(&mut frame_out);
+                    }
                     // get the output sample by processing the input sample
-                    *output_sample = self.ladder.tick_newton(*input_sample);
+                    *output_sample = frame_out[0];
                 }
             }
         }

@@ -15,6 +15,7 @@ imgui-baseview = {git = "https://github.com/BillyDM/imgui-baseview", branch = "m
 imgui = "0.7"
 raw-window-handle = "0.3"
 num = "0.4.0"
+packed_simd = { version = "0.3.4", package = "packed_simd_2" }
 hound = "3.4.0"
 rand = "0.8.4"
 imgui-knobs = {git =" https://github.com/Fredemus/imgui-rs-knobs", branch = "main"}
