@@ -10,15 +10,18 @@ name = "svf_gui"
 crate-type = ["cdylib"]
 [dependencies]
 vst = { git = "https://github.com/rust-dsp/rust-vst" }
-baseview = { git = "https://github.com/RustAudio/baseview.git", rev = "d399c1275522ae75f5a82caadd904df2685c8660" }
-imgui-baseview = {git = "https://github.com/BillyDM/imgui-baseview", branch = "main"}
-imgui = "0.7"
+# baseview = { git = "https://github.com/RustAudio/baseview.git", rev = "d399c1275522ae75f5a82caadd904df2685c8660" }
+baseview = { git = "https://github.com/RustAudio/baseview.git", rev = "9fbfe18f9a6859da83a55f7b51fe1e5a2f6ca1e6"} # newest
+
+# imgui-baseview = {git = "https://github.com/BillyDM/imgui-baseview", branch = "main"}
+imgui-baseview = {git = "https://github.com/Fredemus/imgui-baseview"}
+imgui = "0.8"
 raw-window-handle = "0.3"
 num = "0.4.0"
 packed_simd = { version = "0.3.6", package = "packed_simd_2" }
 hound = "3.4.0"
 rand = "0.8.4"
-imgui-knobs = {git =" https://github.com/Fredemus/imgui-rs-knobs", branch = "main"}
+imgui-knobs = {git =" https://github.com/Fredemus/imgui-rs-knobs", branch = "synth"}
 # imgui-knobs = {git = "https://github.com/DGriffin91/imgui-rs-knobs", branch = "main"}
 # [dependencies.imgui-knobs]
 # path = "../imgui-rs-knobs/"

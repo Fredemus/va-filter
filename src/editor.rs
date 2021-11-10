@@ -144,6 +144,7 @@ impl EditorState {
         let title = parameter.get_name();
         let knob_id = &ImString::new(format!("##{}_KNOB_CONTROL_", title));
         knob_title(ui, &ImString::new(title.to_uppercase()), width);
+        move_cursor(ui, 0., 15.);
         let cursor = ui.cursor_pos();
         ui.set_cursor_pos([cursor[0], cursor[1] + 5.0]);
         let mut val = parameter.get_normalized();
@@ -157,6 +158,7 @@ impl EditorState {
             width * 0.5,
             true,
         );
+        move_cursor(ui, 0., width * 0.9);
         let cursor = ui.cursor_pos();
         ui.set_cursor_pos([cursor[0] + title_fix, cursor[1] - 10.0]);
         knob_title(ui, &ImString::new(parameter.get_display()), width);
@@ -195,6 +197,7 @@ impl EditorState {
         let title = parameter.get_name();
         let knob_id = &ImString::new(format!("##{}_KNOB_CONTORL_", title));
         knob_title(ui, &ImString::new(title.clone().to_uppercase()), width);
+        move_cursor(ui, 0., 15.);
         let cursor = ui.cursor_pos();
         ui.set_cursor_pos([cursor[0], cursor[1] + 5.0]);
         let mut val = parameter.get_normalized();
@@ -210,6 +213,7 @@ impl EditorState {
         );
         let cursor = ui.cursor_pos();
         ui.set_cursor_pos([cursor[0] + title_fix, cursor[1] - 10.0]);
+        move_cursor(ui, 0., width * 0.9);
         knob_title(ui, &ImString::new(parameter.get_display()), width);
 
         if knob.value_changed {
@@ -293,7 +297,7 @@ impl Editor for SVFPluginEditor {
                 //     editor_only.sample_data.consume();
                 // }
                 //ui.show_demo_window(run);
-                let w = Window::new(im_str!("does this matter?"))
+                let w = Window::new("does this matter?")
                     .size([WINDOW_WIDTH_F, WINDOW_HEIGHT_F], Condition::Appearing)
                     .position([0.0, 0.0], Condition::Appearing)
                     .draw_background(false)
@@ -311,7 +315,7 @@ impl Editor for SVFPluginEditor {
                     let _line_height = ui.text_line_height();
                     let n_columns = 5;
                     let lowlight = ColorSet::from(BLACK);
-                    ui.columns(n_columns, im_str!("cols"), false);
+                    ui.columns(n_columns, "cols", false);
                     let width = WINDOW_WIDTH_F / n_columns as f32 - 0.25;
                     for i in 1..n_columns {
                         ui.set_column_width(i, width);
@@ -336,14 +340,14 @@ impl Editor for SVFPluginEditor {
                     }
                     ui.next_column();
 
-                    ui.columns(1, im_str!("nocols"), false);
+                    ui.columns(1, "nocols", false);
                     // move_cursor(ui, (WINDOW_WIDTH_F - 400.) / 2., 333.);
                     // TODO: I would love if this cursor pos could come from knob size or smth
                     ui.set_cursor_pos([(WINDOW_WIDTH_F - 400.) / 2., WINDOW_HEIGHT_F - 4.]);
 
                     state.draw_bode_plot(ui, [400., 335.]);
 
-                    text_style_color.pop(ui);
+                    text_style_color.pop();
                 });
             },
         );
@@ -430,7 +434,7 @@ fn spawn_gui() {
             }]);
         },
         |_run: &mut bool, ui: &Ui, state: &mut Arc<EditorState>| {
-            let w = Window::new(im_str!("does this matter?"))
+            let w = Window::new("does this matter?")
                     .size([WINDOW_WIDTH_F, WINDOW_HEIGHT_F], Condition::Appearing)
                     .position([0.0, 0.0], Condition::Appearing)
                     .draw_background(false)
@@ -448,7 +452,7 @@ fn spawn_gui() {
                     let _line_height = ui.text_line_height();
                     let n_columns = 5;
                     let lowlight = ColorSet::from(BLACK);
-                    ui.columns(n_columns, im_str!("cols"), false);
+                    ui.columns(n_columns, "cols", false);
                     let width = WINDOW_WIDTH_F / n_columns as f32 - 0.25;
                     for i in 1..n_columns {
                         ui.set_column_width(i, width);
@@ -473,14 +477,14 @@ fn spawn_gui() {
                     }
                     ui.next_column();
 
-                    ui.columns(1, im_str!("nocols"), false);
+                    ui.columns(1, "nocols", false);
                     // move_cursor(ui, (WINDOW_WIDTH_F - 400.) / 2., 333.);
                     // TODO: I would love if this cursor pos could come from knob size or smth
                     ui.set_cursor_pos([(WINDOW_WIDTH_F - 400.) / 2., WINDOW_HEIGHT_F - 4.]);
 
                     state.draw_bode_plot(ui, [400., 335.]);
 
-                    text_style_color.pop(ui);
+                    text_style_color.pop();
             });
         },
     );
