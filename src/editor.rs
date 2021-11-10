@@ -397,18 +397,92 @@ unsafe impl HasRawWindowHandle for VstParent {
     }
 }
 
-// not sure how to do this, but would be extremely useful
-// #[test]
-// fn spawn_gui() {
-//     let params = Arc::new(filter_parameters::FilterParameters::default());
-//     let editor = SVFPluginEditor {
-//         is_open: false,
-//         state: Arc::new(EditorState {
-//             params: params,
-//             host: None,
-//         }),
-//     };
-//     // something like spawning a window with imgui, then getting its hwnd and then using that to call editor:: open?
-//     editor.open();
+#[test]
+#[ignore]
+fn spawn_gui() {
+    let params = Arc::new(FilterParameters::default());
+    let editor = SVFPluginEditor {
+        is_open: false,
+        state: Arc::new(EditorState {
+            params: params,
+            host: None,
+        }),
+    };
+    let settings = Settings {
+        window: WindowOpenOptions {
+            title: String::from("synthboy window"),
+            size: Size::new(WINDOW_WIDTH as f64, WINDOW_HEIGHT as f64),
+            scale: WindowScalePolicy::SystemScaleFactor,
+        },
+        clear_color: (0.0, 0.0, 0.0),
+        hidpi_mode: HiDpiMode::Default,
+        render_settings: RenderSettings::default(),
+    };
 
-// }
+    ImguiWindow::open_blocking(
+        settings,
+        editor.state.clone(),
+        |ctx: &mut Context, _state: &mut Arc<EditorState>| {
+            ctx.fonts().add_font(&[FontSource::TtfData {
+                data: include_bytes!("../OpenSans-Semibold.ttf"),
+                size_pixels: 20.0,
+                config: None,
+            }]);
+        },
+        |_run: &mut bool, ui: &Ui, state: &mut Arc<EditorState>| {
+            let w = Window::new(im_str!("does this matter?"))
+                    .size([WINDOW_WIDTH_F, WINDOW_HEIGHT_F], Condition::Appearing)
+                    .position([0.0, 0.0], Condition::Appearing)
+                    .draw_background(false)
+                    .no_decoration()
+                    .movable(false);
+                w.build(&ui, || {
+                    let text_style_color = ui.push_style_color(StyleColor::Text, TEXT);
+
+                    ui.set_cursor_pos([0.0, 25.0]);
+
+                    let highlight = ColorSet::new(ORANGE, ORANGE_HOVERED, ORANGE_HOVERED);
+
+                    let params = &state.params;
+
+                    let _line_height = ui.text_line_height();
+                    let n_columns = 5;
+                    let lowlight = ColorSet::from(BLACK);
+                    ui.columns(n_columns, im_str!("cols"), false);
+                    let width = WINDOW_WIDTH_F / n_columns as f32 - 0.25;
+                    for i in 1..n_columns {
+                        ui.set_column_width(i, width);
+                    }
+                    ui.set_column_width(0, width * 0.5);
+
+                    ui.next_column();
+                    state.make_knob(ui, &params.cutoff, 0, &highlight, &lowlight, 0.0);
+                    move_cursor(ui, 0.0, -113.0);
+
+                    ui.next_column();
+
+                    state.make_knob(ui, &params.res, 1, &highlight, &lowlight, 0.0);
+                    ui.next_column();
+
+                    state.make_knob(ui, &params.drive, 2, &highlight, &lowlight, 0.0);
+                    ui.next_column();
+                    if params.filter_type.get() == 0 {
+                        state.make_steppy_knob(ui, &params.mode, 4, &highlight, &lowlight, 0.0);
+                    } else {
+                        state.make_steppy_knob(ui, &params.slope, 5, &highlight, &lowlight, 0.0);
+                    }
+                    ui.next_column();
+
+                    ui.columns(1, im_str!("nocols"), false);
+                    // move_cursor(ui, (WINDOW_WIDTH_F - 400.) / 2., 333.);
+                    // TODO: I would love if this cursor pos could come from knob size or smth
+                    ui.set_cursor_pos([(WINDOW_WIDTH_F - 400.) / 2., WINDOW_HEIGHT_F - 4.]);
+
+                    state.draw_bode_plot(ui, [400., 335.]);
+
+                    text_style_color.pop(ui);
+            });
+        },
+    );
+}
+

@@ -2,7 +2,6 @@ use crate::filter_parameters::FilterParameters;
 use crate::utils::AtomicOps;
 use std::sync::Arc;
 use packed_simd::f32x4;
-// TODO: Flatten jacobian matrices
 
 /// cheap tanh, potentially useful for optimization. 
 // from a quick look it looks extremely good, max error of ~0.0002 or .02%
@@ -19,13 +18,7 @@ pub fn tanh_levien(x: f32x4) -> f32x4 {
     
     a / (1.0 + (a * a)).sqrt()
 }
-// FIXME: These will likely be slower than using 1 from the stdlib
-// fork packed_simd and copy their tanh codegen, replacing the relevant stuff
-#[inline]
-fn simd_sinh(x: f32x4) -> f32x4 {
-    let e = f32x4::splat(std::f32::consts::E);
-    (e.powf(x) - e.powf(-x))/2.
-}
+// from cursory benchmarking, this is as fast as the standard library cosh
 #[inline]
 fn simd_cosh(x: f32x4) -> f32x4 {
     let e = f32x4::splat(std::f32::consts::E);
@@ -39,19 +32,6 @@ enum EstimateSource {
     PreviousVout,        // use z-1 of Vout
     LinearStateEstimate, // use linear estimate of future state
     LinearVoutEstimate,  // use linear estimate of Vout
-}
-pub trait Filter {
-    fn new() -> Self;
-
-    fn run_filter_linear(&mut self, input: f32) -> f32;
-
-    fn run_filter_pivotal(&mut self, input: f32) -> f32;
-
-    fn run_filter_newton(&mut self, input: f32) -> f32;
-
-    fn tick_filter(&mut self, input: f32) -> f32;
-
-    fn update_state(&mut self);
 }
 pub struct LadderFilter {
     pub params: Arc<FilterParameters>,
@@ -289,10 +269,9 @@ impl SVF {
         ];
         // let mut sinh_v_est0 = v_est[0].sinh();
         // let mut cosh_v_est0 = v_est[0].cosh();
-        let mut sinh_v_est0 = simd_sinh(v_est[0]);
+        let mut tanh_v_est0 = tanh_levien(v_est[0]);
         let mut cosh_v_est0 = simd_cosh(v_est[0]);
-
-        let mut tanh_v_est0 = sinh_v_est0 / cosh_v_est0;
+        let mut sinh_v_est0 = tanh_v_est0 * cosh_v_est0; // from a trig identity
         let mut fb_line = tanh_levien(input - ((k - 1.) * v_est[0] + sinh_v_est0) - v_est[1]);
         // using fixed_pivot as estimate
         // self.run_svf_pivotal(input);
@@ -329,10 +308,10 @@ impl SVF {
                 + j00 * v_est[1]
                 - j10 * residue[0])
                 / (j01 * j10 + j00);
-            sinh_v_est0 = simd_sinh(v_est[0]);
             cosh_v_est0 = simd_cosh(v_est[0]);
-            tanh_v_est0 = sinh_v_est0 / cosh_v_est0;
-            fb_line = (input - ((k - 1.) * v_est[0] + sinh_v_est0) - v_est[1]).tanh();
+            tanh_v_est0 = tanh_levien(v_est[0]);
+            sinh_v_est0 = tanh_v_est0 * cosh_v_est0;
+            fb_line = tanh_levien(input - ((k - 1.) * v_est[0] + sinh_v_est0) - v_est[1]);
             // recompute filter
             // residue = self.run_helper_svf(g, tanh_v_est0, fb_line, v_est);
             residue = [
@@ -356,8 +335,8 @@ impl SVF {
             2 => self.vout[0],                            // bandpass
             3 => input - k * self.vout[0],                // notch
             //3 => input - 2. * k * self.vout[1], // allpass
-            4 => input - 2. * self.vout[1] - k * self.vout[0], // peak
-            _ => k * self.vout[0],                             // bandpass (normalized peak gain)
+            4 => k * self.vout[0],                             // bandpass (normalized peak gain)
+            _ => input - 2. * self.vout[1] - k * self.vout[0], // peak
         }
     }
 }

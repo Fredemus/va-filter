@@ -173,7 +173,15 @@ impl Plugin for VST {
     // the DAW calls process every time a buffer of samples needs to be sent through the vst
     // buffer consists of both input and output buffers
     fn process(&mut self, buffer: &mut AudioBuffer<f32>) {
-        // split the buffer into input and output
+        // // split the buffer into input and output
+        // let (inputs, outputs) = buffer.split();
+        // // Iterate over inputs as (&f32, &f32)
+        // let (l, r) = inputs.split_at(1);
+        // let stereo_in = l[0].iter().zip(r[0].iter());
+        // // Iterate over outputs as (&mut f32, &mut f32)
+        // let (mut l, mut r) = outputs.split_at_mut(1);
+        // let stereo_out = l[0].iter_mut().zip(r[0].iter_mut());
+        
         // potentially the duplications of code could be hidden away with process_buffer functions
         if self.params.filter_type.get() == 0 {
             for (input_buffer, output_buffer) in buffer.zip() {

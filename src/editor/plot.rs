@@ -62,7 +62,7 @@ pub fn get_filter_bode(cutoff: f32, k: f32, mode: usize, filter_type: usize) -> 
                             / ((curr_s).powi(2) + k * g * curr_s + g.powi(2));
                     }
                 }
-                5 => {
+                4 => {
                     // bandpass (constant peak gain)
                     for i in 0..len {
                         curr_s = frequencies[i] * j;
@@ -75,11 +75,8 @@ pub fn get_filter_bode(cutoff: f32, k: f32, mode: usize, filter_type: usize) -> 
         }
         // transistor ladder filter
         1 => {
-            // let k = res.powi(2) * (3.8) - 0.2;
             for i in 0..len {
                 curr_s = frequencies[i] * j;
-                // TODO: the transfer func is not right for 1-3 pole mode. Math it out properly
-                // potentially this should have 1 + k as numerator
                 // could potentially be optimized, i think
                 array[i] = ((1. + k) * (1. + curr_s / g).powi(3 - mode as i32))
                     / (k + (1. + curr_s / g).powi(4));
@@ -142,5 +139,5 @@ fn test_ladder_value() {
 }
 #[test]
 fn db_print() {
-    println!("{}", lin_to_db(20. / 0.00001));
+    println!("{}", lin_to_db(0.1));
 }
