@@ -2,11 +2,11 @@
 // TODO: Instead of knobs beginning and ending changes on knob.value_changed, changes should be "grouped together"
 // somehow, maybe by use of ui.is_item_active()?
 // hmm, it seems our behavior (with regards to undoing at least) is the same as big boy problems, so not sure if it's an issue?
-
 use imgui::*;
 use imgui_knobs::*;
 
 use crate::filter_parameters::FilterParameters;
+use crate::utils::AtomicOps;
 use imgui_baseview::{HiDpiMode, ImguiWindow, RenderSettings, Settings};
 
 use crate::parameter::{ParameterF32, ParameterUsize};
@@ -55,7 +55,6 @@ pub struct EditorState {
     pub host: Option<HostCallback>,
 }
 impl EditorState {
-    // TODO: When resonance gets really low, slope doesn't get gentler, it just looks like cutoff moves. Why??
     fn draw_bode_plot(&self, ui: &Ui, size: [f32; 2]) {
         let draw_list = ui.get_window_draw_list();
         let cursor = ui.cursor_screen_pos();
@@ -71,12 +70,24 @@ impl EditorState {
             .build();
 
         let color = ORANGE;
-        let mut amps = plot::get_svf_bode(
-            self.params.cutoff.get(),
-            self.params.res.get(),
-            self.params.mode.get(),
-        );
-        let maxmin = 30.;
+        let mut amps: Vec<f32>;
+        if self.params.filter_type.get() == 0 {
+            amps = plot::get_filter_bode(
+                self.params.cutoff.get(),
+                self.params.zeta.get(),
+                self.params.mode.get(),
+                self.params.filter_type.get(),
+            );
+        } else {
+            amps = plot::get_filter_bode(
+                self.params.cutoff.get(),
+                self.params.k_ladder.get(),
+                self.params.slope.get(),
+                self.params.filter_type.get(),
+            );
+        };
+
+        let maxmin = 40.;
         // normalizing amplitudes
         for x in &mut amps {
             *x = (*x - (-maxmin)) / (maxmin - (-maxmin))
@@ -87,7 +98,7 @@ impl EditorState {
         let scale_y = size[1];
         let mut last = amps[0] * scale_y;
         for i in 1..length {
-            // TODO: The scale might give problems with clipping out if resonance is higher than +12 dB
+            // The scale might give problems with clipping out if resonance is higher than +12 dB
             let next = amps[i] * scale_y;
 
             let fi = i as f32;
@@ -133,6 +144,7 @@ impl EditorState {
         let title = parameter.get_name();
         let knob_id = &ImString::new(format!("##{}_KNOB_CONTROL_", title));
         knob_title(ui, &ImString::new(title.to_uppercase()), width);
+        move_cursor(ui, 0., 15.);
         let cursor = ui.cursor_pos();
         ui.set_cursor_pos([cursor[0], cursor[1] + 5.0]);
         let mut val = parameter.get_normalized();
@@ -146,6 +158,7 @@ impl EditorState {
             width * 0.5,
             true,
         );
+        move_cursor(ui, 0., width * 0.9);
         let cursor = ui.cursor_pos();
         ui.set_cursor_pos([cursor[0] + title_fix, cursor[1] - 10.0]);
         knob_title(ui, &ImString::new(parameter.get_display()), width);
@@ -184,6 +197,7 @@ impl EditorState {
         let title = parameter.get_name();
         let knob_id = &ImString::new(format!("##{}_KNOB_CONTORL_", title));
         knob_title(ui, &ImString::new(title.clone().to_uppercase()), width);
+        move_cursor(ui, 0., 15.);
         let cursor = ui.cursor_pos();
         ui.set_cursor_pos([cursor[0], cursor[1] + 5.0]);
         let mut val = parameter.get_normalized();
@@ -199,6 +213,7 @@ impl EditorState {
         );
         let cursor = ui.cursor_pos();
         ui.set_cursor_pos([cursor[0] + title_fix, cursor[1] - 10.0]);
+        move_cursor(ui, 0., width * 0.9);
         knob_title(ui, &ImString::new(parameter.get_display()), width);
 
         if knob.value_changed {
@@ -215,7 +230,6 @@ impl EditorState {
             }
         }
         w.pop(ui);
-        // TODO: Proper colors pls
         draw_stepped_knob(
             &knob,
             (parameter.max - parameter.min + 1.) as u32,
@@ -283,7 +297,7 @@ impl Editor for SVFPluginEditor {
                 //     editor_only.sample_data.consume();
                 // }
                 //ui.show_demo_window(run);
-                let w = Window::new(im_str!("does this matter?"))
+                let w = Window::new("does this matter?")
                     .size([WINDOW_WIDTH_F, WINDOW_HEIGHT_F], Condition::Appearing)
                     .position([0.0, 0.0], Condition::Appearing)
                     .draw_background(false)
@@ -301,7 +315,7 @@ impl Editor for SVFPluginEditor {
                     let _line_height = ui.text_line_height();
                     let n_columns = 5;
                     let lowlight = ColorSet::from(BLACK);
-                    ui.columns(n_columns, im_str!("cols"), false);
+                    ui.columns(n_columns, "cols", false);
                     let width = WINDOW_WIDTH_F / n_columns as f32 - 0.25;
                     for i in 1..n_columns {
                         ui.set_column_width(i, width);
@@ -319,18 +333,21 @@ impl Editor for SVFPluginEditor {
 
                     state.make_knob(ui, &params.drive, 2, &highlight, &lowlight, 0.0);
                     ui.next_column();
-
-                    state.make_steppy_knob(ui, &params.mode, 3, &highlight, &lowlight, 0.0);
+                    if params.filter_type.get() == 0 {
+                        state.make_steppy_knob(ui, &params.mode, 4, &highlight, &lowlight, 0.0);
+                    } else {
+                        state.make_steppy_knob(ui, &params.slope, 5, &highlight, &lowlight, 0.0);
+                    }
                     ui.next_column();
 
-                    ui.columns(1, im_str!("nocols"), false);
+                    ui.columns(1, "nocols", false);
                     // move_cursor(ui, (WINDOW_WIDTH_F - 400.) / 2., 333.);
                     // TODO: I would love if this cursor pos could come from knob size or smth
                     ui.set_cursor_pos([(WINDOW_WIDTH_F - 400.) / 2., WINDOW_HEIGHT_F - 4.]);
 
                     state.draw_bode_plot(ui, [400., 335.]);
 
-                    text_style_color.pop(ui);
+                    text_style_color.pop();
                 });
             },
         );
@@ -383,3 +400,93 @@ unsafe impl HasRawWindowHandle for VstParent {
         })
     }
 }
+
+#[test]
+#[ignore]
+fn spawn_gui() {
+    let params = Arc::new(FilterParameters::default());
+    let editor = SVFPluginEditor {
+        is_open: false,
+        state: Arc::new(EditorState {
+            params: params,
+            host: None,
+        }),
+    };
+    let settings = Settings {
+        window: WindowOpenOptions {
+            title: String::from("synthboy window"),
+            size: Size::new(WINDOW_WIDTH as f64, WINDOW_HEIGHT as f64),
+            scale: WindowScalePolicy::SystemScaleFactor,
+        },
+        clear_color: (0.0, 0.0, 0.0),
+        hidpi_mode: HiDpiMode::Default,
+        render_settings: RenderSettings::default(),
+    };
+
+    ImguiWindow::open_blocking(
+        settings,
+        editor.state.clone(),
+        |ctx: &mut Context, _state: &mut Arc<EditorState>| {
+            ctx.fonts().add_font(&[FontSource::TtfData {
+                data: include_bytes!("../OpenSans-Semibold.ttf"),
+                size_pixels: 20.0,
+                config: None,
+            }]);
+        },
+        |_run: &mut bool, ui: &Ui, state: &mut Arc<EditorState>| {
+            let w = Window::new("does this matter?")
+                    .size([WINDOW_WIDTH_F, WINDOW_HEIGHT_F], Condition::Appearing)
+                    .position([0.0, 0.0], Condition::Appearing)
+                    .draw_background(false)
+                    .no_decoration()
+                    .movable(false);
+                w.build(&ui, || {
+                    let text_style_color = ui.push_style_color(StyleColor::Text, TEXT);
+
+                    ui.set_cursor_pos([0.0, 25.0]);
+
+                    let highlight = ColorSet::new(ORANGE, ORANGE_HOVERED, ORANGE_HOVERED);
+
+                    let params = &state.params;
+
+                    let _line_height = ui.text_line_height();
+                    let n_columns = 5;
+                    let lowlight = ColorSet::from(BLACK);
+                    ui.columns(n_columns, "cols", false);
+                    let width = WINDOW_WIDTH_F / n_columns as f32 - 0.25;
+                    for i in 1..n_columns {
+                        ui.set_column_width(i, width);
+                    }
+                    ui.set_column_width(0, width * 0.5);
+
+                    ui.next_column();
+                    state.make_knob(ui, &params.cutoff, 0, &highlight, &lowlight, 0.0);
+                    move_cursor(ui, 0.0, -113.0);
+
+                    ui.next_column();
+
+                    state.make_knob(ui, &params.res, 1, &highlight, &lowlight, 0.0);
+                    ui.next_column();
+
+                    state.make_knob(ui, &params.drive, 2, &highlight, &lowlight, 0.0);
+                    ui.next_column();
+                    if params.filter_type.get() == 0 {
+                        state.make_steppy_knob(ui, &params.mode, 4, &highlight, &lowlight, 0.0);
+                    } else {
+                        state.make_steppy_knob(ui, &params.slope, 5, &highlight, &lowlight, 0.0);
+                    }
+                    ui.next_column();
+
+                    ui.columns(1, "nocols", false);
+                    // move_cursor(ui, (WINDOW_WIDTH_F - 400.) / 2., 333.);
+                    // TODO: I would love if this cursor pos could come from knob size or smth
+                    ui.set_cursor_pos([(WINDOW_WIDTH_F - 400.) / 2., WINDOW_HEIGHT_F - 4.]);
+
+                    state.draw_bode_plot(ui, [400., 335.]);
+
+                    text_style_color.pop();
+            });
+        },
+    );
+}
+

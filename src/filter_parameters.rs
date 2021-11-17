@@ -11,12 +11,25 @@ pub struct FilterParameters {
 
     pub cutoff: ParameterF32,
     pub res: ParameterF32,
+    pub zeta: AtomicF32,
+    pub k_ladder: AtomicF32,
+
     pub drive: ParameterF32,
     pub mode: ParameterUsize,
+    pub slope: ParameterUsize,
+    pub filter_type: AtomicUsize,
     // cutoff: Params,
     // res: Params,
     // drive: Params,
     // mode: Params,
+}
+impl FilterParameters {
+    // transform resonance parameter into something more useful for the filter
+    pub fn set_resonances(&self) {
+        let res = self.res.get_normalized();
+        self.zeta.set(5. - 4.9 * res);
+        self.k_ladder.set(res.powi(2) * 3.8 - 0.2);
+    }
 }
 // use std::ops::Index;
 // pub enum Params {
@@ -42,7 +55,7 @@ pub struct FilterParameters {
 //     type Output = Params;
 //     fn index(&self, i: usize) -> &Self::Output {
 //         match i {
-//             //TODO: What's the best way to handle the reference here? removed for now i guess
+//             // What's the best way to handle the reference here? removed for now i guess
 //             // 0 => Params::F32(&self.cutoff),
 //             0 => &self.cutoff,
 //             1 => &self.res,
@@ -58,6 +71,7 @@ impl Default for FilterParameters {
     fn default() -> FilterParameters {
         let a = FilterParameters {
             sample_rate: AtomicF32::new(48000.),
+            filter_type: AtomicUsize::new(0),
             cutoff: ParameterF32::new(
                 "Cutoff",
                 10000.,
@@ -69,14 +83,27 @@ impl Default for FilterParameters {
             ),
             g: AtomicF32::new((PI * 10000. / 48000.).tan()),
             // TODO: Res fucks up at low values, caused by the formula being dumb
+            // Maybe just rewrite filter equations to divide by res so we can set res as q-factor directly?
+            // should be way easier to work with
+            // res: (ParameterF32::new(
+            //     "Resonance",
+            //     1. / 0.707,
+            //     10.,
+            //     0.05,
+            //     |x| format!("{:.2}", 1. / x),
+            //     |x: f32| x.powf(0.2),
+            //     |x: f32| x.powi(5),
+            //     // |x| 2f32.powf(-11. * x),
+            //     // |x: f32| (x).ln() * -0.13115409,
+            // )),
             res: (ParameterF32::new(
                 "Resonance",
-                1. / 0.707,
-                10.,
-                0.05,
-                |x| format!("{:.2}", 1. / x),
-                |x: f32| x.powf(0.2),
-                |x: f32| x.powi(5),
+                0.5,
+                0.,
+                1.,
+                |x| format!("{:.2} %", x * 100.),
+                |x: f32| x,
+                |x: f32| x,
                 // |x| 2f32.powf(-11. * x),
                 // |x: f32| (x).ln() * -0.13115409,
             )),
@@ -84,7 +111,7 @@ impl Default for FilterParameters {
                 "Drive",
                 0.,
                 0.,
-                15.,
+                14.8490,
                 |x: f32| format!("{:.2} dB", 20. * (x + 1.).log10()),
                 |x| x.powi(2),
                 |x| x.sqrt(),
@@ -93,21 +120,37 @@ impl Default for FilterParameters {
                 "Filter mode",
                 0,
                 0,
-                5,
+                4,
                 |x| match x {
                     0 => format!("Lowpass"),
                     1 => format!("Highpass"),
                     2 => format!("Bandpass 1"),
                     3 => format!("Notch"),
-                    4 => format!("Peak"),
-                    5 => format!("Bandpass 2"),
-                    _ => format!("Peak"),
+                    _ => format!("Bandpass 2"),
                 },
                 |x| x,
                 |x| x,
             )),
+            slope: (ParameterUsize::new(
+                "Filter slope",
+                3,
+                0,
+                3,
+                |x| match x {
+                    0 => format!("Lp6"),
+                    1 => format!("LP12"),
+                    2 => format!("LP18"),
+                    3 => format!("LP24"),
+                    _ => format!("???"),
+                },
+                |x| x,
+                |x| x,
+            )),
+            k_ladder: AtomicF32::new(0.),
+            zeta: AtomicF32::new(0.),
         };
         a.g.set((PI * a.cutoff.get() / (a.sample_rate.get())).tan());
+        a.set_resonances();
         a
     }
 }
