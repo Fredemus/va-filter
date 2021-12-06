@@ -93,6 +93,54 @@ impl LadderFilter {
         self.vout[2] = g0 * (g * self.vout[1] + self.s[2]);
         return self.vout[self.params.slope.get()];
     }
+    // nonlinear ladder filter function with distortion, solved with Mystran's fixed-pivot method.
+    fn run_filter_pivotal(&mut self, input: f32x4) -> f32x4 {
+        let mut a: [f32x4; 5] = [f32x4::splat(1.); 5];
+        // let base = [input, self.s[0], self.s[1], self.s[2], self.s[3]];
+        let g = self.params.g.get();
+        let k = self.params.k_ladder.get();
+        let base = [
+            input - k * self.s[3],
+            // input, // <- old base[0]
+            self.s[0],
+            self.s[1],
+            self.s[2],
+            self.s[3],
+        ];
+        // a[n] is the fixed-pivot approximation for tanh()
+        for n in 0..base.len() {
+            // hopefully this should cook down to the original when not 0,
+            // and 1 when 0 
+            let mask = base[n].ne(f32x4::splat(0.));
+            a[n] = base[n].tanh()  / base[n];
+            // since the line above can become NaN or other stuff when a value in base[n] is 0, 
+            // replace values where a[n] is 0.
+            a[n] = mask.select(a[n], f32x4::splat(1.));
+        }
+        // denominators of solutions of individual stages. Simplifies the math a bit
+        let g0 = 1. / (1. + g * a[1]);
+        let g1 = 1. / (1. + g * a[2]);
+        let g2 = 1. / (1. + g * a[3]);
+        let g3 = 1. / (1. + g * a[4]);
+        //  these are just factored out of the feedback solution. Makes the math way easier to read
+        let f3 = g * a[3] * g3;
+        let f2 = g * a[2] * g2 * f3;
+        let f1 = g * a[1] * g1 * f2;
+        let f0 = g * g0 * f1;
+        // outputs a 24db filter
+        self.vout[3] = (f0 * input * a[0]
+            + f1 * g0 * self.s[0]
+            + f2 * g1 * self.s[1]
+            + f3 * g2 * self.s[2]
+            + g3 * self.s[3])
+            / (f0 * k * a[3] + 1.);
+        // since we know the feedback, we can solve the remaining outputs:
+        self.vout[0] = g0 * (g * a[1] * (input * a[0] - k * a[3] * self.vout[3]) + self.s[0]);
+        self.vout[1] = g1 * (g * a[2] * self.vout[0] + self.s[1]);
+        self.vout[2] = g2 * (g * a[3] * self.vout[1] + self.s[2]);
+
+        return self.vout[self.params.slope.get()];
+    }
     fn run_filter_newton(&mut self, input: f32x4) -> f32x4 {
         // ---------- setup ----------
         // load in g and k from parameters
