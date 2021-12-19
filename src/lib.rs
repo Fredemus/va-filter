@@ -20,7 +20,6 @@
 extern crate vst;
 use filter::{LadderFilter, SVF};
 use packed_simd::f32x4;
-use std::f32::consts::PI;
 use std::sync::Arc;
 use vst::buffer::AudioBuffer;
 use vst::editor::Editor;
@@ -35,6 +34,7 @@ use utils::AtomicOps;
 mod filter_parameters;
 use filter_parameters::FilterParameters;
 
+mod ui;
 mod filter;
 
 // this is a 2-pole filter with resonance, which is why there's 2 states and vouts
@@ -47,73 +47,7 @@ struct VST {
     ladder: filter::LadderFilter,
     svf: filter::SVF,
 }
-impl VST {}
-impl FilterParameters {
-    pub fn update_g(&self) {
-        self.g
-            .set((PI * self.cutoff.get() / (self.sample_rate.get())).tan());
-    }
-}
-impl PluginParameters for FilterParameters {
-    fn get_parameter(&self, index: i32) -> f32 {
-        match index {
-            0 => self.cutoff.get_normalized(),
-            1 => self.res.get_normalized(),
-            2 => self.drive.get_normalized(),
-            3 => self.filter_type.get() as f32,
-            4 => self.mode.get_normalized() as f32,
-            5 => self.slope.get_normalized() as f32,
-            _ => 0.0,
-        }
-    }
-    fn set_parameter(&self, index: i32, value: f32) {
-        match index {
-            0 => {
-                self.cutoff.set_normalized(value);
-                self.update_g();
-            }
-            1 => {
-                self.res.set_normalized(value);
-                self.set_resonances();
-            }
-            2 => self.drive.set_normalized(value),
-            // TODO: filter_type won't work with more than 2 filter modes, make proper param
-            3 => {
-                self.filter_type.set(value as usize);
-            }
-            4 => self.mode.set_normalized(value),
-            5 => self.slope.set_normalized(value),
-            _ => (),
-        }
-    }
-    fn get_parameter_name(&self, index: i32) -> String {
-        match index {
-            0 => "cutoff".to_string(),
-            1 => "resonance".to_string(),
-            2 => "drive".to_string(),
-            3 => "filter type".to_string(),
-            4 => "filter mode".to_string(),
-            5 => "filter slope".to_string(),
-            _ => "".to_string(),
-        }
-    }
-    // This is what will display underneath our control.  We can
-    // format it into a string that makes sense for the user.
-    fn get_parameter_text(&self, index: i32) -> String {
-        match index {
-            0 => self.cutoff.get_display(),
-            1 => self.res.get_display(),
-            2 => self.drive.get_display(),
-            3 => match self.filter_type.get() {
-                0 => "State variable".to_string(),
-                _ => "Transistor ladder".to_string(),
-            },
-            4 => self.mode.get_display(),
-            5 => self.slope.get_display(),
-            _ => format!(""),
-        }
-    }
-}
+
 impl Default for VST {
     fn default() -> Self {
         let params = Arc::new(FilterParameters::default());
@@ -146,10 +80,7 @@ impl Plugin for VST {
             params: params.clone(),
             editor: Some(SVFPluginEditor {
                 is_open: false,
-                state: Arc::new(EditorState {
-                    params: params,
-                    host: Some(host),
-                }),
+                state: Arc::new(EditorState::new(params, Some(host))),
             }),
             svf,
             ladder,

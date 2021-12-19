@@ -15,7 +15,7 @@ pub struct ParameterSmooth {
     normalized_value: AtomicF32,
     state: AtomicF32,
     // target: AtomicF32,   // normalized_value is target val
-    value: AtomicF32, // TODO: can this be not atomic?
+    value: AtomicF32, 
     pub default: f32,
     pub min: f32,
     pub max: f32,
@@ -56,8 +56,6 @@ impl ParameterSmooth {
         self.value.get()
     }
     pub fn update(&self, filter_factor: f32) {
-        // TODO: Find a good way to set filter factor from block size and sample rate
-        // ^ probably have filter factor on params and set it with set_sample_rate, pass it in as function parameter
         // TODO: How to ensure that this is the unmodulated state?
         // TODO: Is it possible/better to make state non-normalized?
         // maybe normalized_value is target? And modulate uses state instead of normalized_value to set value?
@@ -104,7 +102,6 @@ impl Parameter for ParameterSmooth {
         // self.target.set(self.to_range((self.set_func)(x)));
     }
     fn get_display(&self) -> String {
-        // FIXME: this will be a hot mess. Another point in favor for having state be not normalized
         // (self.display_func)(self.value.get())
         (self.display_func)(self.to_range((self.set_func)(self.normalized_value.get())))
     }

@@ -1,3 +1,7 @@
+use vst::plugin::PluginParameters;
+
+use crate::parameter::Parameter;
+
 use super::parameter::{ParameterF32, ParameterUsize};
 use super::utils::*;
 use std::f32::consts::PI;
@@ -82,20 +86,7 @@ impl Default for FilterParameters {
                 |x: f32| 1. + 0.17012975 * (x).ln(),
             ),
             g: AtomicF32::new((PI * 10000. / 48000.).tan()),
-            // TODO: Res fucks up at low values, caused by the formula being dumb
-            // Maybe just rewrite filter equations to divide by res so we can set res as q-factor directly?
-            // should be way easier to work with
-            // res: (ParameterF32::new(
-            //     "Resonance",
-            //     1. / 0.707,
-            //     10.,
-            //     0.05,
-            //     |x| format!("{:.2}", 1. / x),
-            //     |x: f32| x.powf(0.2),
-            //     |x: f32| x.powi(5),
-            //     // |x| 2f32.powf(-11. * x),
-            //     // |x: f32| (x).ln() * -0.13115409,
-            // )),
+
             res: (ParameterF32::new(
                 "Resonance",
                 0.5,
@@ -128,8 +119,6 @@ impl Default for FilterParameters {
                     3 => format!("Notch"),
                     _ => format!("Bandpass 2"),
                 },
-                |x| x,
-                |x| x,
             )),
             slope: (ParameterUsize::new(
                 "Filter slope",
@@ -143,8 +132,6 @@ impl Default for FilterParameters {
                     3 => format!("LP24"),
                     _ => format!("???"),
                 },
-                |x| x,
-                |x| x,
             )),
             k_ladder: AtomicF32::new(0.),
             zeta: AtomicF32::new(0.),
@@ -154,7 +141,72 @@ impl Default for FilterParameters {
         a
     }
 }
-
+impl FilterParameters {
+    pub fn update_g(&self) {
+        self.g
+            .set((PI * self.cutoff.get() / (self.sample_rate.get())).tan());
+    }
+}
+impl PluginParameters for FilterParameters {
+    fn get_parameter(&self, index: i32) -> f32 {
+        match index {
+            0 => self.cutoff.get_normalized(),
+            1 => self.res.get_normalized(),
+            2 => self.drive.get_normalized(),
+            3 => self.filter_type.get() as f32,
+            4 => self.mode.get_normalized() as f32,
+            5 => self.slope.get_normalized() as f32,
+            _ => 0.0,
+        }
+    }
+    fn set_parameter(&self, index: i32, value: f32) {
+        match index {
+            0 => {
+                self.cutoff.set_normalized(value);
+                self.update_g();
+            }
+            1 => {
+                self.res.set_normalized(value);
+                self.set_resonances();
+            }
+            2 => self.drive.set_normalized(value),
+            // TODO: filter_type won't work with more than 2 filter modes, make proper param
+            3 => {
+                self.filter_type.set(value as usize);
+            }
+            4 => self.mode.set_normalized(value),
+            5 => self.slope.set_normalized(value),
+            _ => (),
+        }
+    }
+    fn get_parameter_name(&self, index: i32) -> String {
+        match index {
+            0 => "cutoff".to_string(),
+            1 => "resonance".to_string(),
+            2 => "drive".to_string(),
+            3 => "filter type".to_string(),
+            4 => "filter mode".to_string(),
+            5 => "filter slope".to_string(),
+            _ => "".to_string(),
+        }
+    }
+    // This is what will display underneath our control.  We can
+    // format it into a string that makes sense for the user.
+    fn get_parameter_text(&self, index: i32) -> String {
+        match index {
+            0 => self.cutoff.get_display(),
+            1 => self.res.get_display(),
+            2 => self.drive.get_display(),
+            3 => match self.filter_type.get() {
+                0 => "State variable".to_string(),
+                _ => "Transistor ladder".to_string(),
+            },
+            4 => self.mode.get_display(),
+            5 => self.slope.get_display(),
+            _ => format!(""),
+        }
+    }
+}
 #[test]
 fn test_res_param() {
     let params = FilterParameters::default();
