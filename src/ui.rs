@@ -1,5 +1,5 @@
 use std::sync::Arc;
-
+use crate::utils::*;
 use vizia::*;
 use vst::host::Host;
 use vst::plugin::HostCallback;
@@ -59,7 +59,7 @@ impl Model for Params {
     }
 }
 
-pub fn plugin_gui(cx: &mut Context, state: Arc<EditorState>, ) {
+pub fn plugin_gui(cx: &mut Context, state: Arc<EditorState> ) {
     cx.add_theme(STYLE);
 
     Params {
@@ -125,18 +125,26 @@ pub fn plugin_gui(cx: &mut Context, state: Arc<EditorState>, ) {
     
             });
         }).child_space(Stretch(1.0)).row_between(Pixels(10.0));
+        
         VStack::new(cx, |cx|{
-            Label::new(cx, "Filter mode");
-            let map = GenericMap::new(0.0, 1.0, ValueScaling::Linear, DisplayDecimals::Two, None);
-            Knob::new(cx, map.clone(), 0.5).on_changing(cx, |knob, cx|{
-    
-                // cx.emit(ParamChangeEvent::SetGain(knob.normalized_value));
-                cx.emit(ParamChangeEvent::AllParams(4, knob.normalized_value))
-            });
-            Binding::new(cx, Params::params, move |cx, params|{
-                Label::new(cx, &params.get(cx).mode.get_display());
-    
-            });
+            Binding::new(cx, Params::params, |cx, params|{
+                let map = GenericMap::new(0.0, 1.0, ValueScaling::Linear, DisplayDecimals::Two, None);
+                let ft = params.get(cx).filter_type.get();
+                Label::new(cx, if ft == 0 {"Filter Mode"} else {"Slope"});
+
+                Knob::new(cx, map.clone(), 0.5).on_changing(cx, move |knob, cx|{
+        
+                    // cx.emit(ParamChangeEvent::SetGain(knob.normalized_value));
+                    cx.emit(ParamChangeEvent::AllParams(if ft == 0 {4} else {5}, knob.normalized_value))
+                });
+                Binding::new(cx, Params::params, move |cx, params|{
+                    let ft = params.get(cx).filter_type.get();
+
+                    Label::new(cx, &params.get(cx).get_parameter_text(if ft == 0 {4} else {5}));
+        
+                });
+
+            })
         }).child_space(Stretch(1.0)).row_between(Pixels(10.0));
     }).background_color(Color::rgb(25, 25, 25)).child_space(Stretch(1.0)).row_between(Pixels(0.0));
     
