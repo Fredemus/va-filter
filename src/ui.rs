@@ -146,6 +146,21 @@ pub fn plugin_gui(cx: &mut Context, state: Arc<EditorState> ) {
 
             })
         }).child_space(Stretch(1.0)).row_between(Pixels(10.0));
+        VStack::new(cx, |cx|{
+            Label::new(cx, "Filter circuit");
+            let map = GenericMap::new(0.0, 1.0, ValueScaling::Linear, DisplayDecimals::Two, None);
+            Knob::new(cx, map.clone(), 0.5).on_changing(cx, |knob, cx|{
+    
+                // cx.emit(ParamChangeEvent::SetGain(knob.normalized_value));
+                cx.emit(ParamChangeEvent::AllParams(3, knob.normalized_value))
+            });
+            Binding::new(cx, Params::params, move |cx, params|{
+                let ft = params.get(cx).filter_type.get();
+
+                Label::new(cx, if ft == 0 {"SVF"} else {"Ladder"});
+    
+            });
+        }).child_space(Stretch(1.0)).row_between(Pixels(10.0));
     }).background_color(Color::rgb(25, 25, 25)).child_space(Stretch(1.0)).row_between(Pixels(0.0));
     
     
