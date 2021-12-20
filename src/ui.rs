@@ -66,64 +66,40 @@ pub fn plugin_gui(cx: &mut Context, state: Arc<EditorState> ) {
         params: state.params.clone(),
         host: state.host,
     }.build(cx);
-    //TODO: Just make a method on params getting these, have an event that gets em maybe?
-    // let cutoff_default = state.params.cutoff.get_normalized_default();
-    // let res_default = state.params.res.get_normalized_default();
-    // let drive_default = state.params.drive.get_normalized_default();
-    // let mode_default = state.params.mode.get_normalized_default();
 
-    // TODO: How to move Hstack up/down
     HStack::new(cx, |cx| {
         VStack::new(cx, |cx|{
-            let param_index = 0;
             Binding::new(cx, Params::params, move |cx, params|{
+                let param_index = 0;
                 Label::new(cx, &params.get(cx).get_parameter_name(param_index));
-            });
-            // let param_ref = &params;
-            let map = GenericMap::new(0.0, 1.0, ValueScaling::Linear, DisplayDecimals::Two, None);
-            
-            // Knob::new(cx, map.clone(), params.osc_p[0].volume.get_normalized_default()).on_changing(cx, |knob, cx|{
-                Knob::new(cx, map.clone(), 0.5).on_changing(cx, |knob, cx,|{
-    
-                // cx.emit(ParamChangeEvent::SetGain(knob.normalized_value));
-                cx.emit(ParamChangeEvent::AllParams(0, knob.normalized_value))
-            });
-            Binding::new(cx, Params::params, move |cx, params|{
+                // let param_ref = params.get(cx);
+                // Knob::new(cx, map.clone(), params.osc_p[0].volume.get_normalized_default()).on_changing(cx, |knob, cx|{
+                Knob::new(cx, params.get(cx)._get_parameter_default(param_index), params.get(cx).get_parameter(param_index), false).on_changing(cx, |knob, cx,|{
+                    cx.emit(ParamChangeEvent::AllParams(0, knob.normalized_value))
+                });
                 Label::new(cx, &params.get(cx).get_parameter_text(param_index));
             });
-            
-    
-    
         }).child_space(Stretch(1.0)).row_between(Pixels(10.0));
     
         VStack::new(cx, |cx|{
-            let param_index = 1;
             Binding::new(cx, Params::params, move |cx, params|{
+                let param_index = 1;
                 Label::new(cx, &params.get(cx).get_parameter_name(param_index));
-            });
-            let map = GenericMap::new(0.0, 1.0, ValueScaling::Linear, DisplayDecimals::Two, None);
-            Knob::new(cx, map.clone(), 0.5).on_changing(cx, |knob, cx|{
-    
-                // cx.emit(ParamChangeEvent::SetGain(knob.normalized_value));
-                cx.emit(ParamChangeEvent::AllParams(1, knob.normalized_value))
-            });
-            Binding::new(cx, Params::params, move |cx, params|{
+                Knob::new(cx, params.get(cx)._get_parameter_default(param_index), params.get(cx).get_parameter(param_index), false).on_changing(cx, |knob, cx,|{
+                    cx.emit(ParamChangeEvent::AllParams(1, knob.normalized_value))
+                });
                 Label::new(cx, &params.get(cx).get_parameter_text(param_index));
             });
         }).child_space(Stretch(1.0)).row_between(Pixels(10.0));
 
         VStack::new(cx, |cx|{
-            let param_index = 2;
             Binding::new(cx, Params::params, move |cx, params|{
+                let param_index = 2;
                 Label::new(cx, &params.get(cx).get_parameter_name(param_index));
-            });
-            let map = GenericMap::new(0.0, 1.0, ValueScaling::Linear, DisplayDecimals::Two, None);
-            Knob::new(cx, map.clone(), 0.5).on_changing(cx, |knob, cx|{
-    
-                // cx.emit(ParamChangeEvent::SetGain(knob.normalized_value));
-                cx.emit(ParamChangeEvent::AllParams(2, knob.normalized_value))
-            });
-            Binding::new(cx, Params::params, move |cx, params|{
+                Knob::new(cx, params.get(cx)._get_parameter_default(param_index), params.get(cx).get_parameter(param_index), false).on_changing(cx, |knob, cx,|{
+                    // cx.emit(ParamChangeEvent::SetGain(knob.normalized_value));
+                    cx.emit(ParamChangeEvent::AllParams(2, knob.normalized_value))
+                });
                 Label::new(cx, &params.get(cx).get_parameter_text(param_index));
             });
             
@@ -131,13 +107,11 @@ pub fn plugin_gui(cx: &mut Context, state: Arc<EditorState> ) {
         
         VStack::new(cx, |cx|{
             Binding::new(cx, Params::params, |cx, params|{
-                let map = GenericMap::new(0.0, 1.0, ValueScaling::Linear, DisplayDecimals::Two, None);
                 let ft = params.get(cx).filter_type.get();
                 Label::new(cx, if ft == 0 {"Filter Mode"} else {"Slope"});
-                let default = if ft == 0 {params.get(cx).mode.get_normalized()} else {params.get(cx).slope.get_normalized() };
-                Knob::new(cx, map.clone(), default).on_changing(cx, move |knob, cx|{
-        
-                    // cx.emit(ParamChangeEvent::SetGain(knob.normalized_value));
+                let val = if ft == 0 {params.get(cx).mode.get_normalized()} else {params.get(cx).slope.get_normalized() };
+                let default = if ft == 0 {params.get(cx).mode.get_normalized_default()} else {params.get(cx).slope.get_normalized_default() };
+                Knob::new(cx, default, val, false).on_changing(cx, move |knob, cx|{
                     cx.emit(ParamChangeEvent::AllParams(if ft == 0 {4} else {5}, knob.normalized_value))
                 });
                 Binding::new(cx, Params::params, move |cx, params|{
@@ -149,21 +123,21 @@ pub fn plugin_gui(cx: &mut Context, state: Arc<EditorState> ) {
 
             })
         }).child_space(Stretch(1.0)).row_between(Pixels(10.0));
-        VStack::new(cx, |cx|{
-            Label::new(cx, "Filter circuit");
-            let map = GenericMap::new(0.0, 1.0, ValueScaling::Linear, DisplayDecimals::Two, None);
-            Knob::new(cx, map.clone(), 0.5).on_changing(cx, |knob, cx|{
+        // VStack::new(cx, |cx|{
+        //     Label::new(cx, "Filter circuit");
+        //     let map = GenericMap::new(0.0, 1.0, ValueScaling::Linear, DisplayDecimals::Two, None);
+        //     Knob::new(cx, map.clone(), 0.5).on_changing(cx, |knob, cx|{
     
-                // cx.emit(ParamChangeEvent::SetGain(knob.normalized_value));
-                cx.emit(ParamChangeEvent::AllParams(3, knob.normalized_value))
-            });
-            Binding::new(cx, Params::params, move |cx, params|{
-                let ft = params.get(cx).filter_type.get();
+        //         // cx.emit(ParamChangeEvent::SetGain(knob.normalized_value));
+        //         cx.emit(ParamChangeEvent::AllParams(3, knob.normalized_value))
+        //     });
+        //     Binding::new(cx, Params::params, move |cx, params|{
+        //         let ft = params.get(cx).filter_type.get();
 
-                Label::new(cx, if ft == 0 {"SVF"} else {"Ladder"});
+        //         Label::new(cx, if ft == 0 {"SVF"} else {"Ladder"});
     
-            });
-        }).child_space(Stretch(1.0)).row_between(Pixels(10.0));
+        //     });
+        // }).child_space(Stretch(1.0)).row_between(Pixels(10.0));
     }).background_color(Color::rgb(25, 25, 25)).child_space(Stretch(1.0)).row_between(Pixels(0.0));
     
     
