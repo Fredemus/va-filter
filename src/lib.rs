@@ -25,6 +25,9 @@ use vst::buffer::AudioBuffer;
 use vst::editor::Editor;
 use vst::plugin::{Category, HostCallback, Info, Plugin, PluginParameters};
 
+use vst::event::Event;
+use vst::api::Events;
+
 mod editor;
 use editor::{EditorState, SVFPluginEditor};
 mod parameter;
@@ -66,6 +69,21 @@ impl Default for VST {
             }),
             svf,
             ladder,
+        }
+    }
+}
+impl VST {
+    fn process_midi_event(&self, data: [u8; 3]) {
+        match data[0] {
+            // controller change
+            0xB0 => {
+                // mod wheel
+                if data[1] == 1 {
+                    // TODO: Might want to use hostcallback to automate here
+                    self.params.set_parameter(0, data[2] as f32 / 127.)
+                }
+            }
+            _ => (),
         }
     }
 }
@@ -163,6 +181,16 @@ impl Plugin for VST {
     // lets the plugin host get access to the parameters
     fn get_parameter_object(&mut self) -> Arc<dyn PluginParameters> {
         Arc::clone(&self.params) as Arc<dyn PluginParameters>
+    }
+    // handling of midi events
+    fn process_events(&mut self, events: &Events) {
+        for event in events.events() {
+            match event {
+                Event::Midi(ev) => self.process_midi_event(ev.data),
+                // More events can be handled here.
+                _ => (),
+            }
+        }
     }
 }
 plugin_main!(VST);
