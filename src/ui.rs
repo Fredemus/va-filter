@@ -131,8 +131,8 @@ pub fn plugin_gui(cx: &mut Context, state: Arc<EditorState> ) {
                 let map = GenericMap::new(0.0, 1.0, ValueScaling::Linear, DisplayDecimals::Two, None);
                 let ft = params.get(cx).filter_type.get();
                 Label::new(cx, if ft == 0 {"Filter Mode"} else {"Slope"});
-
-                Knob::new(cx, map.clone(), 0.5).on_changing(cx, move |knob, cx|{
+                let default = if ft == 0 {params.get(cx).mode.get_normalized()} else {params.get(cx).slope.get_normalized() };
+                Knob::new(cx, map.clone(), default).on_changing(cx, move |knob, cx|{
         
                     // cx.emit(ParamChangeEvent::SetGain(knob.normalized_value));
                     cx.emit(ParamChangeEvent::AllParams(if ft == 0 {4} else {5}, knob.normalized_value))
