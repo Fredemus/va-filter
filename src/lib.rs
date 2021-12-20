@@ -23,7 +23,7 @@ use packed_simd::f32x4;
 use std::sync::Arc;
 use vst::buffer::AudioBuffer;
 use vst::editor::Editor;
-use vst::plugin::{Category, HostCallback, Info, Plugin, PluginParameters};
+use vst::plugin::{Category, HostCallback, Info, Plugin, PluginParameters, CanDo};
 
 use vst::event::Event;
 use vst::api::Events;
@@ -74,6 +74,7 @@ impl Default for VST {
 }
 impl VST {
     fn process_midi_event(&self, data: [u8; 3]) {
+        println!("midi data: {:?}", data);
         match data[0] {
             // controller change
             0xB0 => {
@@ -182,7 +183,7 @@ impl Plugin for VST {
     fn get_parameter_object(&mut self) -> Arc<dyn PluginParameters> {
         Arc::clone(&self.params) as Arc<dyn PluginParameters>
     }
-    // handling of midi events
+    // handling of events
     fn process_events(&mut self, events: &Events) {
         for event in events.events() {
             match event {
@@ -191,6 +192,16 @@ impl Plugin for VST {
                 _ => (),
             }
         }
+    }
+    // inform host that plugin can receive midi events
+    fn can_do(&self, can_do: CanDo) -> vst::api::Supported {
+        match can_do {
+            CanDo::ReceiveMidiEvent => {
+                vst::api::Supported::Yes
+            }
+            _ => vst::api::Supported::Maybe
+        }
+
     }
 }
 plugin_main!(VST);
