@@ -75,7 +75,10 @@ pub fn plugin_gui(cx: &mut Context, state: Arc<EditorState> ) {
     // TODO: How to move Hstack up/down
     HStack::new(cx, |cx| {
         VStack::new(cx, |cx|{
-            Label::new(cx, "Cutoff");
+            let param_index = 0;
+            Binding::new(cx, Params::params, move |cx, params|{
+                Label::new(cx, &params.get(cx).get_parameter_name(param_index));
+            });
             // let param_ref = &params;
             let map = GenericMap::new(0.0, 1.0, ValueScaling::Linear, DisplayDecimals::Two, None);
             
@@ -86,12 +89,7 @@ pub fn plugin_gui(cx: &mut Context, state: Arc<EditorState> ) {
                 cx.emit(ParamChangeEvent::AllParams(0, knob.normalized_value))
             });
             Binding::new(cx, Params::params, move |cx, params|{
-                // let amplitude = params.get(cx).osc_p[0].volume.get();
-                // let amplitude = params.get(cx).osc_p[0].volume.get_display();
-                // Label::new(cx, &map.normalized_to_display(amplitude));
-                Label::new(cx, &params.get(cx).cutoff.get_display());
-                // Label::new(cx, &params.get(cx).osc_p[0].volume.get_display());
-    
+                Label::new(cx, &params.get(cx).get_parameter_text(param_index));
             });
             
     
@@ -99,7 +97,10 @@ pub fn plugin_gui(cx: &mut Context, state: Arc<EditorState> ) {
         }).child_space(Stretch(1.0)).row_between(Pixels(10.0));
     
         VStack::new(cx, |cx|{
-            Label::new(cx, "Res");
+            let param_index = 1;
+            Binding::new(cx, Params::params, move |cx, params|{
+                Label::new(cx, &params.get(cx).get_parameter_name(param_index));
+            });
             let map = GenericMap::new(0.0, 1.0, ValueScaling::Linear, DisplayDecimals::Two, None);
             Knob::new(cx, map.clone(), 0.5).on_changing(cx, |knob, cx|{
     
@@ -107,13 +108,15 @@ pub fn plugin_gui(cx: &mut Context, state: Arc<EditorState> ) {
                 cx.emit(ParamChangeEvent::AllParams(1, knob.normalized_value))
             });
             Binding::new(cx, Params::params, move |cx, params|{
-                Label::new(cx, &params.get(cx).res.get_display());
-    
+                Label::new(cx, &params.get(cx).get_parameter_text(param_index));
             });
         }).child_space(Stretch(1.0)).row_between(Pixels(10.0));
 
         VStack::new(cx, |cx|{
-            Label::new(cx, "Drive");
+            let param_index = 2;
+            Binding::new(cx, Params::params, move |cx, params|{
+                Label::new(cx, &params.get(cx).get_parameter_name(param_index));
+            });
             let map = GenericMap::new(0.0, 1.0, ValueScaling::Linear, DisplayDecimals::Two, None);
             Knob::new(cx, map.clone(), 0.5).on_changing(cx, |knob, cx|{
     
@@ -121,9 +124,9 @@ pub fn plugin_gui(cx: &mut Context, state: Arc<EditorState> ) {
                 cx.emit(ParamChangeEvent::AllParams(2, knob.normalized_value))
             });
             Binding::new(cx, Params::params, move |cx, params|{
-                Label::new(cx, &params.get(cx).drive.get_display());
-    
+                Label::new(cx, &params.get(cx).get_parameter_text(param_index));
             });
+            
         }).child_space(Stretch(1.0)).row_between(Pixels(10.0));
         
         VStack::new(cx, |cx|{

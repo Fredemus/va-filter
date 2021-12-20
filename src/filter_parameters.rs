@@ -34,41 +34,23 @@ impl FilterParameters {
         self.zeta.set(5. - 4.9 * res);
         self.k_ladder.set(res.powi(2) * 3.8 - 0.2);
     }
+    pub fn update_g(&self) {
+        self.g
+            .set((PI * self.cutoff.get() / (self.sample_rate.get())).tan());
+    }
+    pub fn _get_parameter_default(&self, index: i32) -> f32 {
+        match index {
+            0 => self.cutoff.get_normalized_default(),
+            1 => self.res.get_normalized_default(),
+            2 => self.drive.get_normalized_default(),
+            3 => 0.,
+            4 => self.mode.get_normalized_default() as f32,
+            5 => self.slope.get_normalized_default() as f32,
+            _ => 0.0,
+        }
+    }
+    
 }
-// use std::ops::Index;
-// pub enum Params {
-//     Usize(Parameter<AtomicUsize>),
-//     F32(Parameter<AtomicF32>),
-// }
-// impl Params {
-//     pub fn as_f32(&self) -> Option<&Parameter<AtomicF32>> {
-//         match *self {
-//             Params::F32(ref d) => Some(d),
-//             _ => None,
-//         }
-//     }
-//     pub fn as_usize(&self) -> Option<&Parameter<AtomicUsize>> {
-//         match *self {
-//             Params::Usize(ref d) => Some(d),
-//             _ => None,
-//         }
-//     }
-// }
-// impl Index<usize> for FilterParameters
-// {
-//     type Output = Params;
-//     fn index(&self, i: usize) -> &Self::Output {
-//         match i {
-//             // What's the best way to handle the reference here? removed for now i guess
-//             // 0 => Params::F32(&self.cutoff),
-//             0 => &self.cutoff,
-//             1 => &self.res,
-//             2 => &self.drive,
-//             3 => &self.mode,
-//             _ => &self.mode,
-//         }
-//     }
-// }
 
 impl Default for FilterParameters {
     // todo: How do we make sure g gets set? Maybe bake g into cutoff and have display func show cutoff
@@ -81,18 +63,18 @@ impl Default for FilterParameters {
                 10000.,
                 0.,
                 20000.,
-                |x| format!("{:.0} Hz", x),
+                |x| format!("{:.0}Hz", x),
                 |x| (1.8f32.powf(10. * x - 10.)),
                 |x: f32| 1. + 0.17012975 * (x).ln(),
             ),
             g: AtomicF32::new((PI * 10000. / 48000.).tan()),
 
             res: (ParameterF32::new(
-                "Resonance",
+                "Res",
                 0.5,
                 0.,
                 1.,
-                |x| format!("{:.2} %", x * 100.),
+                |x| format!("{:.2}%", x * 100.),
                 |x: f32| x,
                 |x: f32| x,
                 // |x| 2f32.powf(-11. * x),
@@ -103,12 +85,12 @@ impl Default for FilterParameters {
                 0.,
                 0.,
                 14.8490,
-                |x: f32| format!("{:.2} dB", 20. * (x + 1.).log10()),
+                |x: f32| format!("{:.2}dB", 20. * (x + 1.).log10()),
                 |x| x.powi(2),
                 |x| x.sqrt(),
             )),
             mode: (ParameterUsize::new(
-                "Filter mode",
+                "Mode",
                 0,
                 0,
                 4,
@@ -121,7 +103,7 @@ impl Default for FilterParameters {
                 },
             )),
             slope: (ParameterUsize::new(
-                "Filter slope",
+                "Slope",
                 3,
                 0,
                 3,
@@ -141,12 +123,7 @@ impl Default for FilterParameters {
         a
     }
 }
-impl FilterParameters {
-    pub fn update_g(&self) {
-        self.g
-            .set((PI * self.cutoff.get() / (self.sample_rate.get())).tan());
-    }
-}
+
 impl PluginParameters for FilterParameters {
     fn get_parameter(&self, index: i32) -> f32 {
         match index {
@@ -181,12 +158,12 @@ impl PluginParameters for FilterParameters {
     }
     fn get_parameter_name(&self, index: i32) -> String {
         match index {
-            0 => "cutoff".to_string(),
-            1 => "resonance".to_string(),
-            2 => "drive".to_string(),
+            0 => self.cutoff.get_name(),
+            1 => self.res.get_name(),
+            2 => self.drive.get_name(),
             3 => "filter type".to_string(),
-            4 => "filter mode".to_string(),
-            5 => "filter slope".to_string(),
+            4 => self.mode.get_name(),
+            5 => self.slope.get_name(),
             _ => "".to_string(),
         }
     }

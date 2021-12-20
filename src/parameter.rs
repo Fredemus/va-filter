@@ -1,7 +1,6 @@
 #![allow(dead_code)]
 use crate::utils::*;
 // draw_knob functions could be made simpler if parameter structs had the parameter_index saved
-
 pub trait Parameter {
     fn get_normalized(&self) -> f32;
     fn get_normalized_default(&self) -> f32;
