@@ -5,7 +5,6 @@ use vst::host::Host;
 use vst::plugin::HostCallback;
 use vst::plugin::PluginParameters;
 use crate::editor::EditorState;
-use crate::parameter::*;
 use crate::FilterParameters;
 const ICON_DOWN_OPEN: &str = "\u{e75c}";
 const STYLE: &str = r#"
@@ -87,6 +86,7 @@ impl Model for UiData {
     }
 }
 
+
 pub fn plugin_gui(cx: &mut Context, state: Arc<EditorState> ) {
     cx.add_theme(STYLE);
 
@@ -127,88 +127,35 @@ pub fn plugin_gui(cx: &mut Context, state: Arc<EditorState> ) {
             });
         // The knobs
         HStack::new(cx, |cx| {
-            // each VStack in here is a knob
-            VStack::new(cx, |cx|{
-                Binding::new(cx, UiData::params, move |cx, params|{
-                    let param_index = 0;
-                    Label::new(cx, &params.get(cx).get_parameter_name(param_index));
-                    // let param_ref = params.get(cx);
-                    // Knob::new(cx, map.clone(), params.osc_p[0].volume.get_normalized_default()).on_changing(cx, |knob, cx|{
-                    Knob::new(cx, params.get(cx)._get_parameter_default(param_index), params.get(cx).get_parameter(param_index), false).on_changing(cx, |knob, cx,|{
-                        cx.emit(ParamChangeEvent::AllParams(0, knob.normalized_value))
-                    });
-                    Label::new(cx, &params.get(cx).get_parameter_text(param_index));
-                });
-            }).child_space(Stretch(1.0)).row_between(Pixels(10.0));
-        
-            VStack::new(cx, |cx|{
-                Binding::new(cx, UiData::params, move |cx, params|{
-                    let param_index = 1;
-                    Label::new(cx, &params.get(cx).get_parameter_name(param_index));
-                    Knob::new(cx, params.get(cx)._get_parameter_default(param_index), params.get(cx).get_parameter(param_index), false).on_changing(cx, |knob, cx,|{
-                        cx.emit(ParamChangeEvent::AllParams(1, knob.normalized_value))
-                    });
-                    Label::new(cx, &params.get(cx).get_parameter_text(param_index));
-                });
-            }).child_space(Stretch(1.0)).row_between(Pixels(10.0));
-
-            VStack::new(cx, |cx|{
-                Binding::new(cx, UiData::params, move |cx, params|{
-                    let param_index = 2;
-                    Label::new(cx, &params.get(cx).get_parameter_name(param_index));
-                    Knob::new(cx, params.get(cx)._get_parameter_default(param_index), params.get(cx).get_parameter(param_index), false).on_changing(cx, |knob, cx,|{
-                        // cx.emit(ParamChangeEvent::SetGain(knob.normalized_value));
-                        cx.emit(ParamChangeEvent::AllParams(2, knob.normalized_value))
-                    });
-                    Label::new(cx, &params.get(cx).get_parameter_text(param_index));
-                });
-                
-            }).child_space(Stretch(1.0)).row_between(Pixels(10.0));
+            make_knob(cx, 0);
+            // resonance
+            make_knob(cx, 1);
+            //drive
+            make_knob(cx, 2);
+            Binding::new(cx, UiData::params, |cx, params|{
+                let ft = params.get(cx).filter_type.get();
+                if ft == 0 {
+                    make_knob(cx, 4);
+                }
+                else {
+                    make_knob(cx, 5);
+                }
+            });
             
-            VStack::new(cx, |cx|{
-                Binding::new(cx, UiData::params, |cx, params|{
-                    let ft = params.get(cx).filter_type.get();
-                    Label::new(cx, if ft == 0 {"Filter Mode"} else {"Slope"});
-                    let val = if ft == 0 {params.get(cx).mode.get_normalized()} else {params.get(cx).slope.get_normalized() };
-                    let default = if ft == 0 {params.get(cx).mode.get_normalized_default()} else {params.get(cx).slope.get_normalized_default() };
-                    Knob::new(cx, default, val, false).on_changing(cx, move |knob, cx|{
-                        cx.emit(ParamChangeEvent::AllParams(if ft == 0 {4} else {5}, knob.normalized_value))
-                    });
-                    Binding::new(cx, UiData::params, move |cx, params|{
-                        let ft = params.get(cx).filter_type.get();
-
-                        Label::new(cx, &params.get(cx).get_parameter_text(if ft == 0 {4} else {5}));
-            
-                    });
-
-                })
-            }).child_space(Stretch(1.0)).row_between(Pixels(10.0));
-            // VStack::new(cx, |cx|{
-            //     Label::new(cx, "Filter circuit");
-            //     let map = GenericMap::new(0.0, 1.0, ValueScaling::Linear, DisplayDecimals::Two, None);
-            //     Knob::new(cx, map.clone(), 0.5).on_changing(cx, |knob, cx|{
-        
-            //         // cx.emit(ParamChangeEvent::SetGain(knob.normalized_value));
-            //         cx.emit(ParamChangeEvent::AllParams(3, knob.normalized_value))
-            //     });
-            //     Binding::new(cx, Params::params, move |cx, params|{
-            //         let ft = params.get(cx).filter_type.get();
-
-            //         Label::new(cx, if ft == 0 {"SVF"} else {"Ladder"});
-        
-            //     });
-            // }).child_space(Stretch(1.0)).row_between(Pixels(10.0));
-        }).background_color(Color::rgb(25, 25, 25)).child_space(Stretch(1.0)).row_between(Pixels(0.0));
+        }).child_space(Pixels(120.)).row_between(Pixels(0.0));
     }).background_color(Color::rgb(25, 25, 25)).child_space(Stretch(1.0)).row_between(Pixels(10.0));
     
 
 }
 
-fn choice_to_color(name: &str) -> Color {
-    match name {
-        "Red" => Color::red(),
-        "Green" => Color::green(),
-        "Blue" => Color::blue(),
-        _ => Color::red(),
-    }
+fn make_knob(cx: &mut Context, param_index: i32) {
+    VStack::new(cx, move |cx|{
+        Binding::new(cx, UiData::params, move |cx, params|{
+            Label::new(cx, &params.get(cx).get_parameter_name(param_index));
+            Knob::new(cx, params.get(cx)._get_parameter_default(param_index), params.get(cx).get_parameter(param_index), false).on_changing(cx, move |knob, cx,|{
+                cx.emit(ParamChangeEvent::AllParams(param_index, knob.normalized_value))
+            });
+            Label::new(cx, &params.get(cx).get_parameter_text(param_index));
+        });
+    }).child_space(Stretch(1.0)).row_between(Pixels(10.0));
 }

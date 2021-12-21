@@ -108,7 +108,7 @@ impl Default for FilterParameters {
                 0,
                 3,
                 |x| match x {
-                    0 => format!("Lp6"),
+                    0 => format!("LP6"),
                     1 => format!("LP12"),
                     2 => format!("LP18"),
                     3 => format!("LP24"),
