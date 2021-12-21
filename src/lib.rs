@@ -11,10 +11,9 @@
 // or possibly just a broyden method fallback, can't be bothered working much more on this lol: http://fabcol.free.fr/pdf/lectnotes5.pdf
 // check if it's well-behaved without the pivotal guess, and how to make pivotal more similar to newton?
 
-// TODO: 
+// TODO:
 // The simd-ified filters are for some reason much slower (not sure if twice as slow, which would be break-even point)
 // Benchmark them and the non-simd filters
-
 
 #[macro_use]
 extern crate vst;
@@ -23,10 +22,10 @@ use packed_simd::f32x4;
 use std::sync::Arc;
 use vst::buffer::AudioBuffer;
 use vst::editor::Editor;
-use vst::plugin::{Category, HostCallback, Info, Plugin, PluginParameters, CanDo};
+use vst::plugin::{CanDo, Category, HostCallback, Info, Plugin, PluginParameters};
 
-use vst::event::Event;
 use vst::api::Events;
+use vst::event::Event;
 
 mod editor;
 use editor::{EditorState, SVFPluginEditor};
@@ -37,8 +36,8 @@ use utils::AtomicOps;
 mod filter_parameters;
 use filter_parameters::FilterParameters;
 
-mod ui;
 mod filter;
+mod ui;
 
 // this is a 2-pole filter with resonance, which is why there's 2 states and vouts
 struct VST {
@@ -131,7 +130,7 @@ impl Plugin for VST {
         // // Iterate over outputs as (&mut f32, &mut f32)
         // let (mut l, mut r) = outputs.split_at_mut(1);
         // let stereo_out = l[0].iter_mut().zip(r[0].iter_mut());
-        
+
         // potentially the duplications of code could be hidden away with process_buffer functions
         if self.params.filter_type.get() == 0 {
             for (input_buffer, output_buffer) in buffer.zip() {
@@ -155,7 +154,6 @@ impl Plugin for VST {
             for (input_buffer, output_buffer) in buffer.zip() {
                 // iterate through each sample in the input and output buffer
                 for (input_sample, output_sample) in input_buffer.iter().zip(output_buffer) {
-
                     // let frame = f32x4::new(input[0][i], input[1][i], 0.0, 0.0);
                     let frame = f32x4::new(*input_sample, 0.0, 0.0, 0.0);
                     // would be nice to align this, but doesn't seem possible with #[repr(align)].
@@ -196,12 +194,9 @@ impl Plugin for VST {
     // inform host that plugin can receive midi events
     fn can_do(&self, can_do: CanDo) -> vst::api::Supported {
         match can_do {
-            CanDo::ReceiveMidiEvent => {
-                vst::api::Supported::Yes
-            }
-            _ => vst::api::Supported::Maybe
+            CanDo::ReceiveMidiEvent => vst::api::Supported::Yes,
+            _ => vst::api::Supported::Maybe,
         }
-
     }
 }
 plugin_main!(VST);
