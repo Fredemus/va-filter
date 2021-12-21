@@ -95,11 +95,11 @@ impl Default for FilterParameters {
                 0,
                 4,
                 |x| match x {
-                    0 => format!("Lowpass"),
-                    1 => format!("Highpass"),
-                    2 => format!("Bandpass 1"),
+                    0 => format!("LP"),
+                    1 => format!("HP"),
+                    2 => format!("BP1"),
                     3 => format!("Notch"),
-                    _ => format!("Bandpass 2"),
+                    _ => format!("BP2"),
                 },
             )),
             slope: (ParameterUsize::new(

@@ -127,18 +127,20 @@ pub fn plugin_gui(cx: &mut Context, state: Arc<EditorState> ) {
             });
         // The knobs
         HStack::new(cx, |cx| {
-            make_knob(cx, 0);
+            // TODO: using a width here seems to make everything not-centered
+            let knob_width = Pixels(90.);
+            make_knob(cx, 0, knob_width);
             // resonance
-            make_knob(cx, 1);
+            make_knob(cx, 1, knob_width);
             //drive
-            make_knob(cx, 2);
-            Binding::new(cx, UiData::params, |cx, params|{
+            make_knob(cx, 2, knob_width);
+            Binding::new(cx, UiData::params, move |cx, params|{
                 let ft = params.get(cx).filter_type.get();
                 if ft == 0 {
-                    make_knob(cx, 4);
+                    make_knob(cx, 4, knob_width);
                 }
                 else {
-                    make_knob(cx, 5);
+                    make_knob(cx, 5, knob_width);
                 }
             });
             
@@ -148,14 +150,14 @@ pub fn plugin_gui(cx: &mut Context, state: Arc<EditorState> ) {
 
 }
 
-fn make_knob(cx: &mut Context, param_index: i32) {
+fn make_knob(cx: &mut Context, param_index: i32, width: Units) {
     VStack::new(cx, move |cx|{
         Binding::new(cx, UiData::params, move |cx, params|{
             Label::new(cx, &params.get(cx).get_parameter_name(param_index));
             Knob::new(cx, params.get(cx)._get_parameter_default(param_index), params.get(cx).get_parameter(param_index), false).on_changing(cx, move |knob, cx,|{
                 cx.emit(ParamChangeEvent::AllParams(param_index, knob.normalized_value))
             });
-            Label::new(cx, &params.get(cx).get_parameter_text(param_index));
+            Label::new(cx, &params.get(cx).get_parameter_text(param_index)).height(Pixels(20.));
         });
-    }).child_space(Stretch(1.0)).row_between(Pixels(10.0));
+    }).child_space(Stretch(1.0)).row_between(Pixels(10.0)).width(width);
 }
