@@ -53,11 +53,16 @@ impl Model for UiData {
 }
 
 pub fn plugin_gui(cx: &mut Context, state: Arc<EditorState>) {
+
     UiData {
         params: state.params.clone(),
         host: state.host,
         filter_circuits: vec!["SVF".to_string(), "Transistor Ladder".to_string()],
-        choice: "SVF".to_string(),
+        choice: if state.params.filter_type.get() == 0 {
+            "SVF".to_string()
+        } else {
+            "Transistor Ladder".to_string()
+        },
     }
     .build(cx);
 
