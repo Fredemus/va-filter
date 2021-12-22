@@ -3,19 +3,20 @@
 use crate::filter_parameters::FilterParameters;
 
 // use crate::parameter::{ParameterF32, ParameterUsize};
-use vst::plugin::{HostCallback};
+use vst::plugin::HostCallback;
 mod plot;
 use vst::editor::Editor;
 
-use vizia::*;
 use crate::ui::*;
+use vizia::*;
 
 use raw_window_handle::{HasRawWindowHandle, RawWindowHandle};
 use std::sync::Arc;
 
+const STYLE: &str = include_str!("style.css");
+
 pub const WINDOW_WIDTH: u32 = 512;
 pub const WINDOW_HEIGHT: u32 = 512;
-
 
 /// keeps track of parameters and enables contact with the host
 pub struct EditorState {
@@ -24,10 +25,7 @@ pub struct EditorState {
 }
 impl EditorState {
     pub fn new(params: Arc<FilterParameters>, host: Option<HostCallback>) -> EditorState {
-        EditorState {
-            params,
-            host,
-        }
+        EditorState { params, host }
     }
     // fn draw_bode_plot(&self, ui: &Ui, size: [f32; 2]) {
     //     let draw_list = ui.get_window_draw_list();
@@ -103,7 +101,6 @@ impl EditorState {
     //         .build();
     // }
     // Todo: Potentially we can avoid passing in parameter reference and just use parameter_index to get stuff we need
-  
 }
 pub struct SVFPluginEditor {
     pub is_open: bool,
@@ -133,10 +130,11 @@ impl Editor for SVFPluginEditor {
             .with_title("Hello Plugin");
 
         Application::new(window_description, move |cx| {
+            cx.add_theme(STYLE);
 
             plugin_gui(cx, state.clone());
-
-        }).open_parented(&ParentWindow(parent));
+        })
+        .open_parented(&ParentWindow(parent));
 
         // self.handle = Some(window_handle);
         true
