@@ -147,8 +147,8 @@ impl LadderFilter {
         let mut v_est: [f32x4; 4];
         let mut temp: [f32x4; 4] = [f32x4::splat(0.); 4];
 
-        let est_type = EstimateSource::LinearVoutEstimate;
-        // let est_type = EstimateSource::State;
+        // let est_type = EstimateSource::LinearVoutEstimate;
+        let est_type = EstimateSource::State;
 
         // getting initial estimate. Could potentially be done with the fixed_pivot filter
         v_est = [
