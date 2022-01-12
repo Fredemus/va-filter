@@ -1,7 +1,14 @@
 # svf_filter
-A nonlinear model of a state variable filter implemented as a VST in Rust
+A nonlinear model of a state variable filter implemented as a VST in Rust.
 
+# Build Instructions
 
-# TO DO
+To run the standalone GUI:
+```bash
+cargo +nightly run --release --bin svf_gui_bin
+```
 
-Just change this to a general filter plugin and add more filters?
+To build the VST:
+```bash
+cargo +nightly build --release
+```

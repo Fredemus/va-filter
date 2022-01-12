@@ -71,47 +71,36 @@ pub fn plugin_gui(cx: &mut Context, state: Arc<EditorState>) {
         HStack::new(cx, |cx| {
             Label::new(cx, "Filter Circuit");
             // Dropdown to select filter circuit
-            Binding::new(cx, UiData::choice, |cx, choice| {
-                // Dropdown List
-                Dropdown::new(
-                    cx,
-                    move |cx|
-                    // A Label and an Icon
-                    HStack::new(cx, move |cx|{
-                        let choice = choice.get(cx).clone();
-                        Label::new(cx, &choice).left(Auto);
-                        Label::new(cx, ICON_DOWN_OPEN).class("arrow");
-                    }),
-                    move |cx| {
-                        // List of options
-                        List::new(cx, UiData::filter_circuits, move |cx, item| {
-                            VStack::new(cx, move |cx| {
-                                let option = item.get(cx).clone();
-                                // Button which updates the chosen option
-                                Button::new(
-                                    cx,
-                                    move |cx| {
-                                        cx.emit(ParamChangeEvent::CircuitEvent(option.clone()));
+            Dropdown::new(
+                cx,
+                move |cx|
+                // A Label and an Icon
+                HStack::new(cx, move |cx|{
+                    //let choice = choice.get(cx).clone();
+                    Binding::new(cx, UiData::choice, |cx, choice|{
+                        Label::new(cx, &choice.get(cx).to_string()).left(Auto);
+                    });
+                    Label::new(cx, ICON_DOWN_OPEN).class("arrow");
+                }),
+                move |cx| {
+                    // List of options
+                    List::new(cx, UiData::filter_circuits, move |cx, item| {
+                        VStack::new(cx, move |cx| {
+                            Binding::new(cx, UiData::choice, move |cx, choice|{
+                                let selected = *item.get(cx) == *choice.get(cx);
+                                Label::new(cx, &item.get(cx).to_string())
+                                    .width(Stretch(1.0))
+                                    .background_color(if selected {Color::from("#f8ac14")} else {Color::transparent()})
+                                    .on_press(move |cx| {
+                                        cx.emit(ParamChangeEvent::CircuitEvent(item.get(cx).clone()));
                                         cx.emit(PopupEvent::Close);
-                                    },
-                                    move |cx| {
-                                        let opt = item.get(cx).clone();
-                                        Label::new(cx, &opt.clone())
-                                    },
-                                )
-                                .width(Stretch(1.0))
-                                .background_color(
-                                    if item.get(cx) == choice.get(cx) {
-                                        Color::from("#f8ac14")
-                                    } else {
-                                        Color::transparent()
-                                    },
-                                );
+                                    });
                             });
                         });
-                    },
-                );
-            });
+                    });
+                },
+            );
+            
         })
         .class("circuit_selector");
 
@@ -151,7 +140,7 @@ fn make_knob(cx: &mut Context, param_index: i32) -> Handle<VStack> {
                 params.get(cx).get_parameter(param_index),
                 false,
             )
-            .on_changing(cx, move |knob, cx| {
+            .on_changing(move |knob, cx| {
                 cx.emit(ParamChangeEvent::AllParams(
                     param_index,
                     knob.normalized_value,
