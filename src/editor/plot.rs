@@ -18,7 +18,7 @@ pub fn get_filter_bode(cutoff: f32, k: f32, mode: usize, filter_type: usize) -> 
     // bogus sample rate of 44100, since it just changes the plot's max value and 22050 seems reasonable
     let g = (PI * cutoff / 44100.).tan();
     // resolution of bodeplot
-    let len = 500;
+    let len = 360;
 
     let mut array = vec![Complex::new(1., 0.); len];
     let mut frequencies = vec![1.; len]; // frequency has to be in range [0, pi/2] because that's the range of g from the BLT

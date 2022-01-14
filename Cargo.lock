@@ -841,6 +841,7 @@ name = "svf_filter"
 version = "0.1.0"
 dependencies = [
  "baseview",
+ "femtovg",
  "hound",
  "num",
  "packed_simd_2",
