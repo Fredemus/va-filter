@@ -116,7 +116,7 @@ pub fn get_amplitude_response(
         amplitudes[min] = -200.;
     }
     // round max reso value to the correct, for same reason as above
-    else if filter_type == 0 && mode != 4 && k < 1.0 {
+    else if filter_type == 0 && mode != 4 && k < 0.5 {
         let max = amplitudes
             .iter()
             .enumerate()
