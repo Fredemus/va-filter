@@ -1,5 +1,4 @@
 // just a place to put the bode plot math
-// TODO: ladder and svf doesn't agree on where cutoff is. Which one is wrong? probably ladder but not sure
 use num::complex::Complex;
 
 use std::f32::consts::PI;
@@ -84,9 +83,9 @@ fn get_filter_bode(
             for i in 0..len {
                 curr_s = frequencies[i] * j;
                 // could potentially be optimized, i think
-                // array[i] = ((1. + k) * (1. + curr_s / g).powi(3 - mode as i32))/ (k + (1. + curr_s / g).powi(4));
-                array[i] =
-                    ((1. + curr_s / g).powi(3 - mode as i32)) / (k + (1. + curr_s / g).powi(4));
+                array[i] = ((1. + k) * (1. + curr_s / g).powi(3 - mode as i32))/ (k + (1. + curr_s / g).powi(4));
+                // array[i] =
+                //     ((1. + curr_s / g).powi(3 - mode as i32)) / (k + (1. + curr_s / g).powi(4));
             }
         }
         _ => (),
