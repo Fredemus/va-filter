@@ -188,7 +188,7 @@ impl BodePlot {
 }
 
 impl View for BodePlot {
-    fn draw(&self, cx: &Context, canvas: &mut Canvas) {
+    fn draw(&self, cx: &mut Context, canvas: &mut Canvas) {
         if let Some(ui_data) = cx.data::<UiData>() {
             let params = ui_data.params.clone();
 
