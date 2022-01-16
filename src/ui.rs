@@ -182,24 +182,17 @@ impl View for BodePlot {
         if let Some(ui_data) = cx.data::<UiData>() {
             let params = ui_data.params.clone();
 
-            let mode_or_slope = if params.filter_type.get() == 0 {
-                params.mode.get()
-            } else {
-                params.slope.get()
-            };
-
-            // let amps = get_filter_bode(
-            //     params.cutoff.get(),
-            //     1.0,
-            //     mode_or_slope,
-            //     params.filter_type.get());
-
+            
+            // TODO - Make this configurable
+            let width = 360;
+            let height = 200;
             let amps = if params.filter_type.get() == 0 {
                         get_filter_bode(
                             params.cutoff.get(),
                             params.zeta.get(),
                             params.mode.get(),
                             params.filter_type.get(),
+                            width,
                         )
                     } else {
                         get_filter_bode(
@@ -207,15 +200,13 @@ impl View for BodePlot {
                             params.k_ladder.get(),
                             params.slope.get(),
                             params.filter_type.get(),
+                            width,
                         )
                     };
                 
     
             let bounds = cx.cache.get_bounds(cx.current);
 
-            // TODO - Make this configurable
-            let width = 360;
-            let height = 200;
 
             let image_id = if let Some(image_id) = self.image {
                 image_id
@@ -242,17 +233,17 @@ impl View for BodePlot {
             let y = height as f32 * ((amp - min) / (max - min)); 
 
             path.move_to(0.0, height as f32 - y + 1.0);
-
+            let line_width = 5.0;
             for i in 1..360 {
                 let amp = amps[i].clamp(min, max);
                 let y = height as f32 * ((amp - min) / (max - min));
     
-                path.line_to(i as f32, height as f32 - y + 1.0);
+                path.line_to(i as f32, height as f32 - y + line_width / 2.0);
             }
 
             // Draw plot
             let mut paint = Paint::color(color.into());
-            paint.set_line_width(2.0);
+            paint.set_line_width(line_width);
             canvas.stroke_path(&mut path, paint);
 
 

@@ -13,12 +13,12 @@ pub fn _cheap_tan(x: f32) -> f32 {
     (-0.66666667 * x.powi(3) + x) / (1. - 0.4 * x.powi(2))
 }
 
-pub fn get_filter_bode(cutoff: f32, k: f32, mode: usize, filter_type: usize) -> Vec<f32> {
+pub fn get_filter_bode(cutoff: f32, k: f32, mode: usize, filter_type: usize, len: usize) -> Vec<f32> {
     // bilinear transform
     // bogus sample rate of 44100, since it just changes the plot's max value and 22050 seems reasonable
     let g = (PI * cutoff / 44100.).tan();
     // resolution of bodeplot
-    let len = 360;
+    // let len = 360;
 
     let mut array = vec![Complex::new(1., 0.); len];
     let mut frequencies = vec![1.; len]; // frequency has to be in range [0, pi/2] because that's the range of g from the BLT
@@ -98,9 +98,9 @@ pub fn get_filter_bode(cutoff: f32, k: f32, mode: usize, filter_type: usize) -> 
 
 #[test]
 fn test_cutoff_value() {
-    let amplitudes = get_filter_bode(25.1425 * 2., 1. / 0.707, 3, 0);
-    // println!("{:?}", amplitudes.iter().max().unwrap());
     let len = 1000;
+    let amplitudes = get_filter_bode(25.1425 * 2., 1. / 0.707, 3, 0, len);
+    // println!("{:?}", amplitudes.iter().max().unwrap());
 
     let mut frequencies = vec![1.; len];
     let base: f32 = 10.;
@@ -118,9 +118,9 @@ fn test_cutoff_value() {
 }
 #[test]
 fn test_ladder_value() {
-    let amplitudes = get_filter_bode(25.1425, 3.99, 3, 1);
-    // println!("{:?}", amplitudes.iter().max().unwrap());
     let len = 1000;
+    let amplitudes = get_filter_bode(25.1425, 3.99, 3, 1, len);
+    // println!("{:?}", amplitudes.iter().max().unwrap());
 
     let mut frequencies = vec![1.; len];
     let base: f32 = 10.;
