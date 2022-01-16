@@ -188,11 +188,28 @@ impl View for BodePlot {
                 params.slope.get()
             };
 
-            let amps = get_filter_bode(
-                params.cutoff.get(),
-                1.0,
-                mode_or_slope,
-                params.filter_type.get());
+            // let amps = get_filter_bode(
+            //     params.cutoff.get(),
+            //     1.0,
+            //     mode_or_slope,
+            //     params.filter_type.get());
+
+            let amps = if params.filter_type.get() == 0 {
+                        get_filter_bode(
+                            params.cutoff.get(),
+                            params.zeta.get(),
+                            params.mode.get(),
+                            params.filter_type.get(),
+                        )
+                    } else {
+                        get_filter_bode(
+                            params.cutoff.get(),
+                            params.k_ladder.get(),
+                            params.slope.get(),
+                            params.filter_type.get(),
+                        )
+                    };
+                
     
             let bounds = cx.cache.get_bounds(cx.current);
 
