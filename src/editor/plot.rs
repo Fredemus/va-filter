@@ -84,10 +84,14 @@ pub fn get_filter_bode(cutoff: f32, k: f32, mode: usize, filter_type: usize) -> 
         }
         _ => (),
     }
-
     let mut amplitudes = vec![1.; len];
     for i in 0..len {
         amplitudes[i] = lin_to_db(array[i].norm());
+    }
+    // make notch draw a lil nicer at high q-factors (the problem is that there might not be a freq sample at the cutoff)
+    if filter_type == 0 && mode == 3 {
+        let min = amplitudes.iter().enumerate().min_by(|(_, a), (_, b)| a.partial_cmp(b).expect("NaN in the filter response")).unwrap().0;
+        amplitudes[min] = -200.;
     }
     amplitudes
 }
