@@ -23,7 +23,8 @@ fn main() {
         .with_title("Hello Plugin");
 
     Application::new(window_description, move |cx| {
-        cx.add_stylesheet("src/style.css");
+        cx.add_stylesheet("src/style.css")
+            .expect("no style sheet found");
 
         // plugin_gui(cx, Arc::clone(&params));
         plugin_gui(cx, Arc::clone(&state));
