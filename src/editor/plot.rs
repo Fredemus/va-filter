@@ -139,7 +139,7 @@ pub fn get_phase_response(
     let array = get_filter_bode(cutoff, k, mode, filter_type, len);
     let mut phases = vec![1.; len];
     for i in 0..len {
-        phases[i] = lin_to_db(array[i].arg());
+        phases[i] = array[i].arg();
     }
     phases
 }
@@ -192,4 +192,8 @@ fn test_ladder_value() {
 #[test]
 fn db_print() {
     println!("{}", lin_to_db(0.1));
+}
+#[test]
+fn pr_print() {
+    println!("{:?}", get_phase_response(10000., 0.707, 0, 0, 1000));
 }

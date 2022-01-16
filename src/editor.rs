@@ -5,7 +5,7 @@ use crate::filter_parameters::FilterParameters;
 // use crate::parameter::{ParameterF32, ParameterUsize};
 use vst::plugin::HostCallback;
 mod plot;
-pub use plot::get_filter_bode;
+pub use plot::*;
 use vst::editor::Editor;
 
 use crate::ui::*;

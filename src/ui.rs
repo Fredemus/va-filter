@@ -1,5 +1,6 @@
 use crate::editor::get_amplitude_response;
 use crate::editor::EditorState;
+use crate::editor::get_phase_response;
 use crate::utils::*;
 use crate::FilterParameters;
 use femtovg::ImageFlags;
@@ -20,12 +21,14 @@ pub struct UiData {
     host: Option<HostCallback>,
     filter_circuits: Vec<String>,
     choice: String,
+    show_phase: bool,
 }
 
 #[derive(Debug)]
 pub enum ParamChangeEvent {
     AllParams(i32, f32),
     CircuitEvent(String),
+    ChangeBodeView()
 }
 
 impl Model for UiData {
@@ -53,6 +56,9 @@ impl Model for UiData {
                     }
                     self.choice = circuit_name.to_string();
                 }
+                ParamChangeEvent::ChangeBodeView() => {
+                    self.show_phase = !self.show_phase;
+                }
             }
         }
     }
@@ -68,6 +74,7 @@ pub fn plugin_gui(cx: &mut Context, state: Arc<EditorState>) {
         } else {
             "Transistor Ladder".to_string()
         },
+        show_phase: false,
     }
     .build(cx);
 
@@ -140,7 +147,9 @@ pub fn plugin_gui(cx: &mut Context, state: Arc<EditorState>) {
         BodePlot::new(cx)
             .class("bode")
             .text("Bode Plot")
-            .overflow(Overflow::Visible);
+            .overflow(Overflow::Visible).on_press(|cx| {
+                cx.emit(ParamChangeEvent::ChangeBodeView());
+            });
     })
     .class("container");
 }
@@ -186,24 +195,62 @@ impl View for BodePlot {
             // TODO - Make this configurable
             let width = 360;
             let height = 200;
-            let amps = if params.filter_type.get() == 0 {
-                get_amplitude_response(
-                    params.cutoff.get(),
-                    params.zeta.get(),
-                    params.mode.get(),
-                    params.filter_type.get(),
-                    width,
-                )
-            } else {
-                get_amplitude_response(
-                    params.cutoff.get(),
-                    // 2.,
-                    params.k_ladder.get(),
-                    params.slope.get(),
-                    params.filter_type.get(),
-                    width,
-                )
-            };
+
+            let amps: Vec<f32>;
+            let max;
+            let min;
+            //
+            if ui_data.show_phase {
+                if params.filter_type.get() == 0 {
+                    amps = get_phase_response(
+                        params.cutoff.get(),
+                        params.zeta.get(),
+                        params.mode.get(),
+                        params.filter_type.get(),
+                        width,
+                    );
+                    max = 0.;
+                    // max phase shift of the ladder filter is Pi radians / 180 degrees
+                    min = -std::f32::consts::PI;
+                } else {
+                    amps = get_phase_response(
+                        params.cutoff.get(),
+                        // 2.,
+                        params.k_ladder.get(),
+                        params.slope.get(),
+                        params.filter_type.get(),
+                        width,
+                    );
+                    max = 0.;
+                    // max phase shift of the ladder filter is 2*Pi radians / 360 degrees
+                    min = -std::f32::consts::PI * 2.;
+                };
+            }
+            else {
+                // min and max amplitude values that will be rendered
+                min = -60.0;
+                max = 40.0;
+                if params.filter_type.get() == 0 {
+                    amps = get_amplitude_response(
+                        params.cutoff.get(),
+                        params.zeta.get(),
+                        params.mode.get(),
+                        params.filter_type.get(),
+                        width,
+                    );
+                } else {
+                    amps =  get_amplitude_response(
+                        params.cutoff.get(),
+                        // 2.,
+                        params.k_ladder.get(),
+                        params.slope.get(),
+                        params.filter_type.get(),
+                        width,
+                    );
+                    
+                }
+            }
+            
 
             let bounds = cx.cache.get_bounds(cx.current);
 
@@ -238,8 +285,7 @@ impl View for BodePlot {
             // Fill background
             canvas.clear_rect(0, 0, width as u32, height as u32, background_color.into());
 
-            let min = -60.0;
-            let max = 40.0;
+            
 
             let mut path = Path::new();
             let amp = amps[0].clamp(min, max);
