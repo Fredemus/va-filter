@@ -963,7 +963,7 @@ checksum = "49874b5167b65d7193b8aba1567f5c7d93d001cafc34600cee003eda787e483f"
 [[package]]
 name = "vizia"
 version = "0.1.0"
-source = "git+https://github.com/geom3trik/VIZIA?branch=main#049114186035ef962e9703e4e11769445cb5a837"
+source = "git+https://github.com/geom3trik/VIZIA?branch=main#11385296421cd4b841ddc7995e4d5675701ef5f5"
 dependencies = [
  "vizia_baseview",
  "vizia_core",
@@ -972,7 +972,7 @@ dependencies = [
 [[package]]
 name = "vizia_baseview"
 version = "0.1.0"
-source = "git+https://github.com/geom3trik/VIZIA?branch=main#049114186035ef962e9703e4e11769445cb5a837"
+source = "git+https://github.com/geom3trik/VIZIA?branch=main#11385296421cd4b841ddc7995e4d5675701ef5f5"
 dependencies = [
  "baseview",
  "femtovg",
@@ -985,7 +985,7 @@ dependencies = [
 [[package]]
 name = "vizia_core"
 version = "0.1.0"
-source = "git+https://github.com/geom3trik/VIZIA?branch=main#049114186035ef962e9703e4e11769445cb5a837"
+source = "git+https://github.com/geom3trik/VIZIA?branch=main#11385296421cd4b841ddc7995e4d5675701ef5f5"
 dependencies = [
  "bitflags",
  "cssparser",
@@ -998,7 +998,7 @@ dependencies = [
 [[package]]
 name = "vizia_derive"
 version = "0.1.0"
-source = "git+https://github.com/geom3trik/VIZIA?branch=main#049114186035ef962e9703e4e11769445cb5a837"
+source = "git+https://github.com/geom3trik/VIZIA?branch=main#11385296421cd4b841ddc7995e4d5675701ef5f5"
 dependencies = [
  "proc-macro2",
  "quote",
