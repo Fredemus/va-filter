@@ -1,5 +1,4 @@
 // just a place to put the bode plot math
-// TODO: ladder and svf doesn't agree on where cutoff is. Which one is wrong? probably ladder but not sure
 use num::complex::Complex;
 
 use std::f32::consts::PI;
@@ -13,12 +12,18 @@ pub fn _cheap_tan(x: f32) -> f32 {
     (-0.66666667 * x.powi(3) + x) / (1. - 0.4 * x.powi(2))
 }
 
-pub fn get_filter_bode(cutoff: f32, k: f32, mode: usize, filter_type: usize) -> Vec<f32> {
+fn get_filter_bode(
+    cutoff: f32,
+    k: f32,
+    mode: usize,
+    filter_type: usize,
+    len: usize,
+) -> Vec<Complex<f32>> {
     // bilinear transform
     // bogus sample rate of 44100, since it just changes the plot's max value and 22050 seems reasonable
     let g = (PI * cutoff / 44100.).tan();
     // resolution of bodeplot
-    let len = 500;
+    // let len = 360;
 
     let mut array = vec![Complex::new(1., 0.); len];
     let mut frequencies = vec![1.; len]; // frequency has to be in range [0, pi/2] because that's the range of g from the BLT
@@ -78,25 +83,72 @@ pub fn get_filter_bode(cutoff: f32, k: f32, mode: usize, filter_type: usize) -> 
             for i in 0..len {
                 curr_s = frequencies[i] * j;
                 // could potentially be optimized, i think
-                array[i] = ((1. + k) * (1. + curr_s / g).powi(3 - mode as i32))
-                    / (k + (1. + curr_s / g).powi(4));
+                array[i] = ((1. + k) * (1. + curr_s / g).powi(3 - mode as i32))/ (k + (1. + curr_s / g).powi(4));
+                // array[i] =
+                //     ((1. + curr_s / g).powi(3 - mode as i32)) / (k + (1. + curr_s / g).powi(4));
             }
         }
         _ => (),
     }
+    return array;
+}
 
+pub fn get_amplitude_response(
+    cutoff: f32,
+    k: f32,
+    mode: usize,
+    filter_type: usize,
+    len: usize,
+) -> Vec<f32> {
+    let array = get_filter_bode(cutoff, k, mode, filter_type, len);
     let mut amplitudes = vec![1.; len];
     for i in 0..len {
         amplitudes[i] = lin_to_db(array[i].norm());
     }
+    // make notch draw a lil nicer at high q-factors (the problem is that there might not be a freq sample at the cutoff)
+    if filter_type == 0 && mode == 3 {
+        let min = amplitudes
+            .iter()
+            .enumerate()
+            .min_by(|(_, a), (_, b)| a.partial_cmp(b).expect("NaN in the filter response"))
+            .unwrap()
+            .0;
+        amplitudes[min] = -200.;
+    }
+    // round max reso value to the correct, for same reason as above
+    else if filter_type == 0 && mode != 4 && k < 0.5 {
+        let max = amplitudes
+            .iter()
+            .enumerate()
+            .max_by(|(_, a), (_, b)| a.partial_cmp(b).expect("NaN in the filter response"))
+            .unwrap()
+            .0;
+        amplitudes[max] = lin_to_db(1.0 / k);
+    }
+    // TODO: I'd like to do this for the ladder filter too, but I couldn't find a formula for its resonance
     amplitudes
+}
+
+pub fn get_phase_response(
+    cutoff: f32,
+    k: f32,
+    mode: usize,
+    filter_type: usize,
+    len: usize,
+) -> Vec<f32> {
+    let array = get_filter_bode(cutoff, k, mode, filter_type, len);
+    let mut phases = vec![1.; len];
+    for i in 0..len {
+        phases[i] = array[i].arg();
+    }
+    phases
 }
 
 #[test]
 fn test_cutoff_value() {
-    let amplitudes = get_filter_bode(25.1425 * 2., 1. / 0.707, 3, 0);
-    // println!("{:?}", amplitudes.iter().max().unwrap());
     let len = 1000;
+    let amplitudes = get_amplitude_response(25.1425 * 2., 1. / 0.707, 0, 0, len);
+    // println!("{:?}", amplitudes.iter().max().unwrap());
 
     let mut frequencies = vec![1.; len];
     let base: f32 = 10.;
@@ -114,9 +166,9 @@ fn test_cutoff_value() {
 }
 #[test]
 fn test_ladder_value() {
-    let amplitudes = get_filter_bode(25.1425, 3.99, 3, 1);
-    // println!("{:?}", amplitudes.iter().max().unwrap());
     let len = 1000;
+    let amplitudes = get_amplitude_response(25.1425, 3.99, 3, 1, len);
+    // println!("{:?}", amplitudes.iter().max().unwrap());
 
     let mut frequencies = vec![1.; len];
     let base: f32 = 10.;
@@ -140,4 +192,8 @@ fn test_ladder_value() {
 #[test]
 fn db_print() {
     println!("{}", lin_to_db(0.1));
+}
+#[test]
+fn pr_print() {
+    println!("{:?}", get_phase_response(10000., 0.707, 1, 1, 1000));
 }

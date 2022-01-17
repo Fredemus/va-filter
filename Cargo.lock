@@ -264,9 +264,9 @@ dependencies = [
 
 [[package]]
 name = "getrandom"
-version = "0.2.3"
+version = "0.2.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7fcd999463524c52659517fe2cea98493cfe485d10565e7b0fb07dbba7ad2753"
+checksum = "418d37c8b1d42553c93648be529cb70f920d3baf8ef469b74b9638df426e0b4c"
 dependencies = [
  "cfg-if 1.0.0",
  "libc",
@@ -715,7 +715,7 @@ version = "0.6.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d34f1408f55294453790c48b2f1ebbb1c5b4b7563eb1f418bcfcfdbb06ebb4e7"
 dependencies = [
- "getrandom 0.2.3",
+ "getrandom 0.2.4",
 ]
 
 [[package]]
@@ -811,9 +811,9 @@ checksum = "97565067517b60e2d1ea8b268e59ce036de907ac523ad83a0475da04e818989a"
 
 [[package]]
 name = "siphasher"
-version = "0.3.7"
+version = "0.3.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "533494a8f9b724d33625ab53c6c4800f7cc445895924a8ef649222dcb76e938b"
+checksum = "ba1eead9e94aa5a2e02de9e7839f96a007f686ae7a1d57c7797774810d24908a"
 
 [[package]]
 name = "slotmap"
@@ -826,9 +826,9 @@ dependencies = [
 
 [[package]]
 name = "smallvec"
-version = "1.7.0"
+version = "1.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1ecab6c735a6bb4139c0caafd0cc3635748bbb3acf4550e8138122099251f309"
+checksum = "f2dd574626839106c320a323308629dcb1acfc96e32a8cba364ddc61ac23ee83"
 
 [[package]]
 name = "stable_deref_trait"
@@ -841,6 +841,7 @@ name = "svf_filter"
 version = "0.1.0"
 dependencies = [
  "baseview",
+ "femtovg",
  "hound",
  "num",
  "packed_simd_2",
@@ -950,7 +951,7 @@ version = "0.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bc5cf98d8186244414c848017f0e2676b3fcb46807f6668a97dfe67359a3c4b7"
 dependencies = [
- "getrandom 0.2.3",
+ "getrandom 0.2.4",
 ]
 
 [[package]]
@@ -962,7 +963,7 @@ checksum = "49874b5167b65d7193b8aba1567f5c7d93d001cafc34600cee003eda787e483f"
 [[package]]
 name = "vizia"
 version = "0.1.0"
-source = "git+https://github.com/geom3trik/VIZIA?branch=main#f6f19ca40c5d98b42702c5ed9be564a06659dc55"
+source = "git+https://github.com/geom3trik/VIZIA?branch=main#11385296421cd4b841ddc7995e4d5675701ef5f5"
 dependencies = [
  "vizia_baseview",
  "vizia_core",
@@ -971,7 +972,7 @@ dependencies = [
 [[package]]
 name = "vizia_baseview"
 version = "0.1.0"
-source = "git+https://github.com/geom3trik/VIZIA?branch=main#f6f19ca40c5d98b42702c5ed9be564a06659dc55"
+source = "git+https://github.com/geom3trik/VIZIA?branch=main#11385296421cd4b841ddc7995e4d5675701ef5f5"
 dependencies = [
  "baseview",
  "femtovg",
@@ -984,7 +985,7 @@ dependencies = [
 [[package]]
 name = "vizia_core"
 version = "0.1.0"
-source = "git+https://github.com/geom3trik/VIZIA?branch=main#f6f19ca40c5d98b42702c5ed9be564a06659dc55"
+source = "git+https://github.com/geom3trik/VIZIA?branch=main#11385296421cd4b841ddc7995e4d5675701ef5f5"
 dependencies = [
  "bitflags",
  "cssparser",
@@ -997,7 +998,7 @@ dependencies = [
 [[package]]
 name = "vizia_derive"
 version = "0.1.0"
-source = "git+https://github.com/geom3trik/VIZIA?branch=main#f6f19ca40c5d98b42702c5ed9be564a06659dc55"
+source = "git+https://github.com/geom3trik/VIZIA?branch=main#11385296421cd4b841ddc7995e4d5675701ef5f5"
 dependencies = [
  "proc-macro2",
  "quote",

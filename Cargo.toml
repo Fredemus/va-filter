@@ -16,6 +16,7 @@ vst = { git = "https://github.com/rust-dsp/rust-vst" }
 # baseview = { git = "https://github.com/RustAudio/baseview.git", rev = "d399c1275522ae75f5a82caadd904df2685c8660" }
 baseview = { git = "https://github.com/RustAudio/baseview.git", rev = "f6e99e9aa6f5aeb6b721cb05e4d882a51d995909"} # newest
 vizia = {git = "https://github.com/geom3trik/VIZIA", branch = "main", features = ["baseview"], default-features = false}
+femtovg = {git = "https://github.com/femtovg/femtovg", rev = "138a45d7b92419cc9eb2566acef7fadf25b81c00", default-features = false}
 
 raw-window-handle = "0.3"
 num = "0.4.0"
