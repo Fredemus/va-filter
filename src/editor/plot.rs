@@ -157,9 +157,12 @@ pub fn get_phase_response(
             .max_by(|(_, a), (_, b)| a.partial_cmp(b).expect("NaN in the filter response"))
             .unwrap()
             .0;
-        
+        if phases[min] < -1. {
             phases[min] = -PI;
+        }
+        if phases[max] > 1. {
             phases[max] = PI;
+        }
     }
     phases
 }

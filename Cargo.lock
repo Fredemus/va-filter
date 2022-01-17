@@ -811,9 +811,9 @@ checksum = "97565067517b60e2d1ea8b268e59ce036de907ac523ad83a0475da04e818989a"
 
 [[package]]
 name = "siphasher"
-version = "0.3.8"
+version = "0.3.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ba1eead9e94aa5a2e02de9e7839f96a007f686ae7a1d57c7797774810d24908a"
+checksum = "a86232ab60fa71287d7f2ddae4a7073f6b7aac33631c3015abb556f08c6d0a3e"
 
 [[package]]
 name = "slotmap"
@@ -963,7 +963,7 @@ checksum = "49874b5167b65d7193b8aba1567f5c7d93d001cafc34600cee003eda787e483f"
 [[package]]
 name = "vizia"
 version = "0.1.0"
-source = "git+https://github.com/geom3trik/VIZIA?branch=main#11385296421cd4b841ddc7995e4d5675701ef5f5"
+source = "git+https://github.com/geom3trik/VIZIA?branch=main#8be74ee52b6be34cad7324bb8b3ca3ca89b29afd"
 dependencies = [
  "vizia_baseview",
  "vizia_core",
@@ -972,7 +972,7 @@ dependencies = [
 [[package]]
 name = "vizia_baseview"
 version = "0.1.0"
-source = "git+https://github.com/geom3trik/VIZIA?branch=main#11385296421cd4b841ddc7995e4d5675701ef5f5"
+source = "git+https://github.com/geom3trik/VIZIA?branch=main#8be74ee52b6be34cad7324bb8b3ca3ca89b29afd"
 dependencies = [
  "baseview",
  "femtovg",
@@ -985,7 +985,7 @@ dependencies = [
 [[package]]
 name = "vizia_core"
 version = "0.1.0"
-source = "git+https://github.com/geom3trik/VIZIA?branch=main#11385296421cd4b841ddc7995e4d5675701ef5f5"
+source = "git+https://github.com/geom3trik/VIZIA?branch=main#8be74ee52b6be34cad7324bb8b3ca3ca89b29afd"
 dependencies = [
  "bitflags",
  "cssparser",
@@ -998,7 +998,7 @@ dependencies = [
 [[package]]
 name = "vizia_derive"
 version = "0.1.0"
-source = "git+https://github.com/geom3trik/VIZIA?branch=main#11385296421cd4b841ddc7995e4d5675701ef5f5"
+source = "git+https://github.com/geom3trik/VIZIA?branch=main#8be74ee52b6be34cad7324bb8b3ca3ca89b29afd"
 dependencies = [
  "proc-macro2",
  "quote",
