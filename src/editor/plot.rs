@@ -20,16 +20,20 @@ fn get_filter_bode(
     len: usize,
 ) -> Vec<Complex<f32>> {
     // bilinear transform
-    // bogus sample rate of 44100, since it just changes the plot's max value and 22050 seems reasonable
+    // bogus sample rate of 44100, since it just changes the plot's possible max value and 22050 seems reasonable
     let g = (PI * cutoff / 44100.).tan();
-    // resolution of bodeplot
-    // let len = 360;
 
+    let mut frequencies = vec![1.; len]; 
     let mut array = vec![Complex::new(1., 0.); len];
-    let mut frequencies = vec![1.; len]; // frequency has to be in range [0, pi/2] because that's the range of g from the BLT
-    let base: f32 = 10.;
+    // frequency has to be in range [0, 6.798795774] because that's the output range of g from the blt, 
+    // assuming 20 kHz as max freq
+    let min: f32 = 0.001;
+    let max: f32 = 6.798795774;
+    let minl = min.log2();
+    let range = max.log2() - minl;
+    
     for i in 0..len {
-        frequencies[i] = base.powf((i + 1) as f32 / (len as f32) * 3. - 3.) * PI / 2.;
+        frequencies[i] = 2.0f32.powf(((i as f32 / len as f32) * range) + minl);
     }
     let j = Complex::new(0., 1.);
     let mut curr_s: Complex<f32>;
