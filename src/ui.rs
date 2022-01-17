@@ -207,16 +207,28 @@ impl View for BodePlot {
             //
             if ui_data.show_phase {
                 if params.filter_type.get() == 0 {
+                    let mode = params.mode.get();
                     amps = get_phase_response(
                         params.cutoff.get(),
                         params.zeta.get(),
-                        params.mode.get(),
+                        mode,
                         params.filter_type.get(),
                         width,
                     );
-                    max = 0.;
-                    // max phase shift of the ladder filter is Pi radians / 180 degrees
-                    min = -PI;
+                    if mode == 0 {
+                        max = 0.;
+                        // max phase shift of the state variable filter is Pi radians / 180 degrees
+                        min = -PI;
+                    }
+                    else if mode == 1 {
+                        max = PI;
+                        min = 0.;
+                    }
+                    else {
+                        max = PI / 2.;
+                        min = -PI / 2.;
+                    }
+                    
                 } else {
                     amps = get_phase_response(
                         params.cutoff.get(),
