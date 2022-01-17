@@ -7,6 +7,8 @@ use femtovg::ImageFlags;
 use femtovg::ImageId;
 use femtovg::RenderTarget;
 use femtovg::{Paint, Path};
+use std::cell::RefCell;
+use std::rc::Rc;
 use std::sync::Arc;
 use vizia::*;
 
@@ -149,7 +151,8 @@ pub fn plugin_gui(cx: &mut Context, state: Arc<EditorState>) {
         BodePlot::new(cx)
             .class("bode")
             .text("Bode Plot")
-            .overflow(Overflow::Visible).on_press(|cx| {
+            .overflow(Overflow::Visible)
+            .on_press(|cx| {
                 cx.emit(ParamChangeEvent::ChangeBodeView());
             });
     })
@@ -180,12 +183,12 @@ fn make_knob(cx: &mut Context, param_index: i32) -> Handle<VStack> {
 }
 
 pub struct BodePlot {
-    image: Option<ImageId>,
+    image: Rc<RefCell<Option<ImageId>>>,
 }
 
 impl BodePlot {
     pub fn new(cx: &mut Context) -> Handle<Self> {
-        Self { image: None }.build2(cx, |_| {})
+        Self { image: Rc::new(RefCell::new(None)) }.build2(cx, |_| {})
     }
 }
 
@@ -261,7 +264,7 @@ impl View for BodePlot {
 
             let bounds = cx.cache.get_bounds(cx.current);
 
-            let image_id = if let Some(image_id) = self.image {
+            let image_id = if let Some(image_id) = *self.image.borrow() {
                 image_id
             } else {
                 canvas
@@ -273,6 +276,8 @@ impl View for BodePlot {
                     )
                     .expect("Failed to create image")
             };
+
+            *self.image.borrow_mut() = Some(image_id);
 
             canvas.set_render_target(RenderTarget::Image(image_id));
 
