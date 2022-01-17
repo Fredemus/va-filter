@@ -291,9 +291,9 @@ impl View for BodePlot {
             let amp = amps[0].clamp(min, max);
             let y = height as f32 * ((amp - min) / (max - min));
 
-            path.move_to(0.0, height as f32 - y + 1.0);
+            path.move_to(-10.0, height as f32 - y + 1.0);
             let line_width = 5.0;
-            for i in 1..360 {
+            for i in 0..360 {
                 let amp = amps[i].clamp(min, max);
                 let y = height as f32 * ((amp - min) / (max - min));
 
@@ -303,6 +303,8 @@ impl View for BodePlot {
             // Draw plot
             let mut paint = Paint::color(color.into());
             paint.set_line_width(line_width);
+            paint.set_line_join(femtovg::LineJoin::Round);
+            paint.set_line_cap(femtovg::LineCap::Square);
             canvas.stroke_path(&mut path, paint);
 
             canvas.set_render_target(RenderTarget::Screen);
