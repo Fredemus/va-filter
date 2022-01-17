@@ -11,20 +11,21 @@
 // or possibly just a broyden method fallback, can't be bothered working much more on this lol: http://fabcol.free.fr/pdf/lectnotes5.pdf
 // check if it's well-behaved without the pivotal guess, and how to make pivotal more similar to newton?
 
-// TODO: 
+// TODO:
 // The simd-ified filters are for some reason much slower (not sure if twice as slow, which would be break-even point)
 // Benchmark them and the non-simd filters
-
 
 #[macro_use]
 extern crate vst;
 use filter::{LadderFilter, SVF};
 use packed_simd::f32x4;
-use std::f32::consts::PI;
 use std::sync::Arc;
 use vst::buffer::AudioBuffer;
 use vst::editor::Editor;
-use vst::plugin::{Category, HostCallback, Info, Plugin, PluginParameters};
+use vst::plugin::{CanDo, Category, HostCallback, Info, Plugin, PluginParameters};
+
+use vst::api::Events;
+use vst::event::Event;
 
 mod editor;
 use editor::{EditorState, SVFPluginEditor};
@@ -36,6 +37,7 @@ mod filter_parameters;
 use filter_parameters::FilterParameters;
 
 mod filter;
+mod ui;
 
 // this is a 2-pole filter with resonance, which is why there's 2 states and vouts
 struct VST {
@@ -47,73 +49,7 @@ struct VST {
     ladder: filter::LadderFilter,
     svf: filter::SVF,
 }
-impl VST {}
-impl FilterParameters {
-    pub fn update_g(&self) {
-        self.g
-            .set((PI * self.cutoff.get() / (self.sample_rate.get())).tan());
-    }
-}
-impl PluginParameters for FilterParameters {
-    fn get_parameter(&self, index: i32) -> f32 {
-        match index {
-            0 => self.cutoff.get_normalized(),
-            1 => self.res.get_normalized(),
-            2 => self.drive.get_normalized(),
-            3 => self.filter_type.get() as f32,
-            4 => self.mode.get_normalized() as f32,
-            5 => self.slope.get_normalized() as f32,
-            _ => 0.0,
-        }
-    }
-    fn set_parameter(&self, index: i32, value: f32) {
-        match index {
-            0 => {
-                self.cutoff.set_normalized(value);
-                self.update_g();
-            }
-            1 => {
-                self.res.set_normalized(value);
-                self.set_resonances();
-            }
-            2 => self.drive.set_normalized(value),
-            // TODO: filter_type won't work with more than 2 filter modes, make proper param
-            3 => {
-                self.filter_type.set(value as usize);
-            }
-            4 => self.mode.set_normalized(value),
-            5 => self.slope.set_normalized(value),
-            _ => (),
-        }
-    }
-    fn get_parameter_name(&self, index: i32) -> String {
-        match index {
-            0 => "cutoff".to_string(),
-            1 => "resonance".to_string(),
-            2 => "drive".to_string(),
-            3 => "filter type".to_string(),
-            4 => "filter mode".to_string(),
-            5 => "filter slope".to_string(),
-            _ => "".to_string(),
-        }
-    }
-    // This is what will display underneath our control.  We can
-    // format it into a string that makes sense for the user.
-    fn get_parameter_text(&self, index: i32) -> String {
-        match index {
-            0 => self.cutoff.get_display(),
-            1 => self.res.get_display(),
-            2 => self.drive.get_display(),
-            3 => match self.filter_type.get() {
-                0 => "State variable".to_string(),
-                _ => "Transistor ladder".to_string(),
-            },
-            4 => self.mode.get_display(),
-            5 => self.slope.get_display(),
-            _ => format!(""),
-        }
-    }
-}
+
 impl Default for VST {
     fn default() -> Self {
         let params = Arc::new(FilterParameters::default());
@@ -135,6 +71,22 @@ impl Default for VST {
         }
     }
 }
+impl VST {
+    fn process_midi_event(&self, data: [u8; 3]) {
+        println!("midi data: {:?}", data);
+        match data[0] {
+            // controller change
+            0xB0 => {
+                // mod wheel
+                if data[1] == 1 {
+                    // TODO: Might want to use hostcallback to automate here
+                    self.params.set_parameter(0, data[2] as f32 / 127.)
+                }
+            }
+            _ => (),
+        }
+    }
+}
 impl Plugin for VST {
     fn new(host: HostCallback) -> Self {
         let params = Arc::new(FilterParameters::default());
@@ -146,10 +98,7 @@ impl Plugin for VST {
             params: params.clone(),
             editor: Some(SVFPluginEditor {
                 is_open: false,
-                state: Arc::new(EditorState {
-                    params: params,
-                    host: Some(host),
-                }),
+                state: Arc::new(EditorState::new(params, Some(host))),
             }),
             svf,
             ladder,
@@ -181,7 +130,7 @@ impl Plugin for VST {
         // // Iterate over outputs as (&mut f32, &mut f32)
         // let (mut l, mut r) = outputs.split_at_mut(1);
         // let stereo_out = l[0].iter_mut().zip(r[0].iter_mut());
-        
+
         // potentially the duplications of code could be hidden away with process_buffer functions
         if self.params.filter_type.get() == 0 {
             for (input_buffer, output_buffer) in buffer.zip() {
@@ -205,7 +154,6 @@ impl Plugin for VST {
             for (input_buffer, output_buffer) in buffer.zip() {
                 // iterate through each sample in the input and output buffer
                 for (input_sample, output_sample) in input_buffer.iter().zip(output_buffer) {
-
                     // let frame = f32x4::new(input[0][i], input[1][i], 0.0, 0.0);
                     let frame = f32x4::new(*input_sample, 0.0, 0.0, 0.0);
                     // would be nice to align this, but doesn't seem possible with #[repr(align)].
@@ -232,6 +180,23 @@ impl Plugin for VST {
     // lets the plugin host get access to the parameters
     fn get_parameter_object(&mut self) -> Arc<dyn PluginParameters> {
         Arc::clone(&self.params) as Arc<dyn PluginParameters>
+    }
+    // handling of events
+    fn process_events(&mut self, events: &Events) {
+        for event in events.events() {
+            match event {
+                Event::Midi(ev) => self.process_midi_event(ev.data),
+                // More events can be handled here.
+                _ => (),
+            }
+        }
+    }
+    // inform host that plugin can receive midi events
+    fn can_do(&self, can_do: CanDo) -> vst::api::Supported {
+        match can_do {
+            CanDo::ReceiveMidiEvent => vst::api::Supported::Yes,
+            _ => vst::api::Supported::Maybe,
+        }
     }
 }
 plugin_main!(VST);

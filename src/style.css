@@ -1,0 +1,83 @@
+/* * {
+    border-width: 1px;
+    border-color: red;
+} */
+
+.container {
+    background-color: #191919;
+    child-space: 1s;
+    row-between: 20px;
+}
+
+.knobs {
+    child-space: 1s;
+}
+
+.circuit_selector {
+    width: 360px;
+    height: auto;
+    child-space: 1s;
+    col-between: 10px;
+}
+
+.bode {
+    height: 200px;
+    width: 360px;
+    color: #ffb74d;
+    child-space: 1s;
+    border-width: 1px;
+    border-color: white;
+}
+
+dropdown .title {
+    background-color: #101010;
+    height: 30px;
+    width: 200px;
+    child-left: 5px;
+    child-right: 5px;
+    child-top: 1s;
+    child-bottom: 1s;
+    col-between: 5px;
+}
+
+dropdown .arrow {
+    font: "icons";
+    top: 1s;
+    bottom: 1s;
+    left: 1s;
+}
+
+dropdown>popup {
+    background-color: #141414;
+    left: 1s;
+    right: 1s;
+}
+
+dropdown>popup>list {
+    width: 200px;
+}
+
+button {
+    width: auto;
+    height: auto;
+    child-space: 5px;
+    background-color: gray;
+    border-radius: 0px;
+}
+
+label {
+    font-size: 20;
+    color: #C2C2C2;
+    height: 20px;
+    child-top: 1s;
+    child-bottom: 1s;
+}
+
+knob {
+    width: 90px;
+    height: 70px;
+}
+
+knob .track {
+    background-color: #ffb74d;
+}

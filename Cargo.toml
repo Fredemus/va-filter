@@ -8,20 +8,18 @@ edition = "2018"
 [lib]
 name = "svf_gui"
 crate-type = ["cdylib"]
+[[bin]]
+name = "svf_gui_bin"
+path = "src/bin.rs"
 [dependencies]
 vst = { git = "https://github.com/rust-dsp/rust-vst" }
 # baseview = { git = "https://github.com/RustAudio/baseview.git", rev = "d399c1275522ae75f5a82caadd904df2685c8660" }
-baseview = { git = "https://github.com/RustAudio/baseview.git", rev = "9fbfe18f9a6859da83a55f7b51fe1e5a2f6ca1e6"} # newest
+baseview = { git = "https://github.com/RustAudio/baseview.git", rev = "f6e99e9aa6f5aeb6b721cb05e4d882a51d995909"} # newest
+vizia = {git = "https://github.com/geom3trik/VIZIA", branch = "main", features = ["baseview"], default-features = false}
+femtovg = {git = "https://github.com/femtovg/femtovg", rev = "138a45d7b92419cc9eb2566acef7fadf25b81c00", default-features = false}
 
-# imgui-baseview = {git = "https://github.com/BillyDM/imgui-baseview", branch = "main"}
-imgui-baseview = {git = "https://github.com/Fredemus/imgui-baseview"}
-imgui = "0.8"
 raw-window-handle = "0.3"
 num = "0.4.0"
 packed_simd = { version = "0.3.6", package = "packed_simd_2" }
 hound = "3.4.0"
 rand = "0.8.4"
-imgui-knobs = {git =" https://github.com/Fredemus/imgui-rs-knobs", branch = "synth"}
-# imgui-knobs = {git = "https://github.com/DGriffin91/imgui-rs-knobs", branch = "main"}
-# [dependencies.imgui-knobs]
-# path = "../imgui-rs-knobs/"
