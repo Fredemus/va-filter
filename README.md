@@ -1,5 +1,5 @@
-# svf_filter
-A nonlinear model of a state variable filter implemented as a VST in Rust.
+# va-filter
+Virtual analogue filters modelled with Topology Preserving Transforms and solved with Newton's method. implemented as a VST2 in Rust, using [Vizia](https://github.com/geom3trik/VIZIA) for the GUI.
 
 # Build Instructions
 
