@@ -141,6 +141,26 @@ pub fn get_phase_response(
     for i in 0..len {
         phases[i] = array[i].arg();
     }
+    // make notch and 4-pole ladder draw a lil nicer at high q-factors 
+    // (the problem is that there might not be a freq sample at the cutoff)
+    // if mode == 3 && (filter_type == 0  || filter_type == 1) {
+    if mode == 3 {
+        let min = phases
+            .iter()
+            .enumerate()
+            .min_by(|(_, a), (_, b)| a.partial_cmp(b).expect("NaN in the filter response"))
+            .unwrap()
+            .0;
+        let max = phases
+            .iter()
+            .enumerate()
+            .max_by(|(_, a), (_, b)| a.partial_cmp(b).expect("NaN in the filter response"))
+            .unwrap()
+            .0;
+        
+            phases[min] = -PI;
+            phases[max] = PI;
+    }
     phases
 }
 
