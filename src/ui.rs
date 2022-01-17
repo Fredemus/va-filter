@@ -15,6 +15,8 @@ use vst::plugin::HostCallback;
 use vst::plugin::PluginParameters;
 const ICON_DOWN_OPEN: &str = "\u{e75c}";
 
+use std::f32::consts::PI;
+
 #[derive(Lens)]
 pub struct UiData {
     params: Arc<FilterParameters>,
@@ -211,7 +213,7 @@ impl View for BodePlot {
                     );
                     max = 0.;
                     // max phase shift of the ladder filter is Pi radians / 180 degrees
-                    min = -std::f32::consts::PI;
+                    min = -PI;
                 } else {
                     amps = get_phase_response(
                         params.cutoff.get(),
@@ -221,9 +223,14 @@ impl View for BodePlot {
                         params.filter_type.get(),
                         width,
                     );
-                    max = 0.;
-                    // max phase shift of the ladder filter is 2*Pi radians / 360 degrees
-                    min = -std::f32::consts::PI * 2.;
+                    if params.slope.get() > 1 {
+                        max = PI;
+                        min = -PI;
+                    }
+                    else {
+                        max = PI / 2.;
+                        min = -PI;
+                    }
                 };
             }
             else {

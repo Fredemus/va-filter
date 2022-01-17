@@ -147,7 +147,7 @@ pub fn get_phase_response(
 #[test]
 fn test_cutoff_value() {
     let len = 1000;
-    let amplitudes = get_amplitude_response(25.1425 * 2., 1. / 0.707, 3, 0, len);
+    let amplitudes = get_amplitude_response(25.1425 * 2., 1. / 0.707, 0, 0, len);
     // println!("{:?}", amplitudes.iter().max().unwrap());
 
     let mut frequencies = vec![1.; len];
@@ -195,5 +195,5 @@ fn db_print() {
 }
 #[test]
 fn pr_print() {
-    println!("{:?}", get_phase_response(10000., 0.707, 0, 0, 1000));
+    println!("{:?}", get_phase_response(10000., 0.707, 1, 1, 1000));
 }
