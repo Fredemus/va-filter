@@ -113,8 +113,8 @@ impl Plugin for VST {
         Info {
             name: "SVF".to_string(),
             unique_id: 80371372,
-            inputs: 1,
-            outputs: 1,
+            inputs: 2,
+            outputs: 2,
             category: Category::Effect,
             parameters: 6,
             preset_chunks: true,
@@ -124,47 +124,39 @@ impl Plugin for VST {
     // the DAW calls process every time a buffer of samples needs to be sent through the vst
     // buffer consists of both input and output buffers
     fn process(&mut self, buffer: &mut AudioBuffer<f32>) {
-        // // split the buffer into input and output
-        // let (inputs, outputs) = buffer.split();
-        // // Iterate over inputs as (&f32, &f32)
-        // let (l, r) = inputs.split_at(1);
-        // let stereo_in = l[0].iter().zip(r[0].iter());
-        // // Iterate over outputs as (&mut f32, &mut f32)
-        // let (mut l, mut r) = outputs.split_at_mut(1);
-        // let stereo_out = l[0].iter_mut().zip(r[0].iter_mut());
+        // split the buffer into input and output
+        let (inputs, outputs) = buffer.split();
+        // Iterate over inputs as (&f32, &f32)
+        let (l, r) = inputs.split_at(1);
+        let stereo_in = l[0].iter().zip(r[0].iter());
+        // Iterate over outputs as (&mut f32, &mut f32)
+        let (mut l, mut r) = outputs.split_at_mut(1);
+        let stereo_out = l[0].iter_mut().zip(r[0].iter_mut());
 
-        // potentially the duplications of code could be hidden away with process_buffer functions
+        // TODO: the duplication of code could be hidden away with process_buffer functions
         if self.params.filter_type.get() == 0 {
-            for (input_buffer, output_buffer) in buffer.zip() {
-                // iterate through each sample in the input and output buffer
-                for (input_sample, output_sample) in input_buffer.iter().zip(output_buffer) {
-                    // get the output sample by processing the input sample
-                    let frame = f32x4::from_array([*input_sample, 0.0, 0.0, 0.0]);
-                    // would be nice to align this, but doesn't seem possible with #[repr(align)].
-                    // ah well. not much of a perf penalty for unaligned writes these days.
-                    let processed = self.svf.tick_newton(frame);
-
-                    let frame_out = *processed.as_array();
-                    
-                    // get the output sample by processing the input sample
-                    *output_sample = frame_out[0];
-                }
+            // iterate through each sample pair in the input and output buffers
+            for ((left_in, right_in), (left_out, right_out)) in stereo_in.zip(stereo_out) {
+                // get the output samples by processing the input samples
+                let frame = f32x4::from_array([*left_in, *right_in, 0.0, 0.0]);
+                let processed = self.svf.tick_newton(frame);
+                
+                let frame_out = *processed.as_array();
+                
+                *left_out = frame_out[0];
+                *right_out = frame_out[1];
             }
         } else {
-            for (input_buffer, output_buffer) in buffer.zip() {
-                // iterate through each sample in the input and output buffer
-                for (input_sample, output_sample) in input_buffer.iter().zip(output_buffer) {
-                    // let frame = f32x4::new(input[0][i], input[1][i], 0.0, 0.0);
-                    let frame = f32x4::from_array([*input_sample, 0.0, 0.0, 0.0]);
-                    // would be nice to align this, but doesn't seem possible with #[repr(align)].
-                    // ah well. not much of a perf penalty for unaligned writes these days.
-                    let processed = self.ladder.tick_newton(frame);
+            // iterate through each sample pair in the input and output buffers
+            for ((left_in, right_in), (left_out, right_out)) in stereo_in.zip(stereo_out) {
+                // get the output samples by processing the input samples
+                let frame = f32x4::from_array([*left_in, *right_in, 0.0, 0.0]);
+                let processed = self.ladder.tick_newton(frame);
 
-                    let frame_out = *processed.as_array();
+                let frame_out = *processed.as_array();
 
-                    // get the output sample by processing the input sample
-                    *output_sample = frame_out[0];
-                }
+                *left_out = frame_out[0];
+                *right_out = frame_out[1];
             }
         }
     }

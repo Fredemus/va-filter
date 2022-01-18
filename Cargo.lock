@@ -284,7 +284,7 @@ checksum = "418d37c8b1d42553c93648be529cb70f920d3baf8ef469b74b9638df426e0b4c"
 dependencies = [
  "cfg-if 1.0.0",
  "libc",
- "wasi 0.10.2+wasi-snapshot-preview1",
+ "wasi 0.10.3+wasi-snapshot-preview1",
 ]
 
 [[package]]
@@ -971,7 +971,7 @@ checksum = "49874b5167b65d7193b8aba1567f5c7d93d001cafc34600cee003eda787e483f"
 [[package]]
 name = "vizia"
 version = "0.1.0"
-source = "git+https://github.com/geom3trik/VIZIA?branch=main#8be74ee52b6be34cad7324bb8b3ca3ca89b29afd"
+source = "git+https://github.com/geom3trik/VIZIA?branch=main#132800388b6e3e475ce3536ee132d834792d36a9"
 dependencies = [
  "vizia_baseview",
  "vizia_core",
@@ -980,7 +980,7 @@ dependencies = [
 [[package]]
 name = "vizia_baseview"
 version = "0.1.0"
-source = "git+https://github.com/geom3trik/VIZIA?branch=main#8be74ee52b6be34cad7324bb8b3ca3ca89b29afd"
+source = "git+https://github.com/geom3trik/VIZIA?branch=main#132800388b6e3e475ce3536ee132d834792d36a9"
 dependencies = [
  "baseview",
  "femtovg",
@@ -993,20 +993,21 @@ dependencies = [
 [[package]]
 name = "vizia_core"
 version = "0.1.0"
-source = "git+https://github.com/geom3trik/VIZIA?branch=main#8be74ee52b6be34cad7324bb8b3ca3ca89b29afd"
+source = "git+https://github.com/geom3trik/VIZIA?branch=main#132800388b6e3e475ce3536ee132d834792d36a9"
 dependencies = [
  "bitflags",
  "cssparser",
  "femtovg",
  "keyboard-types",
  "morphorm",
+ "unicode-segmentation",
  "vizia_derive",
 ]
 
 [[package]]
 name = "vizia_derive"
 version = "0.1.0"
-source = "git+https://github.com/geom3trik/VIZIA?branch=main#8be74ee52b6be34cad7324bb8b3ca3ca89b29afd"
+source = "git+https://github.com/geom3trik/VIZIA?branch=main#132800388b6e3e475ce3536ee132d834792d36a9"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1034,9 +1035,9 @@ checksum = "cccddf32554fecc6acb585f82a32a72e28b48f8c4c1883ddfeeeaa96f7d8e519"
 
 [[package]]
 name = "wasi"
-version = "0.10.2+wasi-snapshot-preview1"
+version = "0.10.3+wasi-snapshot-preview1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fd6fbd9a79829dd1ad0cc20627bf1ed606756a7f77edff7b66b7064f9cb327c6"
+checksum = "46a2e384a3f170b0c7543787a91411175b71afd56ba4d3a0ae5678d4e2243c0e"
 
 [[package]]
 name = "wasm-bindgen"
