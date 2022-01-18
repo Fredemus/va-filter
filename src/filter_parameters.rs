@@ -183,6 +183,26 @@ impl PluginParameters for FilterParameters {
             _ => format!(""),
         }
     }
+    fn get_preset_data(&self) -> Vec<u8> {
+        // std::slice::from_raw_parts(data, len)
+        let mut param_vec = Vec::new();
+        // Remember to update n_params when adding more
+        let n_params = 6;
+        for i in 0..n_params {
+            param_vec.push(self.get_parameter(i));
+        }
+        let param_vec_u8 = bincode::serialize(&param_vec).unwrap();
+        param_vec_u8
+    }
+    // this should use a byte vec from the method above
+    fn load_preset_data(&self, data: &[u8]) {
+        let n_params = 6;
+        let param_data = &data[0..(n_params + 2) * 4];
+        let param_vec: Vec<f32> = bincode::deserialize(param_data).unwrap();
+        for i in 0..n_params {
+            self.set_parameter(i as i32, param_vec[i]);
+        }
+    }
 }
 #[test]
 fn test_res_param() {

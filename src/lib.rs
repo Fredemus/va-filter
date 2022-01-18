@@ -117,6 +117,7 @@ impl Plugin for VST {
             outputs: 1,
             category: Category::Effect,
             parameters: 6,
+            preset_chunks: true,
             ..Default::default()
         }
     }

@@ -26,3 +26,7 @@ rand = "0.8.4"
 core_simd = { git = "https://github.com/rust-lang/portable-simd" }
 std_float = { git = "https://github.com/rust-lang/portable-simd" }
 # packed_simd = { version = "0.3.6", package = "packed_simd_2" }
+
+# data serialization for presets 
+# serde = { version = "1.0.130", features = ["derive"] }
+bincode = "1.3.3"
