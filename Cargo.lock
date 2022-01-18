@@ -153,6 +153,11 @@ dependencies = [
 ]
 
 [[package]]
+name = "core_simd"
+version = "0.1.0"
+source = "git+https://github.com/rust-lang/portable-simd#41db15373a72f5234fefae3b3dd2f95c874a1bfd"
+
+[[package]]
 name = "cssparser"
 version = "0.27.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -344,12 +349,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "libm"
-version = "0.1.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7fc7aa29613bd6a620df431842069224d8bc9011086b1db4c0e0cd47fa03ec9a"
-
-[[package]]
 name = "log"
 version = "0.4.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -528,16 +527,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
-]
-
-[[package]]
-name = "packed_simd_2"
-version = "0.3.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "71c0c06716cfc81616fa8e22b721ce92fecd594508bc0eb3d04ae3ef35ac10c5"
-dependencies = [
- "cfg-if 0.1.10",
- "libm",
 ]
 
 [[package]]
@@ -837,16 +826,25 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a8f112729512f8e442d81f95a8a7ddf2b7c6b8a1a6f509a95864142b30cab2d3"
 
 [[package]]
+name = "std_float"
+version = "0.1.0"
+source = "git+https://github.com/rust-lang/portable-simd#41db15373a72f5234fefae3b3dd2f95c874a1bfd"
+dependencies = [
+ "core_simd",
+]
+
+[[package]]
 name = "svf_filter"
 version = "0.1.0"
 dependencies = [
  "baseview",
+ "core_simd",
  "femtovg",
  "hound",
  "num",
- "packed_simd_2",
  "rand 0.8.4",
  "raw-window-handle 0.3.4",
+ "std_float",
  "vizia",
  "vst",
 ]

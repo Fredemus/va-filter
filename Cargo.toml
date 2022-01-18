@@ -20,6 +20,9 @@ femtovg = {git = "https://github.com/femtovg/femtovg", rev = "138a45d7b92419cc9e
 
 raw-window-handle = "0.3"
 num = "0.4.0"
-packed_simd = { version = "0.3.6", package = "packed_simd_2" }
 hound = "3.4.0"
 rand = "0.8.4"
+# simd optimizations
+core_simd = { git = "https://github.com/rust-lang/portable-simd" }
+std_float = { git = "https://github.com/rust-lang/portable-simd" }
+# packed_simd = { version = "0.3.6", package = "packed_simd_2" }

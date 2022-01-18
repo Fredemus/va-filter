@@ -1,3 +1,4 @@
+#![feature(portable_simd)]
 use std::sync::Arc;
 
 use vizia::{Application, WindowDescription};
