@@ -19,16 +19,12 @@ fn get_filter_bode(
     filter_type: usize,
     len: usize,
 ) -> Vec<Complex<f32>> {
-    // bilinear transform
-    // bogus sample rate of 44100, since it just changes the plot's possible max value and 22050 seems reasonable
-    let g = (PI * cutoff / 44100.).tan();
-
+    let g = cutoff;
     let mut frequencies = vec![1.; len]; 
     let mut array = vec![Complex::new(1., 0.); len];
-    // frequency has to be in range [0, 6.798795774] because that's the output range of g from the blt, 
-    // assuming 20 kHz as max freq
-    let min: f32 = 0.001;
-    let max: f32 = 6.798795774;
+    // frequency map setup
+    let min: f32 = 20.;
+    let max: f32 = 20000.;
     let minl = min.log2();
     let range = max.log2() - minl;
     
