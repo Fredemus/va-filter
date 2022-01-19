@@ -1,6 +1,5 @@
-use crate::editor::get_amplitude_response;
+use crate::editor::{get_amplitude_response, get_phase_response};
 use crate::editor::EditorState;
-use crate::editor::get_phase_response;
 use crate::utils::*;
 use crate::FilterParameters;
 use femtovg::ImageFlags;
@@ -324,12 +323,35 @@ impl View for BodePlot {
                 path.line_to(i as f32, height as f32 - y + line_width / 2.0);
             }
 
+            let mut path2 = path.clone();
             // Draw plot
             let mut paint = Paint::color(color.into());
             paint.set_line_width(line_width);
             paint.set_line_join(femtovg::LineJoin::Round);
             paint.set_line_cap(femtovg::LineCap::Square);
             canvas.stroke_path(&mut path, paint);
+
+            // making a cool background thingy
+            // Graph background
+            let mut mid_color = femtovg::Color::from(color);
+            mid_color.set_alpha(20);
+            let mut edge_color = femtovg::Color::from(color);
+            edge_color.set_alpha(64);
+            // bg color is slightly less visible in the mid-point (0 dB) of the graph
+            let bg = Paint::linear_gradient_stops(
+                0.0,
+                0.0,
+                0.0,
+                height as f32,
+                // femtovg::Color::rgba(0, 160, 192, 0),
+                // femtovg::Color::rgba(0, 160, 192, 64),
+                &[(0.0,edge_color),
+                (0.4, mid_color), (1.0, edge_color)]
+            );
+            // Making the background fill be contained by a line through the mid-point of the graph
+            path2.line_to(width as f32, height as f32 * 0.4  + line_width / 2.0 );
+            path2.line_to(0., height as f32 * 0.4  + line_width / 2.0);
+            canvas.fill_path(&mut path2, bg);
 
             canvas.set_render_target(RenderTarget::Screen);
 
