@@ -45,10 +45,11 @@ struct VST {
     // Store a handle to the plugin's parameter object.
     params: Arc<FilterParameters>,
     // The object responsible for the gui
-    editor: Option<SVFPluginEditor>,
+    // editor: Option<SVFPluginEditor>,
 
     ladder: filter::LadderFilter,
     svf: filter::SVF,
+    host: Option<HostCallback>,
 }
 
 impl Default for VST {
@@ -60,15 +61,10 @@ impl Default for VST {
         ladder.params = params.clone();
         Self {
             params: params.clone(),
-            editor: Some(SVFPluginEditor {
-                is_open: false,
-                state: Arc::new(EditorState {
-                    params: params,
-                    host: None,
-                }),
-            }),
+            
             svf,
             ladder,
+            host: None,
         }
     }
 }
@@ -97,12 +93,13 @@ impl Plugin for VST {
         ladder.params = params.clone();
         Self {
             params: params.clone(),
-            editor: Some(SVFPluginEditor {
-                is_open: false,
-                state: Arc::new(EditorState::new(params, Some(host))),
-            }),
+            // editor: Some(SVFPluginEditor {
+            //     is_open: false,
+            //     state: Arc::new(EditorState::new(params, Some(host))),
+            // }),
             svf,
             ladder,
+            host: Some(host),
         }
     }
     fn set_sample_rate(&mut self, rate: f32) {
@@ -161,11 +158,16 @@ impl Plugin for VST {
         }
     }
     fn get_editor(&mut self) -> Option<Box<dyn Editor>> {
-        if let Some(editor) = self.editor.take() {
-            Some(Box::new(editor) as Box<dyn Editor>)
-        } else {
-            None
-        }
+        // if let Some(editor) = self.editor.take() {
+        //     Some(Box::new(editor) as Box<dyn Editor>)
+        // } else {
+        //     None
+        // }
+        Some(Box::new(SVFPluginEditor {
+            is_open: false,
+            state: Arc::new(EditorState::new(self.params.clone(), self.host)),
+            handle: None,
+        }))
     }
     // lets the plugin host get access to the parameters
     fn get_parameter_object(&mut self) -> Arc<dyn PluginParameters> {

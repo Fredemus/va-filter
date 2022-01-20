@@ -330,7 +330,10 @@ impl View for BodePlot {
             paint.set_line_join(femtovg::LineJoin::Round);
             paint.set_line_cap(femtovg::LineCap::Square);
             canvas.stroke_path(&mut path, paint);
-
+            // println!("original path {:?}", path2);
+            // println!("===============================");
+            // println!("path after stroke {:?}", path);
+            // panic!();
             // making a cool background thingy
             // Graph background
             let mut mid_color = femtovg::Color::from(color);
