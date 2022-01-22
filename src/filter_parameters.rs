@@ -203,6 +203,15 @@ impl PluginParameters for FilterParameters {
             self.set_parameter(i as i32, param_vec[i]);
         }
     }
+    // some hosts call the bank_data methods instead of the preset_data methods when saving/loading state
+    // therefore they need to be implemented, even if they just do the same as the preset_data methods
+    // this should use a byte vec from the method above
+    fn load_bank_data(&self, data: &[u8]) {
+        self.load_preset_data(data);
+    }
+    fn get_bank_data(&self) -> Vec<u8> {
+        self.get_preset_data()
+    }
 }
 #[test]
 fn test_res_param() {
