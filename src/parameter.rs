@@ -14,7 +14,7 @@ pub struct ParameterSmooth {
     normalized_value: AtomicF32,
     state: AtomicF32,
     // target: AtomicF32,   // normalized_value is target val
-    value: AtomicF32, 
+    value: AtomicF32,
     pub default: f32,
     pub min: f32,
     pub max: f32,

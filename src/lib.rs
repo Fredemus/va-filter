@@ -46,7 +46,6 @@ struct VST {
     params: Arc<FilterParameters>,
     // The object responsible for the gui
     // editor: Option<SVFPluginEditor>,
-
     ladder: filter::LadderFilter,
     svf: filter::SVF,
     host: Option<HostCallback>,
@@ -61,7 +60,7 @@ impl Default for VST {
         ladder.params = params.clone();
         Self {
             params: params.clone(),
-            
+
             svf,
             ladder,
             host: None,
@@ -137,9 +136,9 @@ impl Plugin for VST {
                 // get the output samples by processing the input samples
                 let frame = f32x4::from_array([*left_in, *right_in, 0.0, 0.0]);
                 let processed = self.svf.tick_newton(frame);
-                
+
                 let frame_out = *processed.as_array();
-                
+
                 *left_out = frame_out[0];
                 *right_out = frame_out[1];
             }

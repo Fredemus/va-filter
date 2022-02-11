@@ -1,5 +1,5 @@
-use crate::editor::{get_amplitude_response, get_phase_response};
 use crate::editor::EditorState;
+use crate::editor::{get_amplitude_response, get_phase_response};
 use crate::utils::*;
 use crate::FilterParameters;
 use femtovg::ImageFlags;
@@ -31,7 +31,7 @@ pub struct UiData {
 pub enum ParamChangeEvent {
     AllParams(i32, f32),
     CircuitEvent(String),
-    ChangeBodeView()
+    ChangeBodeView(),
 }
 
 impl Model for UiData {
@@ -106,7 +106,7 @@ pub fn plugin_gui(cx: &mut Context, state: Arc<EditorState>) {
                                 Label::new(cx, &item.get(cx).to_string())
                                     .width(Stretch(1.0))
                                     .background_color(if selected {
-                                        Color::from("#f8ac14")
+                                        Color::from("#c28919")
                                     } else {
                                         Color::transparent()
                                     })
@@ -187,7 +187,10 @@ pub struct BodePlot {
 
 impl BodePlot {
     pub fn new(cx: &mut Context) -> Handle<Self> {
-        Self { image: Rc::new(RefCell::new(None)) }.build2(cx, |_| {})
+        Self {
+            image: Rc::new(RefCell::new(None)),
+        }
+        .build2(cx, |_| {})
     }
 }
 
@@ -218,16 +221,13 @@ impl View for BodePlot {
                         max = 0.;
                         // max phase shift of the state variable filter is Pi radians / 180 degrees
                         min = -PI;
-                    }
-                    else if mode == 1 {
+                    } else if mode == 1 {
                         max = PI;
                         min = 0.;
-                    }
-                    else {
+                    } else {
                         max = PI / 2.;
                         min = -PI / 2.;
                     }
-                    
                 } else {
                     amps = get_phase_response(
                         params.cutoff.get(),
@@ -240,14 +240,12 @@ impl View for BodePlot {
                     if params.slope.get() > 1 {
                         max = PI;
                         min = -PI;
-                    }
-                    else {
+                    } else {
                         max = PI / 2.;
                         min = -PI;
                     }
                 };
-            }
-            else {
+            } else {
                 // min and max amplitude values that will be rendered
                 min = -60.0;
                 max = 40.0;
@@ -260,7 +258,7 @@ impl View for BodePlot {
                         width,
                     );
                 } else {
-                    amps =  get_amplitude_response(
+                    amps = get_amplitude_response(
                         params.cutoff.get(),
                         // 2.,
                         params.k_ladder.get(),
@@ -268,10 +266,8 @@ impl View for BodePlot {
                         params.filter_type.get(),
                         width,
                     );
-                    
                 }
             }
-            
 
             let bounds = cx.cache.get_bounds(cx.current);
 
@@ -307,8 +303,6 @@ impl View for BodePlot {
 
             // Fill background
             canvas.clear_rect(0, 0, width as u32, height as u32, background_color.into());
-
-            
 
             let mut path = Path::new();
             let amp = amps[0].clamp(min, max);
@@ -348,12 +342,11 @@ impl View for BodePlot {
                 height as f32,
                 // femtovg::Color::rgba(0, 160, 192, 0),
                 // femtovg::Color::rgba(0, 160, 192, 64),
-                &[(0.0,edge_color),
-                (0.4, mid_color), (1.0, edge_color)]
+                &[(0.0, edge_color), (0.4, mid_color), (1.0, edge_color)],
             );
             // Making the background fill be contained by a line through the mid-point of the graph
-            path2.line_to(width as f32, height as f32 * 0.4  + line_width / 2.0 );
-            path2.line_to(0., height as f32 * 0.4  + line_width / 2.0);
+            path2.line_to(width as f32, height as f32 * 0.4 + line_width / 2.0);
+            path2.line_to(0., height as f32 * 0.4 + line_width / 2.0);
             canvas.fill_path(&mut path2, bg);
 
             canvas.set_render_target(RenderTarget::Screen);

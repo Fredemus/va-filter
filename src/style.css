@@ -52,6 +52,11 @@ dropdown>popup {
     left: 1s;
     right: 1s;
 }
+dropdown list label {
+    color: #C2C2C2;
+    border-width: 1px;
+    border-color: #756e6e;
+}
 
 dropdown>popup>list {
     width: 200px;

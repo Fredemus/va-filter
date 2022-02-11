@@ -49,7 +49,6 @@ impl FilterParameters {
             _ => 0.0,
         }
     }
-    
 }
 
 impl Default for FilterParameters {
@@ -89,32 +88,20 @@ impl Default for FilterParameters {
                 |x| x.powi(2),
                 |x| x.sqrt(),
             )),
-            mode: (ParameterUsize::new(
-                "Mode",
-                0,
-                0,
-                4,
-                |x| match x {
-                    0 => format!("LP"),
-                    1 => format!("HP"),
-                    2 => format!("BP1"),
-                    3 => format!("Notch"),
-                    _ => format!("BP2"),
-                },
-            )),
-            slope: (ParameterUsize::new(
-                "Slope",
-                3,
-                0,
-                3,
-                |x| match x {
-                    0 => format!("LP6"),
-                    1 => format!("LP12"),
-                    2 => format!("LP18"),
-                    3 => format!("LP24"),
-                    _ => format!("???"),
-                },
-            )),
+            mode: (ParameterUsize::new("Mode", 0, 0, 4, |x| match x {
+                0 => format!("LP"),
+                1 => format!("HP"),
+                2 => format!("BP1"),
+                3 => format!("Notch"),
+                _ => format!("BP2"),
+            })),
+            slope: (ParameterUsize::new("Slope", 3, 0, 3, |x| match x {
+                0 => format!("LP6"),
+                1 => format!("LP12"),
+                2 => format!("LP18"),
+                3 => format!("LP24"),
+                _ => format!("???"),
+            })),
             k_ladder: AtomicF32::new(0.),
             zeta: AtomicF32::new(0.),
         };

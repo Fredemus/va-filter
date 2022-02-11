@@ -20,14 +20,14 @@ fn get_filter_bode(
     len: usize,
 ) -> Vec<Complex<f32>> {
     let g = cutoff;
-    let mut frequencies = vec![1.; len]; 
+    let mut frequencies = vec![1.; len];
     let mut array = vec![Complex::new(1., 0.); len];
     // frequency map setup
     let min: f32 = 20.;
     let max: f32 = 20000.;
     let minl = min.log2();
     let range = max.log2() - minl;
-    
+
     for i in 0..len {
         frequencies[i] = 2.0f32.powf(((i as f32 / len as f32) * range) + minl);
     }
@@ -83,7 +83,8 @@ fn get_filter_bode(
             for i in 0..len {
                 curr_s = frequencies[i] * j;
                 // could potentially be optimized, i think
-                array[i] = ((1. + k) * (1. + curr_s / g).powi(3 - mode as i32))/ (k + (1. + curr_s / g).powi(4));
+                array[i] = ((1. + k) * (1. + curr_s / g).powi(3 - mode as i32))
+                    / (k + (1. + curr_s / g).powi(4));
                 // array[i] =
                 //     ((1. + curr_s / g).powi(3 - mode as i32)) / (k + (1. + curr_s / g).powi(4));
             }
@@ -141,7 +142,7 @@ pub fn get_phase_response(
     for i in 0..len {
         phases[i] = array[i].arg();
     }
-    // make notch and 4-pole ladder draw a lil nicer at high q-factors 
+    // make notch and 4-pole ladder draw a lil nicer at high q-factors
     // (the problem is that there might not be a freq sample at the cutoff)
     // if mode == 3 && (filter_type == 0  || filter_type == 1) {
     if mode == 3 {

@@ -2,8 +2,8 @@ use crate::filter_parameters::FilterParameters;
 use crate::utils::AtomicOps;
 // use packed_simd::f32x4;
 use core_simd::f32x4;
-use std_float::*;
 use std::sync::Arc;
+use std_float::*;
 
 /// cheap tanh, potentially useful for optimization.
 // from a quick look it looks extremely good, max error of ~0.0002 or .02%
@@ -21,7 +21,9 @@ pub fn tanh_levien(x: f32x4) -> f32x4 {
 // from cursory benchmarking, this is as fast as the standard library cosh
 #[inline]
 fn simd_cosh(x: f32x4) -> f32x4 {
-    (f32x4::from_array(x.to_array().map(f32::exp)) + f32x4::from_array((-x).to_array().map(f32::exp)))/ f32x4::splat(2.)
+    (f32x4::from_array(x.to_array().map(f32::exp))
+        + f32x4::from_array((-x).to_array().map(f32::exp)))
+        / f32x4::splat(2.)
 }
 #[inline]
 fn simd_asinh(x: f32x4) -> f32x4 {
@@ -88,10 +90,10 @@ impl LadderFilter {
         // a[n] is the fixed-pivot approximation for tanh()
         for n in 0..base.len() {
             // hopefully this should cook down to the original when not 0,
-            // and 1 when 0 
+            // and 1 when 0
             let mask = base[n].lanes_ne(f32x4::splat(0.));
-            a[n] = tanh_levien(base[n])  / base[n];
-            // since the line above can become NaN or other stuff when a value in base[n] is 0, 
+            a[n] = tanh_levien(base[n]) / base[n];
+            // since the line above can become NaN or other stuff when a value in base[n] is 0,
             // replace values where a[n] is 0.
             a[n] = mask.select(a[n], f32x4::splat(1.));
         }
@@ -150,12 +152,7 @@ impl LadderFilter {
         let mut temp: [f32x4; 4] = [f32x4::splat(0.); 4];
 
         // use state as estimate
-        v_est = [
-            self.s[0],
-            self.s[1],
-            self.s[2],
-            self.s[3],
-        ];
+        v_est = [self.s[0], self.s[1], self.s[2], self.s[3]];
 
         let mut tanh_input = tanh_levien(input - k * v_est[3]);
         let mut tanh_y1_est = tanh_levien(v_est[0]);
@@ -174,22 +171,22 @@ impl LadderFilter {
         let max_error = f32x4::splat(0.00001);
         // let mut n_iterations = 0;
 
-        // f32x4.lt(max_error) returns a mask. 
+        // f32x4.lt(max_error) returns a mask.
         while residue[0].abs().lanes_gt(max_error).any()
             || residue[1].abs().lanes_gt(max_error).any()
             || residue[2].abs().lanes_gt(max_error).any()
             || residue[3].abs().lanes_gt(max_error).any()
-            // && n_iterations < 9
+        // && n_iterations < 9
         {
             let one = f32x4::splat(1.);
             // jacobian matrix
             let j10 = g * (one - tanh_y1_est * tanh_y1_est);
-            let j00 = - j10 - one;
+            let j00 = -j10 - one;
             let j03 = -g * k * (one - tanh_input * tanh_input);
             let j21 = g * (one - tanh_y2_est * tanh_y2_est);
-            let j11 = - j21 - one;
+            let j11 = -j21 - one;
             let j32 = g * (one - tanh_y3_est * tanh_y3_est);
-            let j22 = - j32 - one;
+            let j22 = -j32 - one;
             let j33 = -g * (one - tanh_y4_est * tanh_y4_est) - one;
 
             // this one is disgustingly huge, but couldn't find a way to avoid that. Look into inverting matrix
@@ -282,11 +279,12 @@ impl SVF {
         let mut out = self.run_svf_newton(input * f32x4::splat(self.params.drive.get() + 1.));
         // staturating the output and adding some gain compensation for drive
         // should be similar to the EDP Wasp filter
-        // TODO: check if tanh distortion feels too strong. If so, implement a simd_asinh or smth 
-        out = tanh_levien(out * f32x4::splat(0.5)) * f32x4::splat(2. / (self.params.drive.get() * 0.5 + 1.));
+        // TODO: check if tanh distortion feels too strong. If so, implement a simd_asinh or smth
+        out = tanh_levien(out * f32x4::splat(0.5))
+            * f32x4::splat(2. / (self.params.drive.get() * 0.5 + 1.));
         // update ic1eq and ic2eq for next sample
         self.update_state();
-        
+
         out
     }
     pub fn run_svf_linear(&mut self, input: f32x4) -> f32x4 {
@@ -338,8 +336,8 @@ impl SVF {
         ];
         for n in 0..est_source_rest.len() {
             let mask = est_source_rest[n].lanes_ne(f32x4::splat(0.));
-            a[n] = tanh_levien(est_source_rest[n])  / est_source_rest[n];
-            // since the line above can become NaN or other stuff when a value in base[n] is 0, 
+            a[n] = tanh_levien(est_source_rest[n]) / est_source_rest[n];
+            // since the line above can become NaN or other stuff when a value in base[n] is 0,
             // replace values where a[n] is 0.
             a[n] = mask.select(a[n], f32x4::splat(1.));
         }
@@ -390,7 +388,10 @@ impl SVF {
 
         let max_error = f32x4::splat(0.00001);
         let mut n_iterations = 0;
-        while (residue[0].abs().lanes_gt(max_error).any() || residue[0].abs().lanes_gt(max_error).any()) && n_iterations < 9 {
+        while (residue[0].abs().lanes_gt(max_error).any()
+            || residue[0].abs().lanes_gt(max_error).any())
+            && n_iterations < 9
+        {
             // terminate if error doesn't improve after 10 iterations
             // if n_iterations > 9 {
             //     // panic!("infinite loop mayhaps?");
@@ -410,7 +411,8 @@ impl SVF {
             cosh_v_est0 = simd_cosh(v_est[0]);
             tanh_v_est0 = tanh_levien(v_est[0]);
             sinh_v_est0 = tanh_v_est0 * cosh_v_est0;
-            fb_line = tanh_levien(input - ((k - f32x4::splat(1.)) * v_est[0] + sinh_v_est0) - v_est[1]);
+            fb_line =
+                tanh_levien(input - ((k - f32x4::splat(1.)) * v_est[0] + sinh_v_est0) - v_est[1]);
             // recompute filter
             // residue = self.run_helper_svf(g, tanh_v_est0, fb_line, v_est);
             residue = [

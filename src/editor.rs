@@ -27,14 +27,13 @@ pub struct EditorState {
 }
 impl EditorState {
     pub fn new(params: Arc<FilterParameters>, host: Option<HostCallback>) -> EditorState {
-        EditorState { params, host}
+        EditorState { params, host }
     }
 }
 pub struct SVFPluginEditor {
     pub is_open: bool,
     pub state: Arc<EditorState>,
-    pub handle: Option<WindowHandle>
-
+    pub handle: Option<WindowHandle>,
 }
 
 impl Editor for SVFPluginEditor {
