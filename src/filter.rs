@@ -5,9 +5,9 @@ use core_simd::f32x4;
 use std::sync::Arc;
 use std_float::*;
 
-/// cheap tanh, potentially useful for optimization.
+/// cheap tanh to make the filter faster.
 // from a quick look it looks extremely good, max error of ~0.0002 or .02%
-// the error of 1 - tanh_levien^2 as the derivative is about .06%, so maybe this could easily be substituted?
+// the error of 1 - tanh_levien^2 as the derivative is about .06%
 #[inline]
 pub fn tanh_levien(x: f32x4) -> f32x4 {
     let x2 = x * x;
@@ -17,8 +17,7 @@ pub fn tanh_levien(x: f32x4) -> f32x4 {
     // println!("a: {:?}, b: {:?}", a, b);
     a / (f32x4::splat(1.0) + (a * a)).sqrt()
 }
-// TODO: FIXME: scalar exp and ln should really be replaced
-// from cursory benchmarking, this is as fast as the standard library cosh
+// TODO: scalar exp and ln should really be replaced when portable_simd adds them
 #[inline]
 fn simd_cosh(x: f32x4) -> f32x4 {
     (f32x4::from_array(x.to_array().map(f32::exp))
@@ -81,7 +80,6 @@ impl LadderFilter {
         let k = f32x4::splat(self.params.k_ladder.get());
         let base = [
             input - k * self.s[3],
-            // input, // <- old base[0]
             self.s[0],
             self.s[1],
             self.s[2],
@@ -296,10 +294,11 @@ impl SVF {
         let g1 = one / (one + g * (g + k));
         let g2 = g * g1;
         // let g3 = g * g2;
-        // outputs the correct output voltages
+        // find the correct output voltages
         self.vout[0] = g1 * self.s[0] + g2 * (input - self.s[1]);
         // self.vout[1] = (input - self.s[1]) * g3 + self.s[0] * g2 + self.s[1]; <- meant for parallel processing
         self.vout[1] = self.s[1] + g * self.vout[0];
+        // get output according to the current filter_mode
         self.get_output(input, k)
     }
     pub fn run_svf_pivotal(&mut self, input: f32x4) -> f32x4 {
@@ -456,8 +455,6 @@ impl Default for LadderFilter {
             params: Arc::new(FilterParameters::default()),
             vout: [f32x4::splat(0.); 4],
             s: [f32x4::splat(0.); 4],
-            // vout: [0.; 4],
-            // s: [0.; 4],
         }
     }
 }

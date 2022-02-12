@@ -19,10 +19,12 @@ impl AtomicOps for AtomicF32 {
         AtomicF32(atomic::AtomicU32::new(v.to_bits()))
     }
     /// Loads a value from the atomic float with relaxed ordering.
+    #[inline]
     fn get(&self) -> f32 {
         f32::from_bits(self.0.load(Ordering::Relaxed))
     }
     /// Stores a value into the atomic float with relaxed ordering.
+    #[inline]
     fn set(&self, v: f32) {
         self.0.store(v.to_bits(), Ordering::Relaxed)
     }
@@ -36,10 +38,12 @@ impl AtomicOps for AtomicUsize {
         AtomicUsize(atomic::AtomicUsize::new(v))
     }
     /// Loads a value from the atomic integer with relaxed ordering.
+    #[inline]
     fn get(&self) -> usize {
         self.0.load(Ordering::Relaxed)
     }
     /// Stores a value into the atomic integer with relaxed ordering.
+    #[inline]
     fn set(&self, v: usize) {
         self.0.store(v, Ordering::Relaxed)
     }
@@ -55,11 +59,13 @@ impl AtomicOps for AtomicBool {
     }
 
     /// Loads a value from the atomic integer with relaxed ordering.
+    #[inline]
     fn get(&self) -> bool {
         self.0.load(Ordering::Relaxed)
     }
 
     /// Stores a value into the atomic integer with relaxed ordering.
+    #[inline]
     fn set(&self, v: bool) {
         self.0.store(v, Ordering::Relaxed)
     }
@@ -74,11 +80,13 @@ impl AtomicI8 {
     }
 
     /// Loads a value from the atomic integer with relaxed ordering.
+    #[inline]
     pub fn get(&self) -> i8 {
         self.0.load(Ordering::Relaxed)
     }
 
     /// Stores a value into the atomic integer with relaxed ordering.
+    #[inline]
     pub fn set(&self, v: i8) {
         self.0.store(v, Ordering::Relaxed)
     }
@@ -93,11 +101,13 @@ impl AtomicF64 {
     }
 
     /// Loads a value from the atomic float with relaxed ordering.
+    #[inline]
     pub fn get(&self) -> f64 {
         f64::from_bits(self.0.load(Ordering::Relaxed))
     }
 
     /// Stores a value into the atomic float with relaxed ordering.
+    #[inline]
     pub fn set(&self, v: f64) {
         self.0.store(v.to_bits(), Ordering::Relaxed)
     }

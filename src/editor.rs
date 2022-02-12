@@ -46,7 +46,6 @@ impl Editor for SVFPluginEditor {
     }
 
     fn open(&mut self, parent: *mut ::std::ffi::c_void) -> bool {
-        //::log::info!("self.running {}", self.running);
         if self.is_open {
             return false;
         }
@@ -66,7 +65,6 @@ impl Editor for SVFPluginEditor {
         .open_parented(&ParentWindow(parent));
         self.handle = Some(handle);
 
-        // self.handle = Some(window_handle);
         true
     }
 

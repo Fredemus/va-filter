@@ -7,12 +7,10 @@ use super::utils::*;
 use std::f32::consts::PI;
 
 pub struct FilterParameters {
-    // the "cutoff" parameter. Determines how heavy filtering is
-    // cutoff: AtomicFloat,
-    // cutoff: Parameter<AtomicF32>,
     pub g: AtomicF32,
     pub sample_rate: AtomicF32,
-
+    
+    // the "cutoff" parameter. Determines how heavy filtering is
     pub cutoff: ParameterF32,
     pub res: ParameterF32,
     pub zeta: AtomicF32,
@@ -22,13 +20,9 @@ pub struct FilterParameters {
     pub mode: ParameterUsize,
     pub slope: ParameterUsize,
     pub filter_type: AtomicUsize,
-    // cutoff: Params,
-    // res: Params,
-    // drive: Params,
-    // mode: Params,
 }
 impl FilterParameters {
-    // transform resonance parameter into something more useful for the filter
+    // transform resonance parameter into something more useful for the 2 filters
     pub fn set_resonances(&self) {
         let res = self.res.get_normalized();
         self.zeta.set(5. - 4.9 * res);
@@ -52,7 +46,6 @@ impl FilterParameters {
 }
 
 impl Default for FilterParameters {
-    // todo: How do we make sure g gets set? Maybe bake g into cutoff and have display func show cutoff
     fn default() -> FilterParameters {
         let a = FilterParameters {
             sample_rate: AtomicF32::new(48000.),
@@ -76,8 +69,6 @@ impl Default for FilterParameters {
                 |x| format!("{:.2}%", x * 100.),
                 |x: f32| x,
                 |x: f32| x,
-                // |x| 2f32.powf(-11. * x),
-                // |x: f32| (x).ln() * -0.13115409,
             )),
             drive: (ParameterF32::new(
                 "Drive",
@@ -170,6 +161,8 @@ impl PluginParameters for FilterParameters {
             _ => format!(""),
         }
     }
+    // transforms the plugin state into a byte vector. 
+    // For this plugin, this is just the parameters' normalized values
     fn get_preset_data(&self) -> Vec<u8> {
         // std::slice::from_raw_parts(data, len)
         let mut param_vec = Vec::new();
@@ -199,26 +192,4 @@ impl PluginParameters for FilterParameters {
     fn get_bank_data(&self) -> Vec<u8> {
         self.get_preset_data()
     }
-}
-#[test]
-fn test_res_param() {
-    let params = FilterParameters::default();
-    let res = params.res;
-
-    res.set_normalized(0.0);
-    println!("res value: {}", res.get());
-    println!("display value: {}", res.get_display());
-    println!("param value: {}", res.get_normalized());
-    res.set_normalized(0.1);
-    println!("res value: {}", res.get());
-    println!("display value: {}", res.get_display());
-    println!("param value: {}", res.get_normalized());
-    res.set_normalized(0.5);
-    println!("res value: {}", res.get());
-    println!("display value: {}", res.get_display());
-    println!("param value: {}", res.get_normalized());
-    res.set_normalized(1.);
-    println!("res value: {}", res.get());
-    println!("display value: {}", res.get_display());
-    println!("param value: {}", res.get_normalized());
 }
