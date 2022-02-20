@@ -316,12 +316,7 @@ impl SVF {
         let est_source_a2 = self.get_estimate(0, est_type, input);
         // employing fixed-pivot method
         // a[2] first, since it involves the antisaturator
-        // v_t and i_s are constants to control the diode clipper's character
-        // just earballed em to be honest. Hard to figure out what they should be
-        // without knowing the circuit's operating voltage and temperature
         let mask1 = est_source_a2.lanes_ne(f32x4::splat(0.));
-        // let v_t = 4.;
-        // let i_s = 4.;
         // a2 is clipped with the inverse of the diode anti-saturator
         // a[2] = (v_t * simd_asinh(est_source_a2 / i_s)) / est_source_a2;
         a[2] = simd_asinh(est_source_a2) / est_source_a2;

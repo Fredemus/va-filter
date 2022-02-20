@@ -99,7 +99,7 @@ pub fn plugin_gui(cx: &mut Context, state: Arc<EditorState>) {
                 }),
                 move |cx| {
                     // List of options
-                    List::new(cx, UiData::filter_circuits, move |cx, item| {
+                    List::new(cx, UiData::filter_circuits, move |cx, _, item| {
                         VStack::new(cx, move |cx| {
                             Binding::new(cx, UiData::choice, move |cx, choice| {
                                 let selected = *item.get(cx) == *choice.get(cx);
