@@ -133,14 +133,17 @@ pub fn plugin_gui(cx: &mut Context, state: Arc<EditorState>) {
             // Drive
             make_knob(cx, 2);
             // Mode/ Slope
-            Binding::new(cx, UiData::params, move |cx, params| {
-                let ft = params.get(cx).filter_type.get();
-                if ft == 0 {
-                    make_knob(cx, 4);
-                } else {
-                    make_knob(cx, 5);
-                }
-            });
+            Binding::new(
+                cx,
+                UiData::params.map(|params| params.filter_type.get()),
+                move |cx, ft| {
+                    if *ft.get(cx) == 0 {
+                        make_knob(cx, 4);
+                    } else {
+                        make_knob(cx, 5);
+                    }
+                },
+            );
         })
         .class("knobs");
 
@@ -162,18 +165,20 @@ fn make_knob(cx: &mut Context, param_index: i32) -> Handle<VStack> {
     VStack::new(cx, move |cx| {
         Binding::new(cx, UiData::params, move |cx, params| {
             Label::new(cx, &params.get(cx).get_parameter_name(param_index));
-            Knob::new(
-                cx,
-                params.get(cx)._get_parameter_default(param_index),
-                params.get(cx).get_parameter(param_index),
-                false,
-            )
-            .on_changing(move |knob, cx| {
-                cx.emit(ParamChangeEvent::AllParams(
-                    param_index,
-                    knob.normalized_value,
-                ))
-            });
+        });
+
+        Knob::new(
+            cx,
+            UiData::params.get(cx)._get_parameter_default(param_index),
+            // params.get(cx).get_parameter(param_index),
+            UiData::params.map(move |params| {
+                let guy = params.get_parameter(param_index);
+                guy
+            }),
+            false,
+        )
+        .on_changing(move |cx, val| cx.emit(ParamChangeEvent::AllParams(param_index, val)));
+        Binding::new(cx, UiData::params, move |cx, params| {
             Label::new(cx, &params.get(cx).get_parameter_text(param_index));
         });
     })

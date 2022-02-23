@@ -11,6 +11,7 @@
 
 .knobs {
     child-space: 1s;
+    col-between: 15px;
 }
 
 .circuit_selector {
@@ -79,7 +80,7 @@ label {
 }
 
 knob {
-    width: 90px;
+    width: 70px;
     height: 70px;
 }
 

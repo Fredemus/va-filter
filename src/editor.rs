@@ -61,9 +61,9 @@ impl Editor for SVFPluginEditor {
             cx.add_theme(STYLE);
 
             plugin_gui(cx, state.clone());
-        })
-        .open_parented(&ParentWindow(parent));
-        self.handle = Some(handle);
+        });
+        // .open_parented(&ParentWindow(parent));
+        // self.handle = Some(handle);
 
         true
     }
