@@ -91,10 +91,7 @@ pub fn plugin_gui(cx: &mut Context, state: Arc<EditorState>) {
                 move |cx|
                 // A Label and an Icon
                 HStack::new(cx, move |cx|{
-                    //let choice = choice.get(cx).clone();
-                    Binding::new(cx, UiData::choice, |cx, choice|{
-                        Label::new(cx, &choice.get(cx).to_string()).left(Auto);
-                    });
+                    Label::new(cx, UiData::choice).left(Auto);
                     Label::new(cx, ICON_DOWN_OPEN).class("arrow");
                 }),
                 move |cx| {
@@ -163,9 +160,8 @@ pub fn plugin_gui(cx: &mut Context, state: Arc<EditorState>) {
 
 fn make_knob(cx: &mut Context, param_index: i32) -> Handle<VStack> {
     VStack::new(cx, move |cx| {
-        Binding::new(cx, UiData::params, move |cx, params| {
-            Label::new(cx, &params.get(cx).get_parameter_name(param_index));
-        });
+
+        Label::new(cx, UiData::params.map(move |params| params.get_parameter_name(param_index)));
 
         Knob::new(
             cx,
@@ -178,9 +174,8 @@ fn make_knob(cx: &mut Context, param_index: i32) -> Handle<VStack> {
             false,
         )
         .on_changing(move |cx, val| cx.emit(ParamChangeEvent::AllParams(param_index, val)));
-        Binding::new(cx, UiData::params, move |cx, params| {
-            Label::new(cx, &params.get(cx).get_parameter_text(param_index));
-        });
+        
+        Label::new(cx, UiData::params.map(move |params| params.get_parameter_text(param_index)));
     })
     .child_space(Stretch(1.0))
     .row_between(Pixels(10.0))
