@@ -135,9 +135,14 @@ pub fn plugin_gui(cx: &mut Context, state: Arc<EditorState>) {
                 UiData::params.map(|params| params.filter_type.get()),
                 move |cx, ft| {
                     if *ft.get(cx) == 0 {
-                        make_knob(cx, 4);
+                        let param = &UiData::params.get(cx).mode;
+                        let steps = (param.max - param.min + 1.) as usize;
+
+                        make_steppy_knob(cx, 4, steps, 270.);
                     } else {
-                        make_knob(cx, 5);
+                        let param = &UiData::params.get(cx).slope;
+                        let steps = (param.max - param.min + 1.) as usize;
+                        make_steppy_knob(cx, 5, steps, 270.);
                     }
                 },
             );
@@ -163,7 +168,17 @@ fn make_knob(cx: &mut Context, param_index: i32) -> Handle<VStack> {
 
         Label::new(cx, UiData::params.map(move |params| params.get_parameter_name(param_index)));
 
-        Knob::new(
+        // Knob::new(
+        //     cx,
+        //     UiData::params.get(cx)._get_parameter_default(param_index),
+        //     // params.get(cx).get_parameter(param_index),
+        //     UiData::params.map(move |params| {
+        //         let guy = params.get_parameter(param_index);
+        //         guy
+        //     }),
+        //     false,
+        // )
+        Knob::custom(
             cx,
             UiData::params.get(cx)._get_parameter_default(param_index),
             // params.get(cx).get_parameter(param_index),
@@ -171,7 +186,75 @@ fn make_knob(cx: &mut Context, param_index: i32) -> Handle<VStack> {
                 let guy = params.get_parameter(param_index);
                 guy
             }),
-            false,
+            move |cx, lens| {
+                TickKnob::new(
+                    cx,
+                    Percentage(90.0),
+                    // Percentage(20.0),
+                    Pixels(4.),
+                    Percentage(50.0),
+                    270.0,
+                    KnobMode::Continuous,
+                )
+                .value(lens.clone())
+                .class("tick");
+                ArcTrack::new(
+                    cx,
+                    false,
+                    Percentage(100.0),
+                    Percentage(10.),
+                    270.,
+                    KnobMode::Continuous,
+                )
+                .value(lens)
+                .class("track")
+            },
+        )
+        .on_changing(move |cx, val| cx.emit(ParamChangeEvent::AllParams(param_index, val)));
+        
+        Label::new(cx, UiData::params.map(move |params| params.get_parameter_text(param_index)));
+    })
+    .child_space(Stretch(1.0))
+    .row_between(Pixels(10.0))
+}
+// using Knob::custom() to make a stepped knob with tickmarks indicating the steps
+fn make_steppy_knob(cx: &mut Context, param_index: i32, steps: usize, arc_len: f32) -> Handle<VStack> {
+    VStack::new(cx, move |cx| {
+
+        Label::new(cx, UiData::params.map(move |params| params.get_parameter_name(param_index)));
+
+        Knob::custom(
+            cx,
+            UiData::params.get(cx)._get_parameter_default(param_index),
+            // params.get(cx).get_parameter(param_index),
+            UiData::params.map(move |params| {
+                let guy = params.get_parameter(param_index);
+                guy
+            }),
+            move |cx, lens| {
+                let mode = KnobMode::Discrete(steps);
+                Ticks::new(
+                    cx,
+                    Percentage(100.0),
+                    Percentage(25.0),
+                    // Pixels(2.),
+                    Pixels(2.0),
+                    arc_len,
+                    mode,
+                )
+                .class("track");
+                TickKnob::new(
+                    cx,
+                    Percentage(80.0),
+                    Pixels(4.),
+                    Percentage(50.0),
+                    arc_len,
+                    mode,
+                )
+                .value(lens)
+                .class("tick")
+                
+            },
         )
         .on_changing(move |cx, val| cx.emit(ParamChangeEvent::AllParams(param_index, val)));
         

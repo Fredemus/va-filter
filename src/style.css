@@ -84,6 +84,10 @@ knob {
     height: 70px;
 }
 
+knob .tick {
+    background-color: #eeece4be;
+}
+
 knob .track {
     background-color: #ffb74d;
 }
