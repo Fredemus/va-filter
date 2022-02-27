@@ -9,7 +9,7 @@ use std::f32::consts::PI;
 pub struct FilterParameters {
     pub g: AtomicF32,
     pub sample_rate: AtomicF32,
-    
+
     // the "cutoff" parameter. Determines how heavy filtering is
     pub cutoff: ParameterF32,
     pub res: ParameterF32,
@@ -32,7 +32,7 @@ impl FilterParameters {
         self.g
             .set((PI * self.cutoff.get() / (self.sample_rate.get())).tan());
     }
-    pub fn _get_parameter_default(&self, index: i32) -> f32 {
+    pub fn get_parameter_default(&self, index: i32) -> f32 {
         match index {
             0 => self.cutoff.get_normalized_default(),
             1 => self.res.get_normalized_default(),
@@ -161,7 +161,7 @@ impl PluginParameters for FilterParameters {
             _ => format!(""),
         }
     }
-    // transforms the plugin state into a byte vector. 
+    // transforms the plugin state into a byte vector.
     // For this plugin, this is just the parameters' normalized values
     fn get_preset_data(&self) -> Vec<u8> {
         // std::slice::from_raw_parts(data, len)

@@ -32,7 +32,6 @@ use filter_parameters::FilterParameters;
 mod filter;
 mod ui;
 
-// this is a 2-pole filter with resonance, which is why there's 2 states and vouts
 struct VST {
     // Store a handle to the plugin's parameter object.
     params: Arc<FilterParameters>,

@@ -149,9 +149,6 @@ pub fn plugin_gui(cx: &mut Context, state: Arc<EditorState>) {
         })
         .class("knobs");
 
-        // Placeholder for bode plot
-        //Element::new(cx).class("bode").text("Bode Plot");
-
         BodePlot::new(cx)
             .class("bode")
             .text("Bode Plot")
@@ -162,25 +159,17 @@ pub fn plugin_gui(cx: &mut Context, state: Arc<EditorState>) {
     })
     .class("container");
 }
-
+// makes a knob linked to a parameter
 fn make_knob(cx: &mut Context, param_index: i32) -> Handle<VStack> {
     VStack::new(cx, move |cx| {
+        Label::new(
+            cx,
+            UiData::params.map(move |params| params.get_parameter_name(param_index)),
+        );
 
-        Label::new(cx, UiData::params.map(move |params| params.get_parameter_name(param_index)));
-
-        // Knob::new(
-        //     cx,
-        //     UiData::params.get(cx)._get_parameter_default(param_index),
-        //     // params.get(cx).get_parameter(param_index),
-        //     UiData::params.map(move |params| {
-        //         let guy = params.get_parameter(param_index);
-        //         guy
-        //     }),
-        //     false,
-        // )
         Knob::custom(
             cx,
-            UiData::params.get(cx)._get_parameter_default(param_index),
+            UiData::params.get(cx).get_parameter_default(param_index),
             // params.get(cx).get_parameter(param_index),
             UiData::params.map(move |params| {
                 let guy = params.get_parameter(param_index);
@@ -211,22 +200,31 @@ fn make_knob(cx: &mut Context, param_index: i32) -> Handle<VStack> {
             },
         )
         .on_changing(move |cx, val| cx.emit(ParamChangeEvent::AllParams(param_index, val)));
-        
-        Label::new(cx, UiData::params.map(move |params| params.get_parameter_text(param_index)));
+
+        Label::new(
+            cx,
+            UiData::params.map(move |params| params.get_parameter_text(param_index)),
+        );
     })
     .child_space(Stretch(1.0))
     .row_between(Pixels(10.0))
 }
 // using Knob::custom() to make a stepped knob with tickmarks indicating the steps
-fn make_steppy_knob(cx: &mut Context, param_index: i32, steps: usize, arc_len: f32) -> Handle<VStack> {
+fn make_steppy_knob(
+    cx: &mut Context,
+    param_index: i32,
+    steps: usize,
+    arc_len: f32,
+) -> Handle<VStack> {
     VStack::new(cx, move |cx| {
-
-        Label::new(cx, UiData::params.map(move |params| params.get_parameter_name(param_index)));
+        Label::new(
+            cx,
+            UiData::params.map(move |params| params.get_parameter_name(param_index)),
+        );
 
         Knob::custom(
             cx,
-            UiData::params.get(cx)._get_parameter_default(param_index),
-            // params.get(cx).get_parameter(param_index),
+            UiData::params.get(cx).get_parameter_default(param_index),
             UiData::params.map(move |params| {
                 let guy = params.get_parameter(param_index);
                 guy
@@ -253,12 +251,14 @@ fn make_steppy_knob(cx: &mut Context, param_index: i32, steps: usize, arc_len: f
                 )
                 .value(lens)
                 .class("tick")
-                
             },
         )
         .on_changing(move |cx, val| cx.emit(ParamChangeEvent::AllParams(param_index, val)));
-        
-        Label::new(cx, UiData::params.map(move |params| params.get_parameter_text(param_index)));
+
+        Label::new(
+            cx,
+            UiData::params.map(move |params| params.get_parameter_text(param_index)),
+        );
     })
     .child_space(Stretch(1.0))
     .row_between(Pixels(10.0))
@@ -407,12 +407,8 @@ impl View for BodePlot {
             paint.set_line_join(femtovg::LineJoin::Round);
             paint.set_line_cap(femtovg::LineCap::Square);
             canvas.stroke_path(&mut path, paint);
-            // println!("original path {:?}", path2);
-            // println!("===============================");
-            // println!("path after stroke {:?}", path);
-            // panic!();
-            // making a cool background thingy
-            // Graph background
+
+            // making a cool background gradient
             let mut mid_color = femtovg::Color::from(color);
             mid_color.set_alpha(20);
             let mut edge_color = femtovg::Color::from(color);

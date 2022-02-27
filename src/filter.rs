@@ -234,7 +234,7 @@ impl LadderFilter {
         out
     }
 }
-
+// this is a 2-pole filter with resonance, which is why there's 2 states and vouts
 pub struct SVF {
     pub params: Arc<FilterParameters>,
     vout: [f32x4; 2],

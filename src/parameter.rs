@@ -55,10 +55,6 @@ impl ParameterSmooth {
         self.value.get()
     }
     pub fn update(&self, filter_factor: f32) {
-        // TODO: How to ensure that this is the unmodulated state?
-        // TODO: Is it possible/better to make state non-normalized?
-        // maybe normalized_value is target? And modulate uses state instead of normalized_value to set value?
-        // let filter_factor = 0.01;
         self.state.set(
             self.state.get() + (self.normalized_value.get() - self.state.get()) * filter_factor,
         );
