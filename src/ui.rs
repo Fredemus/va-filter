@@ -189,7 +189,7 @@ fn make_knob(cx: &mut Context, param_index: i32) -> Handle<VStack> {
             move |cx, lens| {
                 TickKnob::new(
                     cx,
-                    Percentage(90.0),
+                    Percentage(80.0),
                     // Percentage(20.0),
                     Pixels(4.),
                     Percentage(50.0),
