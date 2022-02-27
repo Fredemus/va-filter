@@ -172,8 +172,7 @@ fn make_knob(cx: &mut Context, param_index: i32) -> Handle<VStack> {
             UiData::params.get(cx).get_parameter_default(param_index),
             // params.get(cx).get_parameter(param_index),
             UiData::params.map(move |params| {
-                let guy = params.get_parameter(param_index);
-                guy
+                params.get_parameter(param_index)
             }),
             move |cx, lens| {
                 TickKnob::new(
@@ -226,8 +225,7 @@ fn make_steppy_knob(
             cx,
             UiData::params.get(cx).get_parameter_default(param_index),
             UiData::params.map(move |params| {
-                let guy = params.get_parameter(param_index);
-                guy
+                params.get_parameter(param_index)
             }),
             move |cx, lens| {
                 let mode = KnobMode::Discrete(steps);
