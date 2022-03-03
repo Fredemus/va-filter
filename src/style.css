@@ -53,6 +53,7 @@ dropdown>popup {
     left: 1s;
     right: 1s;
 }
+
 dropdown list label {
     color: #C2C2C2;
     border-width: 1px;
@@ -72,7 +73,7 @@ button {
 }
 
 label {
-    font-size: 20;
+    font-size: 16;
     color: #C2C2C2;
     height: 20px;
     child-top: 1s;
