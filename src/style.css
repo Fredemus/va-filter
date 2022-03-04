@@ -48,6 +48,10 @@ dropdown .arrow {
     left: 1s;
 }
 
+dropdown .arrow:hover {
+    background-color: #CCCCCC;
+}
+
 dropdown>popup {
     background-color: #141414;
     left: 1s;
