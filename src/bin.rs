@@ -19,9 +19,10 @@ use ui::*;
 fn main() {
     let params = Arc::new(FilterParameters::default());
     let state = Arc::new(EditorState::new(params.clone(), None));
-    let window_description = WindowDescription::new()
+    let mut window_description = WindowDescription::new()
         .with_inner_size(WINDOW_WIDTH, WINDOW_HEIGHT)
         .with_title("Hello Plugin");
+    window_description.resizable = false;
 
     Application::new(window_description, move |cx| {
         cx.add_stylesheet("src/style.css")

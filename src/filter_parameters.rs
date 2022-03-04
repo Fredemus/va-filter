@@ -4,6 +4,11 @@ use crate::parameter::Parameter;
 
 use super::parameter::{ParameterF32, ParameterUsize};
 use super::utils::*;
+use enum_index::{EnumIndex, IndexEnum};
+// #[macro_use]
+// extern crate enum_index_derive;
+use enum_index_derive::{EnumIndex, IndexEnum};
+
 use std::f32::consts::PI;
 
 pub struct FilterParameters {
@@ -21,6 +26,41 @@ pub struct FilterParameters {
     pub slope: ParameterUsize,
     pub filter_type: AtomicUsize,
 }
+
+#[repr(C)]
+#[derive(EnumIndex, IndexEnum, Debug)]
+pub enum FilterParameterNr {
+    Cutoff = 0x0,
+    Res = 0x1,
+    Drive = 0x2,
+    Zeta = 0x3,
+    Mode = 0x4,
+    Slope = 0x5,
+    FilterType = 0x6,
+    Undef,
+}
+
+#[repr(C)]
+#[derive(EnumIndex, IndexEnum, Debug)]
+pub enum Mode {
+    LP,
+    HP,
+    BP1,
+    Notch,
+    BP2,
+    Undef,
+}
+
+#[repr(C)]
+#[derive(EnumIndex, IndexEnum, Debug)]
+pub enum Slope {
+    LP6,
+    LP12,
+    LP18,
+    LP24,
+    Undef,
+}
+
 impl FilterParameters {
     // transform resonance parameter into something more useful for the 2 filters
     pub fn set_resonances(&self) {
@@ -32,6 +72,7 @@ impl FilterParameters {
         self.g
             .set((PI * self.cutoff.get() / (self.sample_rate.get())).tan());
     }
+
     pub fn get_parameter_default(&self, index: i32) -> f32 {
         match index {
             0 => self.cutoff.get_normalized_default(),
@@ -47,7 +88,7 @@ impl FilterParameters {
 
 impl Default for FilterParameters {
     fn default() -> FilterParameters {
-        let a = FilterParameters {
+        let filter_parameters = FilterParameters {
             sample_rate: AtomicF32::new(48000.),
             filter_type: AtomicUsize::new(0),
             cutoff: ParameterF32::new(
@@ -79,85 +120,82 @@ impl Default for FilterParameters {
                 |x| x.powi(2),
                 |x| x.sqrt(),
             )),
-            mode: (ParameterUsize::new("Mode", 0, 0, 4, |x| match x {
-                0 => format!("LP"),
-                1 => format!("HP"),
-                2 => format!("BP1"),
-                3 => format!("Notch"),
-                _ => format!("BP2"),
+
+            mode: (ParameterUsize::new("Mode", 0, 0, 4, |x| {
+                format!("{:?}", Mode::index_enum(x).unwrap_or(Mode::Undef))
             })),
-            slope: (ParameterUsize::new("Slope", 3, 0, 3, |x| match x {
-                0 => format!("LP6"),
-                1 => format!("LP12"),
-                2 => format!("LP18"),
-                3 => format!("LP24"),
-                _ => format!("???"),
+
+            slope: (ParameterUsize::new("Slope", 3, 0, 3, |x| {
+                format!("{:?}", Slope::index_enum(x).unwrap_or(Slope::Undef))
             })),
             k_ladder: AtomicF32::new(0.),
             zeta: AtomicF32::new(0.),
         };
-        a.g.set((PI * a.cutoff.get() / (a.sample_rate.get())).tan());
-        a.set_resonances();
-        a
+        filter_parameters.g.set(
+            (PI * filter_parameters.cutoff.get() / (filter_parameters.sample_rate.get())).tan(),
+        );
+        filter_parameters.set_resonances();
+        filter_parameters
     }
 }
 
+use FilterParameterNr::*;
 impl PluginParameters for FilterParameters {
     fn get_parameter(&self, index: i32) -> f32 {
-        match index {
-            0 => self.cutoff.get_normalized(),
-            1 => self.res.get_normalized(),
-            2 => self.drive.get_normalized(),
-            3 => self.filter_type.get() as f32,
-            4 => self.mode.get_normalized() as f32,
-            5 => self.slope.get_normalized() as f32,
+        match FilterParameterNr::index_enum(index as usize).unwrap_or(FilterParameterNr::Undef) {
+            Cutoff => self.cutoff.get_normalized(),
+            Res => self.res.get_normalized(),
+            Drive => self.drive.get_normalized(),
+            FilterType => self.filter_type.get() as f32,
+            Mode => self.mode.get_normalized() as f32,
+            Slope => self.slope.get_normalized() as f32,
             _ => 0.0,
         }
     }
     fn set_parameter(&self, index: i32, value: f32) {
-        match index {
-            0 => {
+        match FilterParameterNr::index_enum(index as usize).unwrap_or(FilterParameterNr::Undef) {
+            Cutoff => {
                 self.cutoff.set_normalized(value);
                 self.update_g();
             }
-            1 => {
+            Res => {
                 self.res.set_normalized(value);
                 self.set_resonances();
             }
-            2 => self.drive.set_normalized(value),
+            Drive => self.drive.set_normalized(value),
             // TODO: filter_type won't work with more than 2 filter modes, make proper param
-            3 => {
+            FilterType => {
                 self.filter_type.set(value as usize);
             }
-            4 => self.mode.set_normalized(value),
-            5 => self.slope.set_normalized(value),
+            Mode => self.mode.set_normalized(value),
+            Slope => self.slope.set_normalized(value),
             _ => (),
         }
     }
     fn get_parameter_name(&self, index: i32) -> String {
-        match index {
-            0 => self.cutoff.get_name(),
-            1 => self.res.get_name(),
-            2 => self.drive.get_name(),
-            3 => "filter type".to_string(),
-            4 => self.mode.get_name(),
-            5 => self.slope.get_name(),
+        match FilterParameterNr::index_enum(index as usize).unwrap_or(FilterParameterNr::Undef) {
+            Cutoff => self.cutoff.get_name(),
+            Res => self.res.get_name(),
+            Drive => self.drive.get_name(),
+            FilterType => "filter type".to_string(),
+            Mode => self.mode.get_name(),
+            Slope => self.slope.get_name(),
             _ => "".to_string(),
         }
     }
     // This is what will display underneath our control.  We can
     // format it into a string that makes sense for the user.
     fn get_parameter_text(&self, index: i32) -> String {
-        match index {
-            0 => self.cutoff.get_display(),
-            1 => self.res.get_display(),
-            2 => self.drive.get_display(),
-            3 => match self.filter_type.get() {
+        match FilterParameterNr::index_enum(index as usize).unwrap_or(FilterParameterNr::Undef) {
+            Cutoff => self.cutoff.get_display(),
+            Res => self.res.get_display(),
+            Drive => self.drive.get_display(),
+            FilterType => match self.filter_type.get() {
                 0 => "State variable".to_string(),
                 _ => "Transistor ladder".to_string(),
             },
-            4 => self.mode.get_display(),
-            5 => self.slope.get_display(),
+            Mode => self.mode.get_display(),
+            Slope => self.slope.get_display(),
             _ => format!(""),
         }
     }
