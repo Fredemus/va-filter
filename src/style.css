@@ -48,8 +48,16 @@ dropdown .arrow {
     left: 1s;
 }
 
-dropdown .arrow:hover {
-    background-color: #CCCCCC;
+dropdown .item {
+    background-color: #141414;
+}
+  
+dropdown .item:hover {
+    background-color: gray;
+}
+
+dropdown .item:checked {
+    background-color: #c28919;
 }
 
 dropdown>popup {
