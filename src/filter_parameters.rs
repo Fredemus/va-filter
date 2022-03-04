@@ -5,9 +5,10 @@ use crate::parameter::Parameter;
 use super::parameter::{ParameterF32, ParameterUsize};
 use super::utils::*;
 use enum_index::{EnumIndex, IndexEnum};
-// #[macro_use]
-// extern crate enum_index_derive;
+
 use enum_index_derive::{EnumIndex, IndexEnum};
+
+use std::fmt;
 
 use std::f32::consts::PI;
 
@@ -24,19 +25,18 @@ pub struct FilterParameters {
     pub drive: ParameterF32,
     pub mode: ParameterUsize,
     pub slope: ParameterUsize,
-    pub filter_type: AtomicUsize,
+    pub filter_type: ParameterUsize,
 }
 
 #[repr(C)]
 #[derive(EnumIndex, IndexEnum, Debug)]
 pub enum FilterParameterNr {
-    Cutoff = 0x0,
-    Res = 0x1,
-    Drive = 0x2,
-    Zeta = 0x3,
-    Mode = 0x4,
-    Slope = 0x5,
-    FilterType = 0x6,
+    Cutoff,
+    Res,
+    Drive,
+    FilterType,
+    Mode,
+    Slope,
     Undef,
 }
 
@@ -61,6 +61,28 @@ pub enum Slope {
     Undef,
 }
 
+#[repr(C)]
+#[derive(EnumIndex, IndexEnum)]
+pub enum FilterType {
+    StateVariableFilter,
+    TransistorLadderFilter,
+    Undef,
+}
+
+impl fmt::Debug for FilterType {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "{}",
+            match *self {
+                FilterType::StateVariableFilter => &"State Variable Filter",
+                FilterType::TransistorLadderFilter => &"Transistor Ladder",
+                _ => &"???",
+            }
+        )
+    }
+}
+
 impl FilterParameters {
     // transform resonance parameter into something more useful for the 2 filters
     pub fn set_resonances(&self) {
@@ -74,13 +96,13 @@ impl FilterParameters {
     }
 
     pub fn get_parameter_default(&self, index: i32) -> f32 {
-        match index {
-            0 => self.cutoff.get_normalized_default(),
-            1 => self.res.get_normalized_default(),
-            2 => self.drive.get_normalized_default(),
-            3 => 0.,
-            4 => self.mode.get_normalized_default() as f32,
-            5 => self.slope.get_normalized_default() as f32,
+        match FilterParameterNr::index_enum(index as usize).unwrap_or(FilterParameterNr::Undef) {
+            Cutoff => self.cutoff.get_normalized_default(),
+            Res => self.res.get_normalized_default(),
+            Drive => self.drive.get_normalized_default(),
+            FilterType => self.filter_type.get_normalized_default(),
+            Mode => self.mode.get_normalized_default(),
+            Slope => self.slope.get_normalized_default(),
             _ => 0.0,
         }
     }
@@ -90,7 +112,7 @@ impl Default for FilterParameters {
     fn default() -> FilterParameters {
         let filter_parameters = FilterParameters {
             sample_rate: AtomicF32::new(48000.),
-            filter_type: AtomicUsize::new(0),
+
             cutoff: ParameterF32::new(
                 "Cutoff",
                 10000.,
@@ -125,9 +147,17 @@ impl Default for FilterParameters {
                 format!("{:?}", Mode::index_enum(x).unwrap_or(Mode::Undef))
             })),
 
+            filter_type: (ParameterUsize::new("Type", 0, 0, 1, |x| {
+                format!(
+                    "{:?}",
+                    FilterType::index_enum(x).unwrap_or(FilterType::Undef)
+                )
+            })),
+
             slope: (ParameterUsize::new("Slope", 3, 0, 3, |x| {
                 format!("{:?}", Slope::index_enum(x).unwrap_or(Slope::Undef))
             })),
+
             k_ladder: AtomicF32::new(0.),
             zeta: AtomicF32::new(0.),
         };
@@ -163,9 +193,8 @@ impl PluginParameters for FilterParameters {
                 self.set_resonances();
             }
             Drive => self.drive.set_normalized(value),
-            // TODO: filter_type won't work with more than 2 filter modes, make proper param
             FilterType => {
-                self.filter_type.set(value as usize);
+                self.filter_type.set_normalized(value);
             }
             Mode => self.mode.set_normalized(value),
             Slope => self.slope.set_normalized(value),
@@ -177,7 +206,7 @@ impl PluginParameters for FilterParameters {
             Cutoff => self.cutoff.get_name(),
             Res => self.res.get_name(),
             Drive => self.drive.get_name(),
-            FilterType => "filter type".to_string(),
+            FilterType => self.filter_type.get_name(),
             Mode => self.mode.get_name(),
             Slope => self.slope.get_name(),
             _ => "".to_string(),
@@ -190,10 +219,7 @@ impl PluginParameters for FilterParameters {
             Cutoff => self.cutoff.get_display(),
             Res => self.res.get_display(),
             Drive => self.drive.get_display(),
-            FilterType => match self.filter_type.get() {
-                0 => "State variable".to_string(),
-                _ => "Transistor ladder".to_string(),
-            },
+            FilterType => self.filter_type.get_display(),
             Mode => self.mode.get_display(),
             Slope => self.slope.get_display(),
             _ => format!(""),

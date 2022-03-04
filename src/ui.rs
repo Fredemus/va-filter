@@ -1,7 +1,10 @@
 use crate::editor::EditorState;
 use crate::editor::{get_amplitude_response, get_phase_response};
+use crate::filter;
+use crate::filter_parameters::FilterParameterNr;
 use crate::utils::*;
 use crate::FilterParameters;
+use enum_index::EnumIndex;
 use femtovg::ImageFlags;
 use femtovg::ImageId;
 use femtovg::RenderTarget;
@@ -15,7 +18,6 @@ use vst::host::Host;
 use vst::plugin::HostCallback;
 use vst::plugin::PluginParameters;
 const ICON_DOWN_OPEN: &str = "\u{e75c}";
-
 use std::f32::consts::PI;
 
 #[derive(Lens)]
@@ -52,11 +54,14 @@ impl Model for UiData {
                 }
 
                 ParamChangeEvent::CircuitEvent(circuit_name) => {
-                    if circuit_name == "SVF" {
-                        self.params.set_parameter(3, 0.);
-                    } else {
-                        self.params.set_parameter(3, 1.);
-                    }
+                    self.params.set_parameter(
+                        FilterParameterNr::FilterType.enum_index() as i32,
+                        match circuit_name.as_str() {
+                            "SVF" => 0.,
+                            _ => 1.,
+                        },
+                    );
+
                     self.choice = circuit_name.to_string();
                 }
                 ParamChangeEvent::ChangeBodeView() => {
@@ -71,7 +76,10 @@ pub fn plugin_gui(cx: &mut Context, state: Arc<EditorState>) {
     UiData {
         params: state.params.clone(),
         host: state.host,
-        filter_circuits: vec!["SVF".to_string(), "Transistor Ladder".to_string()],
+        filter_circuits: vec![
+            "State Variable Filter".to_string(),
+            "Transistor Ladder".to_string(),
+        ],
         choice: if state.params.filter_type.get() == 0 {
             "SVF".to_string()
         } else {
