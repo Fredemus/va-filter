@@ -102,11 +102,8 @@ pub fn plugin_gui(cx: &mut Context, state: Arc<EditorState>) {
                                 let selected = *item.get(cx) == *choice.get(cx);
                                 Label::new(cx, &item.get(cx).to_string())
                                     .width(Stretch(1.0))
-                                    .background_color(if selected {
-                                        Color::from("#c28919")
-                                    } else {
-                                        Color::transparent()
-                                    })
+                                    .class("item")
+                                    .checked(selected)
                                     .on_press(move |cx| {
                                         cx.emit(ParamChangeEvent::CircuitEvent(
                                             item.get(cx).clone(),
@@ -171,9 +168,7 @@ fn make_knob(cx: &mut Context, param_index: i32) -> Handle<VStack> {
             cx,
             UiData::params.get(cx).get_parameter_default(param_index),
             // params.get(cx).get_parameter(param_index),
-            UiData::params.map(move |params| {
-                params.get_parameter(param_index)
-            }),
+            UiData::params.map(move |params| params.get_parameter(param_index)),
             move |cx, lens| {
                 TickKnob::new(
                     cx,
@@ -224,9 +219,7 @@ fn make_steppy_knob(
         Knob::custom(
             cx,
             UiData::params.get(cx).get_parameter_default(param_index),
-            UiData::params.map(move |params| {
-                params.get_parameter(param_index)
-            }),
+            UiData::params.map(move |params| params.get_parameter(param_index)),
             move |cx, lens| {
                 let mode = KnobMode::Discrete(steps);
                 Ticks::new(
