@@ -37,7 +37,6 @@ pub enum FilterParameterNr {
     FilterType,
     Mode,
     Slope,
-    Undef,
 }
 
 #[repr(C)]
@@ -48,7 +47,6 @@ pub enum Mode {
     BP1,
     Notch,
     BP2,
-    Undef,
 }
 
 #[repr(C)]
@@ -58,7 +56,6 @@ pub enum Slope {
     LP12,
     LP18,
     LP24,
-    Undef,
 }
 
 #[repr(C)]
@@ -66,7 +63,6 @@ pub enum Slope {
 pub enum FilterType {
     StateVariableFilter,
     TransistorLadderFilter,
-    Undef,
 }
 
 impl fmt::Debug for FilterType {
@@ -77,7 +73,6 @@ impl fmt::Debug for FilterType {
             match *self {
                 FilterType::StateVariableFilter => &"State Variable Filter",
                 FilterType::TransistorLadderFilter => &"Transistor Ladder",
-                _ => &"???",
             }
         )
     }
@@ -96,14 +91,13 @@ impl FilterParameters {
     }
 
     pub fn get_parameter_default(&self, index: i32) -> f32 {
-        match FilterParameterNr::index_enum(index as usize).unwrap_or(FilterParameterNr::Undef) {
+        match FilterParameterNr::index_enum(index as usize).unwrap() {
             Cutoff => self.cutoff.get_normalized_default(),
             Res => self.res.get_normalized_default(),
             Drive => self.drive.get_normalized_default(),
             FilterType => self.filter_type.get_normalized_default(),
             Mode => self.mode.get_normalized_default(),
             Slope => self.slope.get_normalized_default(),
-            _ => 0.0,
         }
     }
 }
@@ -143,19 +137,16 @@ impl Default for FilterParameters {
                 |x| x.sqrt(),
             )),
 
-            mode: (ParameterUsize::new("Mode", 0, 0, 4, |x| {
-                format!("{:?}", Mode::index_enum(x).unwrap_or(Mode::Undef))
+            filter_type: (ParameterUsize::new("Type", 0, 0, 1, |x| {
+                format!("{:?}", FilterType::index_enum(x).unwrap())
             })),
 
-            filter_type: (ParameterUsize::new("Type", 0, 0, 1, |x| {
-                format!(
-                    "{:?}",
-                    FilterType::index_enum(x).unwrap_or(FilterType::Undef)
-                )
+            mode: (ParameterUsize::new("Mode", 0, 0, 4, |x| {
+                format!("{:?}", Mode::index_enum(x).unwrap())
             })),
 
             slope: (ParameterUsize::new("Slope", 3, 0, 3, |x| {
-                format!("{:?}", Slope::index_enum(x).unwrap_or(Slope::Undef))
+                format!("{:?}", Slope::index_enum(x).unwrap())
             })),
 
             k_ladder: AtomicF32::new(0.),
@@ -172,18 +163,17 @@ impl Default for FilterParameters {
 use FilterParameterNr::*;
 impl PluginParameters for FilterParameters {
     fn get_parameter(&self, index: i32) -> f32 {
-        match FilterParameterNr::index_enum(index as usize).unwrap_or(FilterParameterNr::Undef) {
+        match FilterParameterNr::index_enum(index as usize).unwrap() {
             Cutoff => self.cutoff.get_normalized(),
             Res => self.res.get_normalized(),
             Drive => self.drive.get_normalized(),
             FilterType => self.filter_type.get() as f32,
             Mode => self.mode.get_normalized() as f32,
             Slope => self.slope.get_normalized() as f32,
-            _ => 0.0,
         }
     }
     fn set_parameter(&self, index: i32, value: f32) {
-        match FilterParameterNr::index_enum(index as usize).unwrap_or(FilterParameterNr::Undef) {
+        match FilterParameterNr::index_enum(index as usize).unwrap() {
             Cutoff => {
                 self.cutoff.set_normalized(value);
                 self.update_g();
@@ -198,31 +188,28 @@ impl PluginParameters for FilterParameters {
             }
             Mode => self.mode.set_normalized(value),
             Slope => self.slope.set_normalized(value),
-            _ => (),
         }
     }
     fn get_parameter_name(&self, index: i32) -> String {
-        match FilterParameterNr::index_enum(index as usize).unwrap_or(FilterParameterNr::Undef) {
+        match FilterParameterNr::index_enum(index as usize).unwrap() {
             Cutoff => self.cutoff.get_name(),
             Res => self.res.get_name(),
             Drive => self.drive.get_name(),
             FilterType => self.filter_type.get_name(),
             Mode => self.mode.get_name(),
             Slope => self.slope.get_name(),
-            _ => "".to_string(),
         }
     }
     // This is what will display underneath our control.  We can
     // format it into a string that makes sense for the user.
     fn get_parameter_text(&self, index: i32) -> String {
-        match FilterParameterNr::index_enum(index as usize).unwrap_or(FilterParameterNr::Undef) {
+        match FilterParameterNr::index_enum(index as usize).unwrap() {
             Cutoff => self.cutoff.get_display(),
             Res => self.res.get_display(),
             Drive => self.drive.get_display(),
             FilterType => self.filter_type.get_display(),
             Mode => self.mode.get_display(),
             Slope => self.slope.get_display(),
-            _ => format!(""),
         }
     }
     // transforms the plugin state into a byte vector.

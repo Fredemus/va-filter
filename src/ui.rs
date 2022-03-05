@@ -32,7 +32,7 @@ pub struct UiData {
 #[derive(Debug)]
 pub enum ParamChangeEvent {
     AllParams(i32, f32),
-    CircuitEvent(String),
+    CircuitEvent(usize),
     ChangeBodeView(),
 }
 
@@ -53,16 +53,13 @@ impl Model for UiData {
                     }
                 }
 
-                ParamChangeEvent::CircuitEvent(circuit_name) => {
+                ParamChangeEvent::CircuitEvent(index) => {
                     self.params.set_parameter(
                         FilterParameterNr::FilterType.enum_index() as i32,
-                        match circuit_name.as_str() {
-                            "SVF" => 0.,
-                            _ => 1.,
-                        },
+                        *index as f32,
                     );
 
-                    self.choice = circuit_name.to_string();
+                    self.choice = self.filter_circuits[*index].clone()
                 }
                 ParamChangeEvent::ChangeBodeView() => {
                     self.show_phase = !self.show_phase;
@@ -81,7 +78,7 @@ pub fn plugin_gui(cx: &mut Context, state: Arc<EditorState>) {
             "Transistor Ladder".to_string(),
         ],
         choice: if state.params.filter_type.get() == 0 {
-            "SVF".to_string()
+            "State Variable Filter".to_string()
         } else {
             "Transistor Ladder".to_string()
         },
@@ -104,7 +101,7 @@ pub fn plugin_gui(cx: &mut Context, state: Arc<EditorState>) {
                 }),
                 move |cx| {
                     // List of options
-                    List::new(cx, UiData::filter_circuits, move |cx, _, item| {
+                    List::new(cx, UiData::filter_circuits, move |cx, index, item| {
                         VStack::new(cx, move |cx| {
                             Binding::new(cx, UiData::choice, move |cx, choice| {
                                 let selected = *item.get(cx) == *choice.get(cx);
@@ -113,9 +110,7 @@ pub fn plugin_gui(cx: &mut Context, state: Arc<EditorState>) {
                                     .class("item")
                                     .checked(selected)
                                     .on_press(move |cx| {
-                                        cx.emit(ParamChangeEvent::CircuitEvent(
-                                            item.get(cx).clone(),
-                                        ));
+                                        cx.emit(ParamChangeEvent::CircuitEvent(index));
                                         cx.emit(PopupEvent::Close);
                                     });
                             });
