@@ -35,3 +35,9 @@ bincode = "1.3.3"
 
 num_enum = "0.5.7"
 num_enum_derive = "0.5.7"
+
+[dependencies.strum]
+version = "0.24"
+features = ["derive"]
+
+# strum_macros = "0.24"
