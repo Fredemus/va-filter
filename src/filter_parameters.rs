@@ -4,7 +4,8 @@ use crate::parameter::Parameter;
 
 use super::parameter::{ParameterF32, ParameterUsize};
 use super::utils::*;
-use enum_index::{EnumIndex, IndexEnum};
+use crate::parameter::GetParameterByIndex;
+use enum_index::IndexEnum;
 
 use enum_index_derive::{EnumIndex, IndexEnum};
 
@@ -31,12 +32,28 @@ pub struct FilterParameters {
 #[repr(C)]
 #[derive(EnumIndex, IndexEnum, Debug)]
 pub enum FilterParameterNr {
-    Cutoff,
+    Cutoff = 0x20,
     Res,
     Drive,
-    FilterType,
+    FilterType = 0x10,
     Mode,
     Slope,
+}
+
+impl GetParameterByIndex for FilterParameters {
+    fn get_parameter_by_index<'a>(&'a self, index: i32) -> &'a dyn Parameter {
+        if index > 0x10 {
+            println!("-- get_parameter_by_index {}", index);
+        }
+        match FilterParameterNr::index_enum(index as usize).unwrap() {
+            Cutoff => &self.cutoff,
+            Res => &self.res,
+            Drive => &self.drive,
+            FilterType => &self.filter_type,
+            Mode => &self.mode,
+            Slope => &self.slope,
+        }
+    }
 }
 
 #[repr(C)]
@@ -88,17 +105,6 @@ impl FilterParameters {
     pub fn update_g(&self) {
         self.g
             .set((PI * self.cutoff.get() / (self.sample_rate.get())).tan());
-    }
-
-    pub fn get_parameter_default(&self, index: i32) -> f32 {
-        match FilterParameterNr::index_enum(index as usize).unwrap() {
-            Cutoff => self.cutoff.get_normalized_default(),
-            Res => self.res.get_normalized_default(),
-            Drive => self.drive.get_normalized_default(),
-            FilterType => self.filter_type.get_normalized_default(),
-            Mode => self.mode.get_normalized_default(),
-            Slope => self.slope.get_normalized_default(),
-        }
     }
 }
 
@@ -163,15 +169,9 @@ impl Default for FilterParameters {
 use FilterParameterNr::*;
 impl PluginParameters for FilterParameters {
     fn get_parameter(&self, index: i32) -> f32 {
-        match FilterParameterNr::index_enum(index as usize).unwrap() {
-            Cutoff => self.cutoff.get_normalized(),
-            Res => self.res.get_normalized(),
-            Drive => self.drive.get_normalized(),
-            FilterType => self.filter_type.get() as f32,
-            Mode => self.mode.get_normalized() as f32,
-            Slope => self.slope.get_normalized() as f32,
-        }
+        self.get_parameter_by_index(index).get_normalized()
     }
+
     fn set_parameter(&self, index: i32, value: f32) {
         match FilterParameterNr::index_enum(index as usize).unwrap() {
             Cutoff => {
@@ -191,26 +191,12 @@ impl PluginParameters for FilterParameters {
         }
     }
     fn get_parameter_name(&self, index: i32) -> String {
-        match FilterParameterNr::index_enum(index as usize).unwrap() {
-            Cutoff => self.cutoff.get_name(),
-            Res => self.res.get_name(),
-            Drive => self.drive.get_name(),
-            FilterType => self.filter_type.get_name(),
-            Mode => self.mode.get_name(),
-            Slope => self.slope.get_name(),
-        }
+        self.get_parameter_by_index(index).get_name()
     }
     // This is what will display underneath our control.  We can
     // format it into a string that makes sense for the user.
     fn get_parameter_text(&self, index: i32) -> String {
-        match FilterParameterNr::index_enum(index as usize).unwrap() {
-            Cutoff => self.cutoff.get_display(),
-            Res => self.res.get_display(),
-            Drive => self.drive.get_display(),
-            FilterType => self.filter_type.get_display(),
-            Mode => self.mode.get_display(),
-            Slope => self.slope.get_display(),
-        }
+        self.get_parameter_by_index(index).get_display()
     }
     // transforms the plugin state into a byte vector.
     // For this plugin, this is just the parameters' normalized values
@@ -242,5 +228,15 @@ impl PluginParameters for FilterParameters {
     }
     fn get_bank_data(&self) -> Vec<u8> {
         self.get_preset_data()
+    }
+}
+
+#[test]
+fn test_index() {
+    use super::*;
+    let filter_parameters = FilterParameters::default();
+
+    for i in 0..5 {
+        println!(" {:?}", filter_parameters.get_parameter_text(i));
     }
 }
