@@ -1,4 +1,5 @@
 use num_enum::FromPrimitive;
+use strum::{EnumIter, IntoEnumIterator};
 use vst::plugin::PluginParameters;
 
 use crate::parameter::Parameter;
@@ -25,25 +26,30 @@ pub struct FilterParameters {
     pub mode: ParameterUsize,
     pub slope: ParameterUsize,
     pub filter_type: ParameterUsize,
+
+    pub reserved: ParameterUsize,
 }
 
 #[repr(i32)]
-#[derive(FromPrimitive, Eq, PartialEq, Debug)]
+#[derive(FromPrimitive, Eq, PartialEq, Debug, EnumIter)]
 pub enum FilterParameterNr {
-    #[num_enum(default)]
     Cutoff,
     Res,
     Drive,
+
     FilterType = 32,
     Mode,
     Slope,
+
+    #[num_enum(default)]
+    Padding = 200,
 }
 
 impl GetParameterByIndex for FilterParameters {
     fn get_parameter_by_index<'a>(&'a self, index: i32) -> &'a dyn Parameter {
-        if index > 0x10 {
-            println!("-- get_parameter_by_index {}", index);
-        }
+        // if index > 0x10 {
+        //     println!("-- get_parameter_by_index {}", index);
+        // }
         match FilterParameterNr::from(index) {
             Cutoff => &self.cutoff,
             Res => &self.res,
@@ -51,6 +57,7 @@ impl GetParameterByIndex for FilterParameters {
             FilterType => &self.filter_type,
             Mode => &self.mode,
             Slope => &self.slope,
+            Padding => &self.reserved,
         }
     }
 }
@@ -155,6 +162,8 @@ impl Default for FilterParameters {
                 format!("{:?}", Slope::from(x as i32))
             })),
 
+            reserved: (ParameterUsize::new("Reserved", 0, 0, 1, |_| "reserved".to_string())),
+
             k_ladder: AtomicF32::new(0.),
             zeta: AtomicF32::new(0.),
         };
@@ -188,6 +197,7 @@ impl PluginParameters for FilterParameters {
             }
             Mode => self.mode.set_normalized(value),
             Slope => self.slope.set_normalized(value),
+            Padding => self.reserved.set_normalized(value),
         }
     }
     fn get_parameter_name(&self, index: i32) -> String {
@@ -203,9 +213,10 @@ impl PluginParameters for FilterParameters {
     fn get_preset_data(&self) -> Vec<u8> {
         // std::slice::from_raw_parts(data, len)
         let mut param_vec = Vec::new();
-        // Remember to update n_params when adding more
-        let n_params = 6;
-        for i in 0..n_params {
+
+        let max_index = FilterParameterNr::iter().fold(0, |max_index, v| max_index.max(v as i32));
+
+        for i in 0..=max_index {
             param_vec.push(self.get_parameter(i));
         }
         let param_vec_u8 = bincode::serialize(&param_vec).unwrap();
@@ -213,10 +224,12 @@ impl PluginParameters for FilterParameters {
     }
     // this should use a byte vec from the method above
     fn load_preset_data(&self, data: &[u8]) {
-        let n_params = 6;
-        let param_data = &data[0..(n_params + 2) * 4];
+        let max_index =
+            FilterParameterNr::iter().fold(0, |max_index, v| max_index.max(v as i32)) as usize;
+
+        let param_data = data;
         let param_vec: Vec<f32> = bincode::deserialize(param_data).unwrap();
-        for i in 0..n_params {
+        for i in 0..=max_index {
             self.set_parameter(i as i32, param_vec[i]);
         }
     }
@@ -231,12 +244,66 @@ impl PluginParameters for FilterParameters {
     }
 }
 
-#[test]
-fn test_index() {
-    use super::*;
-    let filter_parameters = FilterParameters::default();
+#[cfg(test)]
+mod tests {
 
-    for i in 0..5 {
-        println!(" {:?}", filter_parameters.get_parameter_text(i));
+    use super::*;
+    #[test]
+    fn test_index() {
+        let filter_parameters = FilterParameters::default();
+
+        for i in 0..5 {
+            println!(" {:?}", filter_parameters.get_parameter_text(i));
+        }
+    }
+
+    #[test]
+    fn test_get_preset() {
+        use super::*;
+        let filter_parameters = FilterParameters::default();
+
+        let slope = filter_parameters.get_parameter_by_index(FilterParameterNr::Slope as i32);
+
+        println!(
+            "Slope.  {} {} {}",
+            slope.get_name(),
+            slope.get_display(),
+            slope.get_normalized()
+        );
+
+        slope.set_normalized(0.3);
+
+        println!(
+            "Slope.  {} {} {}",
+            slope.get_name(),
+            slope.get_display(),
+            slope.get_normalized()
+        );
+
+        let data = filter_parameters.get_preset_data();
+        println!("data {:?}", data);
+
+        let load = FilterParameters::default();
+
+        load.load_preset_data(&data);
+        let load_slope = load.get_parameter_by_index(FilterParameterNr::Slope as i32);
+
+        println!(
+            "Slope.  {} {} {}",
+            load_slope.get_name(),
+            load_slope.get_display(),
+            load_slope.get_normalized()
+        );
+        assert! { load_slope.get_normalized() == 0.3 }
+    }
+
+    #[test]
+    fn test_max_index() {
+        use super::*;
+        let filter_parameters = FilterParameters::default();
+
+        let max = FilterParameterNr::iter().fold(0, |max_index, v| max_index.max(v as i32));
+
+        println!("max  {}", max);
     }
 }
