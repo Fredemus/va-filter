@@ -34,7 +34,7 @@ pub enum FilterParameterNr {
     Cutoff,
     Res,
     Drive,
-    FilterType,
+    FilterType = 32,
     Mode,
     Slope,
 }

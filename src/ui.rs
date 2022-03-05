@@ -125,11 +125,11 @@ pub fn plugin_gui(cx: &mut Context, state: Arc<EditorState>) {
         // The filter control knobs
         HStack::new(cx, |cx| {
             // Cutoff
-            make_knob(cx, 0);
+            make_knob(cx, FilterParameterNr::Cutoff as i32);
             // Resonance
-            make_knob(cx, 1);
+            make_knob(cx, FilterParameterNr::Res as i32);
             // Drive
-            make_knob(cx, 2);
+            make_knob(cx, FilterParameterNr::Drive as i32);
             // Mode/ Slope
             Binding::new(
                 cx,
@@ -139,11 +139,11 @@ pub fn plugin_gui(cx: &mut Context, state: Arc<EditorState>) {
                         let param = &UiData::params.get(cx).mode;
                         let steps = (param.max - param.min + 1.) as usize;
 
-                        make_steppy_knob(cx, 4, steps, 270.);
+                        make_steppy_knob(cx, FilterParameterNr::Mode as i32, steps, 270.);
                     } else {
                         let param = &UiData::params.get(cx).slope;
                         let steps = (param.max - param.min + 1.) as usize;
-                        make_steppy_knob(cx, 5, steps, 270.);
+                        make_steppy_knob(cx, FilterParameterNr::Slope as i32, steps, 270.);
                     }
                 },
             );
