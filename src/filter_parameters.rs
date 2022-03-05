@@ -300,10 +300,10 @@ mod tests {
     #[test]
     fn test_max_index() {
         use super::*;
-        let filter_parameters = FilterParameters::default();
 
         let max = FilterParameterNr::iter().fold(0, |max_index, v| max_index.max(v as i32));
 
         println!("max  {}", max);
+        assert_eq!(max, 200);
     }
 }
