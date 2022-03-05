@@ -5,7 +5,7 @@ use crate::filter_parameters::FilterParameterNr;
 use crate::parameter::GetParameterByIndex;
 use crate::utils::*;
 use crate::FilterParameters;
-use enum_index::EnumIndex;
+use num_enum::FromPrimitive;
 use femtovg::ImageFlags;
 use femtovg::ImageId;
 use femtovg::RenderTarget;
@@ -56,7 +56,7 @@ impl Model for UiData {
 
                 ParamChangeEvent::CircuitEvent(index) => {
                     self.params.set_parameter(
-                        FilterParameterNr::FilterType.enum_index() as i32,
+                        FilterParameterNr::FilterType as i32,
                         *index as f32,
                     );
 

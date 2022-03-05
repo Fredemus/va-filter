@@ -1,3 +1,4 @@
+use num_enum::FromPrimitive;
 use vst::plugin::PluginParameters;
 
 use crate::parameter::Parameter;
@@ -5,9 +6,6 @@ use crate::parameter::Parameter;
 use super::parameter::{ParameterF32, ParameterUsize};
 use super::utils::*;
 use crate::parameter::GetParameterByIndex;
-use enum_index::IndexEnum;
-
-use enum_index_derive::{EnumIndex, IndexEnum};
 
 use std::fmt;
 
@@ -29,13 +27,14 @@ pub struct FilterParameters {
     pub filter_type: ParameterUsize,
 }
 
-#[repr(C)]
-#[derive(EnumIndex, IndexEnum, Debug)]
+#[repr(i32)]
+#[derive(FromPrimitive, Eq, PartialEq, Debug)]
 pub enum FilterParameterNr {
-    Cutoff = 0x20,
+    #[num_enum(default)]
+    Cutoff,
     Res,
     Drive,
-    FilterType = 0x10,
+    FilterType,
     Mode,
     Slope,
 }
@@ -45,7 +44,7 @@ impl GetParameterByIndex for FilterParameters {
         if index > 0x10 {
             println!("-- get_parameter_by_index {}", index);
         }
-        match FilterParameterNr::index_enum(index as usize).unwrap() {
+        match FilterParameterNr::from(index) {
             Cutoff => &self.cutoff,
             Res => &self.res,
             Drive => &self.drive,
@@ -56,9 +55,10 @@ impl GetParameterByIndex for FilterParameters {
     }
 }
 
-#[repr(C)]
-#[derive(EnumIndex, IndexEnum, Debug)]
+#[repr(i32)]
+#[derive(FromPrimitive, Eq, PartialEq, Debug)]
 pub enum Mode {
+    #[num_enum(default)]
     LP,
     HP,
     BP1,
@@ -66,18 +66,20 @@ pub enum Mode {
     BP2,
 }
 
-#[repr(C)]
-#[derive(EnumIndex, IndexEnum, Debug)]
+#[repr(i32)]
+#[derive(FromPrimitive, Eq, PartialEq, Debug)]
 pub enum Slope {
+    #[num_enum(default)]
     LP6,
     LP12,
     LP18,
     LP24,
 }
 
-#[repr(C)]
-#[derive(EnumIndex, IndexEnum)]
+#[repr(i32)]
+#[derive(FromPrimitive, Eq, PartialEq)]
 pub enum FilterType {
+    #[num_enum(default)]
     StateVariableFilter,
     TransistorLadderFilter,
 }
@@ -144,15 +146,13 @@ impl Default for FilterParameters {
             )),
 
             filter_type: (ParameterUsize::new("Type", 0, 0, 1, |x| {
-                format!("{:?}", FilterType::index_enum(x).unwrap())
+                format!("{:?}", FilterType::from(x as i32))
             })),
 
-            mode: (ParameterUsize::new("Mode", 0, 0, 4, |x| {
-                format!("{:?}", Mode::index_enum(x).unwrap())
-            })),
+            mode: (ParameterUsize::new("Mode", 0, 0, 4, |x| format!("{:?}", Mode::from(x as i32)))),
 
             slope: (ParameterUsize::new("Slope", 3, 0, 3, |x| {
-                format!("{:?}", Slope::index_enum(x).unwrap())
+                format!("{:?}", Slope::from(x as i32))
             })),
 
             k_ladder: AtomicF32::new(0.),
@@ -173,7 +173,7 @@ impl PluginParameters for FilterParameters {
     }
 
     fn set_parameter(&self, index: i32, value: f32) {
-        match FilterParameterNr::index_enum(index as usize).unwrap() {
+        match FilterParameterNr::from(index) {
             Cutoff => {
                 self.cutoff.set_normalized(value);
                 self.update_g();
