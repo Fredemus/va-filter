@@ -1,7 +1,7 @@
 use crate::editor::EditorState;
 use crate::editor::{get_amplitude_response, get_phase_response};
 use crate::filter;
-use crate::filter_parameters::FilterParameterNr;
+use crate::filter_parameters::Parameters;
 use crate::parameter::GetParameterByIndex;
 use crate::utils::*;
 use crate::FilterParameters;
@@ -56,7 +56,7 @@ impl Model for UiData {
 
                 ParamChangeEvent::CircuitEvent(index) => {
                     self.params.set_parameter(
-                        FilterParameterNr::FilterType as i32,
+                        Parameters::FilterType as i32,
                         *index as f32,
                     );
 
@@ -125,11 +125,11 @@ pub fn plugin_gui(cx: &mut Context, state: Arc<EditorState>) {
         // The filter control knobs
         HStack::new(cx, |cx| {
             // Cutoff
-            make_knob(cx, FilterParameterNr::Cutoff as i32);
+            make_knob(cx, Parameters::Cutoff as i32);
             // Resonance
-            make_knob(cx, FilterParameterNr::Res as i32);
+            make_knob(cx, Parameters::Res as i32);
             // Drive
-            make_knob(cx, FilterParameterNr::Drive as i32);
+            make_knob(cx, Parameters::Drive as i32);
             // Mode/ Slope
             Binding::new(
                 cx,
@@ -139,11 +139,11 @@ pub fn plugin_gui(cx: &mut Context, state: Arc<EditorState>) {
                         let param = &UiData::params.get(cx).mode;
                         let steps = (param.max - param.min + 1.) as usize;
 
-                        make_steppy_knob(cx, FilterParameterNr::Mode as i32, steps, 270.);
+                        make_steppy_knob(cx, Parameters::Mode as i32, steps, 270.);
                     } else {
                         let param = &UiData::params.get(cx).slope;
                         let steps = (param.max - param.min + 1.) as usize;
-                        make_steppy_knob(cx, FilterParameterNr::Slope as i32, steps, 270.);
+                        make_steppy_knob(cx, Parameters::Slope as i32, steps, 270.);
                     }
                 },
             );
@@ -206,7 +206,7 @@ fn make_knob(cx: &mut Context, param_index: i32) -> Handle<VStack> {
         Label::new(
             cx,
             UiData::params.map(move |params| params.get_parameter_text(param_index)),
-        );
+        ).width(Pixels(100.));
     })
     .child_space(Stretch(1.0))
     .row_between(Pixels(10.0))

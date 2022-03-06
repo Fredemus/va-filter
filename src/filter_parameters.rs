@@ -1,4 +1,4 @@
-use num_enum::FromPrimitive;
+use num_enum::{FromPrimitive, IntoPrimitive};
 use strum::{EnumIter, IntoEnumIterator};
 use vst::plugin::PluginParameters;
 
@@ -10,7 +10,22 @@ use crate::parameter::GetParameterByIndex;
 
 use std::fmt;
 
+use std::convert::Into;
 use std::f32::consts::PI;
+
+// Helper for the indexing, could be moved elsewhere
+trait MaxIndex {
+    fn max_index() -> i32;
+}
+
+impl<T> MaxIndex for T
+where
+    T: IntoEnumIterator + Into<i32>,
+{
+    fn max_index() -> i32 {
+        T::iter().fold(0, |max_index, v| max_index.max(v.into()))
+    }
+}
 
 pub struct FilterParameters {
     pub g: AtomicF32,
@@ -31,33 +46,27 @@ pub struct FilterParameters {
 }
 
 #[repr(i32)]
-#[derive(FromPrimitive, Eq, PartialEq, Debug, EnumIter)]
-pub enum FilterParameterNr {
+#[derive(FromPrimitive, IntoPrimitive, Eq, PartialEq, Debug, EnumIter)]
+pub enum Parameters {
+    #[num_enum(default)]
     Cutoff,
     Res,
     Drive,
 
-    FilterType = 32,
+    FilterType,
     Mode,
     Slope,
-
-    #[num_enum(default)]
-    Padding = 200,
 }
 
 impl GetParameterByIndex for FilterParameters {
     fn get_parameter_by_index<'a>(&'a self, index: i32) -> &'a dyn Parameter {
-        // if index > 0x10 {
-        //     println!("-- get_parameter_by_index {}", index);
-        // }
-        match FilterParameterNr::from(index) {
+        match Parameters::from(index) {
             Cutoff => &self.cutoff,
             Res => &self.res,
             Drive => &self.drive,
             FilterType => &self.filter_type,
             Mode => &self.mode,
             Slope => &self.slope,
-            Padding => &self.reserved,
         }
     }
 }
@@ -175,14 +184,14 @@ impl Default for FilterParameters {
     }
 }
 
-use FilterParameterNr::*;
+use Parameters::*;
 impl PluginParameters for FilterParameters {
     fn get_parameter(&self, index: i32) -> f32 {
         self.get_parameter_by_index(index).get_normalized()
     }
 
     fn set_parameter(&self, index: i32, value: f32) {
-        match FilterParameterNr::from(index) {
+        match Parameters::from(index) {
             Cutoff => {
                 self.cutoff.set_normalized(value);
                 self.update_g();
@@ -214,8 +223,7 @@ impl PluginParameters for FilterParameters {
         // std::slice::from_raw_parts(data, len)
         let mut param_vec = Vec::new();
 
-        let max_index = FilterParameterNr::iter().fold(0, |max_index, v| max_index.max(v as i32));
-
+        let max_index = Parameters::max_index();
         for i in 0..=max_index {
             param_vec.push(self.get_parameter(i));
         }
@@ -224,8 +232,7 @@ impl PluginParameters for FilterParameters {
     }
     // this should use a byte vec from the method above
     fn load_preset_data(&self, data: &[u8]) {
-        let max_index =
-            FilterParameterNr::iter().fold(0, |max_index, v| max_index.max(v as i32)) as usize;
+        let max_index = Parameters::max_index() as usize;
 
         let param_data = data;
         let param_vec: Vec<f32> = bincode::deserialize(param_data).unwrap();
@@ -262,7 +269,7 @@ mod tests {
         use super::*;
         let filter_parameters = FilterParameters::default();
 
-        let slope = filter_parameters.get_parameter_by_index(FilterParameterNr::Slope as i32);
+        let slope = filter_parameters.get_parameter_by_index(Parameters::Slope as i32);
 
         println!(
             "Slope.  {} {} {}",
@@ -286,7 +293,7 @@ mod tests {
         let load = FilterParameters::default();
 
         load.load_preset_data(&data);
-        let load_slope = load.get_parameter_by_index(FilterParameterNr::Slope as i32);
+        let load_slope = load.get_parameter_by_index(Parameters::Slope as i32);
 
         println!(
             "Slope.  {} {} {}",
@@ -301,9 +308,30 @@ mod tests {
     fn test_max_index() {
         use super::*;
 
-        let max = FilterParameterNr::iter().fold(0, |max_index, v| max_index.max(v as i32));
+        #[repr(i32)]
+        #[derive(FromPrimitive, IntoPrimitive, Eq, PartialEq, Debug, EnumIter)]
+        enum Test {
+            #[num_enum(default)]
+            Cutoff,
+            Res,
+            Drive,
 
-        println!("max  {}", max);
-        assert_eq!(max, 200);
+            FilterType,
+            Mode,
+            Slope,
+
+            End = 200,
+        }
+
+        let max_raw = Test::iter().fold(0, |max_index, v| max_index.max(v as i32));
+
+        println!("max_raw  {}", max_raw);
+
+        let max_trait = Test::max_index();
+
+        println!("max_trait  {}", max_trait);
+
+        assert_eq!(max_raw, 200);
+        assert_eq!(max_trait, 200);
     }
 }
