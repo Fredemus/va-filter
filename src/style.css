@@ -48,11 +48,24 @@ dropdown .arrow {
     left: 1s;
 }
 
+dropdown .item {
+    background-color: #141414;
+}
+  
+dropdown .item:hover {
+    background-color: gray;
+}
+
+dropdown .item:checked {
+    background-color: #c28919;
+}
+
 dropdown>popup {
     background-color: #141414;
     left: 1s;
     right: 1s;
 }
+
 dropdown list label {
     color: #C2C2C2;
     border-width: 1px;
@@ -72,7 +85,7 @@ button {
 }
 
 label {
-    font-size: 20;
+    font-size: 18;
     color: #C2C2C2;
     height: 20px;
     child-top: 1s;

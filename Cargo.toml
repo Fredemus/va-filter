@@ -2,7 +2,7 @@
 name = "svf_filter"
 version = "0.1.0"
 authors = ["Fredemus <frederik.halkjaer1@gmail.com>"]
-edition = "2018"
+edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [lib]
@@ -14,9 +14,10 @@ path = "src/bin.rs"
 [dependencies]
 vst = { git = "https://github.com/rust-dsp/rust-vst" }
 # baseview = { git = "https://github.com/RustAudio/baseview.git", rev = "d399c1275522ae75f5a82caadd904df2685c8660" }
-baseview = { git = "https://github.com/RustAudio/baseview.git", rev = "f6e99e9aa6f5aeb6b721cb05e4d882a51d995909"} # newest
+baseview = { git = "https://github.com/RustAudio/baseview.git", rev = "f6e99e9aa6f5aeb6b721cb05e4d882a51d995909" } # newest
 vizia = {git = "https://github.com/vizia/vizia", branch = "main", features = ["baseview"], default-features = false}
-femtovg = {version = "0.3.0", default-features = false}
+# vizia = {git = "https://github.com/vizia/vizia", branch = "main", features = ["glutin"], default-features = false}
+femtovg = { version = "0.3.0", default-features = false }
 
 raw-window-handle = "0.3"
 num = "0.4.0"
@@ -30,3 +31,12 @@ std_float = { git = "https://github.com/rust-lang/portable-simd" }
 # data serialization for presets 
 # serde = { version = "1.0.130", features = ["derive"] }
 bincode = "1.3.3"
+
+num_enum = "0.5.7"
+num_enum_derive = "0.5.7"
+
+[dependencies.strum]
+version = "0.24"
+features = ["derive"]
+
+# strum_macros = "0.24"
