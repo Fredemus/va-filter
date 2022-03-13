@@ -49,7 +49,7 @@ impl FilterParams {
                 },
             )
             // This needs quite a bit of smoothing to avoid artifacts
-            .with_smoother(SmoothingStyle::Logarithmic(100.0))
+            .with_smoother(SmoothingStyle::Logarithmic(20.0))
             .with_unit(" Hz")
             .with_value_to_string(formatters::f32_rounded(0))
             .with_callback(Arc::new({
@@ -57,14 +57,13 @@ impl FilterParams {
                 move |_| should_update_filter.store(true, std::sync::atomic::Ordering::Release)
             })),
 
-            // resonance is a good ol' percentage
             // TODO: Need a callback here I think to update q and res?
             res: FloatParam::new(
                 "Filter Resonance",
                 0.5,
                 FloatRange::Linear { min: 0., max: 1. },
             )
-            .with_smoother(SmoothingStyle::Logarithmic(100.0))
+            .with_smoother(SmoothingStyle::Linear(20.0))
             .with_value_to_string(formatters::f32_rounded(2))
             .with_callback(Arc::new({
                 let should_update_filter = should_update_filter.clone();
@@ -98,17 +97,17 @@ impl FilterParams {
             sample_rate: AtomicF32::new(48000.),
         };
         a.g.set((PI * a.cutoff.value / (a.sample_rate.get())).tan());
-        a.set_resonances();
+        a.set_resonances(a.res.value);
         a
     }
-    pub fn set_resonances(&self) {
-        let res = self.res.value;
+    pub fn set_resonances(&self, val: f32) {
+        let res = val;
         self.zeta.set(5. - 4.9 * res);
         self.k_ladder.set(res.powi(2) * 3.8 - 0.2);
     }
-    pub fn update_g(&self) {
+    pub fn update_g(&self, val: f32) {
         self.g
-            .set((PI * self.cutoff.value / (self.sample_rate.get())).tan());
+            .set((PI * val / (self.sample_rate.get())).tan());
     }
     // pub fn get_param<P: Param>(&self, index: usize) -> Box<dyn Param<Plain = f32>>
     // {

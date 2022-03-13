@@ -139,8 +139,16 @@ impl Plugin for VST {
                 // println!("ladder k {}", self.params.k_ladder.get());
                 // println!("filter mode {:?}", self.params.filter_type.value());
                 // println!("slope {:?}", self.params.slope.value() as usize);
-                self.params.update_g();
-                self.params.set_resonances();
+                self.params.update_g(self.params.cutoff.value);
+                self.params.set_resonances(self.params.res.value);
+            }
+            if self.params.cutoff.smoothed.is_smoothing() {
+                let cut_smooth = self.params.cutoff.smoothed.next();
+                self.params.update_g(cut_smooth);
+            }
+            if self.params.res.smoothed.is_smoothing() {
+                let res_smooth = self.params.res.smoothed.next();
+                self.params.set_resonances(res_smooth);
             }
 
             // channel_samples[0];

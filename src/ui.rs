@@ -178,7 +178,7 @@ pub fn plugin_gui(cx: &mut Context, params: Pin<Arc<FilterParams>>, context: Arc
                     if *ft.get(cx) == 0 {
                         // let param = &UiData::params.get(cx).mode;
                         // let steps = (param.max - param.min + 1.) as usize;
-                        let steps = 4;
+                        let steps = 5;
                         make_steppy_knob(
                             cx,
                             4,
@@ -189,13 +189,13 @@ pub fn plugin_gui(cx: &mut Context, params: Pin<Arc<FilterParams>>, context: Arc
                             UiData::params.map(|params| params.mode.to_string()),
                         );
                     } else {
-                        let steps = 5;
+                        let steps = 4;
                         make_steppy_knob(
                             cx,
-                            4,
+                            5,
                             steps,
                             270.,
-                            "Mode",
+                            "Slope",
                             UiData::params.map(|params| params.slope.normalized_value()),
                             UiData::params.map(|params| params.slope.to_string()),
                         );
@@ -280,7 +280,7 @@ where
             )
         });
 
-        Label::new(cx, param_text);
+        Label::new(cx, param_text).width(Pixels(100.));
     })
     .child_space(Stretch(1.0))
     .row_between(Pixels(10.0));
@@ -342,7 +342,7 @@ fn make_steppy_knob<'a, L1, L2>(
             cx,
             // UiData::params.map(move |params| params.get_parameter_text(param_index)),
             param_text,
-        );
+        ).width(Pixels(100.));
     })
     .child_space(Stretch(1.0))
     .row_between(Pixels(10.0));
