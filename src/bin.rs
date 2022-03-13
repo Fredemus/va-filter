@@ -3,32 +3,33 @@ use std::sync::Arc;
 
 use vizia::{Application, WindowDescription};
 
-mod editor;
-use editor::{EditorState, WINDOW_HEIGHT, WINDOW_WIDTH};
-mod filter_parameters;
+// mod editor;
+// use editor::{EditorState, WINDOW_HEIGHT, WINDOW_WIDTH};
+mod filter_params_nih;
 mod parameter;
 #[allow(dead_code)]
 mod utils;
-use filter_parameters::FilterParameters;
+use filter_params_nih::FilterParams;
 
 mod filter;
 
 mod ui;
 use ui::*;
 
-fn main() {
-    let params = Arc::new(FilterParameters::default());
-    let state = Arc::new(EditorState::new(params.clone(), None));
-    let window_description = WindowDescription::new()
-        .with_inner_size(WINDOW_WIDTH, WINDOW_HEIGHT)
-        .with_title("Hello Plugin");
+// fn main() {
+//     let params = Arc::new(FilterParams::new());
+//     // let state = Arc::new(EditorState::new(params.clone(), None));
 
-    Application::new(window_description, move |cx| {
-        cx.add_stylesheet("src/style.css")
-            .expect("no style sheet found");
+//     let window_description = WindowDescription::new()
+//         .with_inner_size(0, 0)
+//         .with_title("Hello Plugin");
 
-        // plugin_gui(cx, Arc::clone(&params));
-        plugin_gui(cx, Arc::clone(&state));
-    })
-    .run();
-}
+//     Application::new(window_description, move |cx| {
+//         cx.add_stylesheet("src/style.css")
+//             .expect("no style sheet found");
+
+//         // plugin_gui(cx, Arc::clone(&params));
+//         plugin_gui(cx, Arc::clone(&params));
+//     })
+//     .run();
+// }

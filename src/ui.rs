@@ -1,27 +1,33 @@
-use crate::editor::EditorState;
-use crate::editor::{get_amplitude_response, get_phase_response};
+// use crate::editor::EditorState;
+mod plot;
+use nih_plug::context::GuiContext;
+use plot::{get_amplitude_response, get_phase_response};
+use crate::filter_params_nih::Circuits;
+// use crate::editor::{get_amplitude_response, get_phase_response};
 use crate::utils::*;
-use crate::FilterParameters;
+use crate::FilterParams;
 use femtovg::ImageFlags;
 use femtovg::ImageId;
 use femtovg::RenderTarget;
 use femtovg::{Paint, Path};
 use std::cell::RefCell;
+use std::pin::Pin;
 use std::rc::Rc;
 use std::sync::Arc;
 use vizia::*;
-
-use vst::host::Host;
-use vst::plugin::HostCallback;
-use vst::plugin::PluginParameters;
+use nih_plug::prelude::{Param, ParamSetter};
+// use vst::host::Host;
+// use vst::plugin::HostCallback;
+// use vst::plugin::PluginParameters;
 const ICON_DOWN_OPEN: &str = "\u{e75c}";
 
 use std::f32::consts::PI;
 
 #[derive(Lens)]
 pub struct UiData {
-    params: Arc<FilterParameters>,
-    host: Option<HostCallback>,
+    pub context: Arc<dyn GuiContext>,
+    params: Pin<Arc<FilterParams>>,
+    // host: Option<HostCallback>,
     filter_circuits: Vec<String>,
     choice: String,
     show_phase: bool,
@@ -32,6 +38,7 @@ pub enum ParamChangeEvent {
     AllParams(i32, f32),
     CircuitEvent(String),
     ChangeBodeView(),
+    
 }
 
 impl Model for UiData {
@@ -39,24 +46,26 @@ impl Model for UiData {
         if let Some(param_change_event) = event.message.downcast() {
             match param_change_event {
                 ParamChangeEvent::AllParams(parameter_index, new_value) => {
+                    let setter = ParamSetter::new(self.context.as_ref());
+                    setter.set_parameter_normalized(&self.params.cutoff, *new_value);
                     // host needs to know that the parameter should/has changed
-                    if let Some(host) = self.host {
-                        host.begin_edit(*parameter_index);
-                        host.automate(*parameter_index, *new_value);
-                        host.end_edit(*parameter_index);
-                    }
-                    // set_parameter is on the PluginParameters trait
-                    else {
-                        self.params.set_parameter(*parameter_index, *new_value);
-                    }
+                    // if let Some(host) = self.host {
+                    //     host.begin_edit(*parameter_index);
+                    //     host.automate(*parameter_index, *new_value);
+                    //     host.end_edit(*parameter_index);
+                    // }
+                    // // set_parameter is on the PluginParameters trait
+                    // else {
+                        // self.params.set_parameter(*parameter_index, *new_value);
+                    // }
                 }
 
                 ParamChangeEvent::CircuitEvent(circuit_name) => {
-                    if circuit_name == "SVF" {
-                        self.params.set_parameter(3, 0.);
-                    } else {
-                        self.params.set_parameter(3, 1.);
-                    }
+                    // if circuit_name == "SVF" {
+                    //     self.params.set_parameter(3, 0.);
+                    // } else {
+                    //     self.params.set_parameter(3, 1.);
+                    // }
                     self.choice = circuit_name.to_string();
                 }
                 ParamChangeEvent::ChangeBodeView() => {
@@ -67,12 +76,13 @@ impl Model for UiData {
     }
 }
 
-pub fn plugin_gui(cx: &mut Context, state: Arc<EditorState>) {
+pub fn plugin_gui(cx: &mut Context, params: Pin<Arc<FilterParams>>, context: Arc<dyn GuiContext>) {
     UiData {
-        params: state.params.clone(),
-        host: state.host,
+        context: context.clone(),
+        params: params.clone(),
+        // host: state.host,
         filter_circuits: vec!["SVF".to_string(), "Transistor Ladder".to_string()],
-        choice: if state.params.filter_type.get() == 0 {
+        choice: if params.filter_type.value() == Circuits::SVF {
             "SVF".to_string()
         } else {
             "Transistor Ladder".to_string()
@@ -123,26 +133,27 @@ pub fn plugin_gui(cx: &mut Context, state: Arc<EditorState>) {
 
         // The filter control knobs
         HStack::new(cx, |cx| {
+            // UiData::params.filter_type;
             // Cutoff
-            make_knob(cx, 0);
+            // make_knob(cx, 0);
             // Resonance
-            make_knob(cx, 1);
+            // make_knob(cx, 1);
             // Drive
-            make_knob(cx, 2);
+            make_knob(cx, "cutoff", UiData::params.map(|params| params.cutoff.normalized_value()), UiData::params.map(|params| params.cutoff.to_string()), &params.cutoff);
             // Mode/ Slope
             Binding::new(
                 cx,
-                UiData::params.map(|params| params.filter_type.get()),
+                UiData::params.map(|params| params.filter_type.value() as usize),
                 move |cx, ft| {
                     if *ft.get(cx) == 0 {
                         let param = &UiData::params.get(cx).mode;
-                        let steps = (param.max - param.min + 1.) as usize;
+                        // let steps = (param.max - param.min + 1.) as usize;
 
-                        make_steppy_knob(cx, 4, steps, 270.);
+                        // make_steppy_knob(cx, 4, steps, 270.);
                     } else {
-                        let param = &UiData::params.get(cx).slope;
-                        let steps = (param.max - param.min + 1.) as usize;
-                        make_steppy_knob(cx, 5, steps, 270.);
+                        // let param = &UiData::params.get(cx).slope;
+                        // let steps = (param.max - param.min + 1.) as usize;
+                        // make_steppy_knob(cx, 5, steps, 270.);
                     }
                 },
             );
@@ -160,20 +171,27 @@ pub fn plugin_gui(cx: &mut Context, state: Arc<EditorState>) {
     .class("container");
 }
 // makes a knob linked to a parameter
-fn make_knob(cx: &mut Context, param_index: i32) -> Handle<VStack> {
+// fn make_knob<'a, P: Param>(cx: &mut Context, param: &'a P, setter: &'a ParamSetter<'a>) // -> Handle<VStack> 
+fn make_knob<'a, L1, L2, P: Param>(cx: &mut Context, name: &str, norm_val: L1, param_text: L2, param: &'a P) // -> Handle<VStack> 
+where L1: Lens<Target = f32>, L2: Lens<Target = String>
+{
     VStack::new(cx, move |cx| {
         Label::new(
             cx,
-            UiData::params.map(move |params| params.get_parameter_name(param_index)),
+            // UiData::params.map(move |params| {
+            //     // params.get_parameter_name(param_index);
+            //     // params.
+            //     ""
+            // })
+            name,
         );
 
         Knob::custom(
             cx,
-            UiData::params.get(cx).get_parameter_default(param_index),
+            // UiData::params.get(cx).get_parameter_default(param_index),
+            0.5,
             // params.get(cx).get_parameter(param_index),
-            UiData::params.map(move |params| {
-                params.get_parameter(param_index)
-            }),
+            norm_val,
             move |cx, lens| {
                 TickKnob::new(
                     cx,
@@ -198,69 +216,71 @@ fn make_knob(cx: &mut Context, param_index: i32) -> Handle<VStack> {
                 .class("track")
             },
         )
-        .on_changing(move |cx, val| cx.emit(ParamChangeEvent::AllParams(param_index, val)));
+        .on_changing(move |cx, val| cx.emit(
+            // setter.set_parameter_normalized(param, val);
+            ParamChangeEvent::AllParams(0, val)));
 
         Label::new(
             cx,
-            UiData::params.map(move |params| params.get_parameter_text(param_index)),
+            param_text,
         );
     })
     .child_space(Stretch(1.0))
-    .row_between(Pixels(10.0))
+    .row_between(Pixels(10.0));
 }
 // using Knob::custom() to make a stepped knob with tickmarks indicating the steps
-fn make_steppy_knob(
-    cx: &mut Context,
-    param_index: i32,
-    steps: usize,
-    arc_len: f32,
-) -> Handle<VStack> {
-    VStack::new(cx, move |cx| {
-        Label::new(
-            cx,
-            UiData::params.map(move |params| params.get_parameter_name(param_index)),
-        );
+// fn make_steppy_knob(
+//     cx: &mut Context,
+//     param_index: i32,
+//     steps: usize,
+//     arc_len: f32,
+// ) -> Handle<VStack> {
+//     VStack::new(cx, move |cx| {
+//         Label::new(
+//             cx,
+//             UiData::params.map(move |params| params.get_parameter_name(param_index)),
+//         );
 
-        Knob::custom(
-            cx,
-            UiData::params.get(cx).get_parameter_default(param_index),
-            UiData::params.map(move |params| {
-                params.get_parameter(param_index)
-            }),
-            move |cx, lens| {
-                let mode = KnobMode::Discrete(steps);
-                Ticks::new(
-                    cx,
-                    Percentage(100.0),
-                    Percentage(25.0),
-                    // Pixels(2.),
-                    Pixels(2.0),
-                    arc_len,
-                    mode,
-                )
-                .class("track");
-                TickKnob::new(
-                    cx,
-                    Percentage(80.0),
-                    Pixels(4.),
-                    Percentage(50.0),
-                    arc_len,
-                    mode,
-                )
-                .value(lens)
-                .class("tick")
-            },
-        )
-        .on_changing(move |cx, val| cx.emit(ParamChangeEvent::AllParams(param_index, val)));
+//         Knob::custom(
+//             cx,
+//             UiData::params.get(cx).get_parameter_default(param_index),
+//             UiData::params.map(move |params| {
+//                 params.get_parameter(param_index)
+//             }),
+//             move |cx, lens| {
+//                 let mode = KnobMode::Discrete(steps);
+//                 Ticks::new(
+//                     cx,
+//                     Percentage(100.0),
+//                     Percentage(25.0),
+//                     // Pixels(2.),
+//                     Pixels(2.0),
+//                     arc_len,
+//                     mode,
+//                 )
+//                 .class("track");
+//                 TickKnob::new(
+//                     cx,
+//                     Percentage(80.0),
+//                     Pixels(4.),
+//                     Percentage(50.0),
+//                     arc_len,
+//                     mode,
+//                 )
+//                 .value(lens)
+//                 .class("tick")
+//             },
+//         )
+//         .on_changing(move |cx, val| cx.emit(ParamChangeEvent::AllParams(param_index, val)));
 
-        Label::new(
-            cx,
-            UiData::params.map(move |params| params.get_parameter_text(param_index)),
-        );
-    })
-    .child_space(Stretch(1.0))
-    .row_between(Pixels(10.0))
-}
+//         Label::new(
+//             cx,
+//             UiData::params.map(move |params| params.get_parameter_text(param_index)),
+//         );
+//     })
+//     .child_space(Stretch(1.0))
+//     .row_between(Pixels(10.0))
+// }
 
 pub struct BodePlot {
     image: Rc<RefCell<Option<ImageId>>>,
@@ -289,13 +309,13 @@ impl View for BodePlot {
             let min;
             //
             if ui_data.show_phase {
-                if params.filter_type.get() == 0 {
-                    let mode = params.mode.get();
+                if params.filter_type.value() == Circuits::SVF {
+                    let mode = params.mode.value() as usize;
                     amps = get_phase_response(
-                        params.cutoff.get(),
+                        params.cutoff.value,
                         params.zeta.get(),
                         mode,
-                        params.filter_type.get(),
+                        params.filter_type.value() as usize,
                         width,
                     );
                     if mode == 0 {
@@ -311,14 +331,14 @@ impl View for BodePlot {
                     }
                 } else {
                     amps = get_phase_response(
-                        params.cutoff.get(),
+                        params.cutoff.value,
                         // 2.,
                         params.k_ladder.get(),
-                        params.slope.get(),
-                        params.filter_type.get(),
+                        params.slope.value() as usize,
+                        params.filter_type.value() as usize,
                         width,
                     );
-                    if params.slope.get() > 1 {
+                    if params.slope.value() as usize > 1 {
                         max = PI;
                         min = -PI;
                     } else {
@@ -330,21 +350,21 @@ impl View for BodePlot {
                 // min and max amplitude values that will be rendered
                 min = -60.0;
                 max = 40.0;
-                if params.filter_type.get() == 0 {
+                if params.filter_type.value() == Circuits::SVF {
                     amps = get_amplitude_response(
-                        params.cutoff.get(),
+                        params.cutoff.value,
                         params.zeta.get(),
-                        params.mode.get(),
-                        params.filter_type.get(),
+                        params.mode.value() as usize,
+                        params.filter_type.value() as usize,
                         width,
                     );
                 } else {
                     amps = get_amplitude_response(
-                        params.cutoff.get(),
+                        params.cutoff.value,
                         // 2.,
                         params.k_ladder.get(),
-                        params.slope.get(),
-                        params.filter_type.get(),
+                        params.slope.value() as usize,
+                        params.filter_type.value() as usize,
                         width,
                     );
                 }

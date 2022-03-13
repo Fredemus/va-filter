@@ -1,5 +1,6 @@
-use crate::filter_parameters::FilterParameters;
-use crate::utils::AtomicOps;
+// use crate::filter_parameters::FilterParameters;
+// use crate::filter_params_nih::{FilterParams, SvfMode};
+use crate::{utils::AtomicOps, filter_params_nih::{FilterParams, SvfMode}};
 // use packed_simd::f32x4;
 use core_simd::f32x4;
 use std::sync::Arc;
@@ -43,13 +44,20 @@ enum EstimateSource {
     LinearVoutEstimate,  // use linear estimate of Vout
 }
 pub struct LadderFilter {
-    pub params: Arc<FilterParameters>,
+    pub params: Arc<FilterParams>,
 
     vout: [f32x4; 4],
     s: [f32x4; 4],
 }
 #[allow(dead_code)]
 impl LadderFilter {
+    pub fn new(params: Arc<FilterParams>) -> Self {
+        Self {
+            params,
+            vout: [f32x4::splat(0.); 4],
+            s: [f32x4::splat(0.); 4],
+        }
+    }
     fn get_estimate(&mut self, n: usize, estimate: EstimateSource, input: f32x4) -> f32x4 {
         // if we ask for an estimate based on the linear filter, we have to run it
         if estimate == EstimateSource::LinearStateEstimate
@@ -118,7 +126,7 @@ impl LadderFilter {
         self.vout[1] = g1 * (g * a[2] * self.vout[0] + self.s[1]);
         self.vout[2] = g2 * (g * a[3] * self.vout[1] + self.s[2]);
 
-        self.vout[self.params.slope.get()]
+        self.vout[self.params.slope.value() as usize ]
     }
     // linear version without distortion
     pub fn run_filter_linear(&mut self, input: f32x4) -> f32x4 {
@@ -138,7 +146,7 @@ impl LadderFilter {
         self.vout[0] = g0 * (g * (input - k * self.vout[3]) + self.s[0]);
         self.vout[1] = g0 * (g * self.vout[0] + self.s[1]);
         self.vout[2] = g0 * (g * self.vout[1] + self.s[2]);
-        self.vout[self.params.slope.get()]
+        self.vout[self.params.slope.value() as usize]
     }
     pub fn run_filter_newton(&mut self, input: f32x4) -> f32x4 {
         // ---------- setup ----------
@@ -167,7 +175,7 @@ impl LadderFilter {
         // println!("vest: {:?}", v_est);
         // let max_error = 0.00001;
         let max_error = f32x4::splat(0.00001);
-        // let mut n_iterations = 0;
+        let mut n_iterations = 0;
 
         // f32x4.lt(max_error) returns a mask.
         while residue[0].abs().lanes_gt(max_error).any()
@@ -176,6 +184,10 @@ impl LadderFilter {
             || residue[3].abs().lanes_gt(max_error).any()
         // && n_iterations < 9
         {
+            n_iterations += 1;
+            if n_iterations > 9 {
+                println!("TOO MANY ITS");
+            }
             let one = f32x4::splat(1.);
             // jacobian matrix
             let j10 = g * (one - tanh_y1_est * tanh_y1_est);
@@ -215,20 +227,29 @@ impl LadderFilter {
             // n_iterations += 1;
         }
         self.vout = v_est;
-        self.vout[self.params.slope.get()]
+        self.vout[self.params.slope.value() as usize]
     }
     // performs a complete filter process (newton-raphson method)
     pub fn tick_newton(&mut self, input: f32x4) -> f32x4 {
         // perform filter process
-        let out = self.run_filter_newton(input * f32x4::splat(self.params.drive.get() + 1.));
+        let out = self.run_filter_newton(input * f32x4::splat(self.params.drive.value + 1.));
         // update ic1eq and ic2eq for next sample
         self.update_state();
-        out * f32x4::splat((1. + self.params.k_ladder.get()) / (self.params.drive.get() * 0.5 + 1.))
+        out * f32x4::splat((1. + self.params.k_ladder.get()) / (self.params.drive.value * 0.5 + 1.))
     }
     // performs a complete filter process (newton-raphson method)
     pub fn tick_pivotal(&mut self, input: f32x4) -> f32x4 {
         // perform filter process
-        let out = self.run_filter_pivotal(input * f32x4::splat(self.params.drive.get() + 1.));
+        let out = self.run_filter_pivotal(input * f32x4::splat(self.params.drive.value + 1.));
+        // update ic1eq and ic2eq for next sample
+        self.update_state();
+        out
+    }
+    // performs a complete filter process (newton-raphson method)
+    pub fn tick_linear(&mut self, input: f32x4) -> f32x4 {
+        // perform filter process
+        // let out = self.run_filter_linear(input * f32x4::splat(self.params.drive.value + 1.));
+        let out = self.run_filter_linear(input);
         // update ic1eq and ic2eq for next sample
         self.update_state();
         out
@@ -236,12 +257,19 @@ impl LadderFilter {
 }
 // this is a 2-pole filter with resonance, which is why there's 2 states and vouts
 pub struct SVF {
-    pub params: Arc<FilterParameters>,
+    pub params: Arc<FilterParams>,
     vout: [f32x4; 2],
     s: [f32x4; 2],
 }
 #[allow(dead_code)]
 impl SVF {
+    pub fn new(params: Arc<FilterParams>) -> Self {
+        Self {
+            params,
+            vout: [f32x4::splat(0.); 2],
+            s: [f32x4::splat(0.); 2],
+        }
+    }
     // the state needs to be updated after each process. Found by trapezoidal integration
     #[inline]
     fn update_state(&mut self) {
@@ -266,7 +294,7 @@ impl SVF {
     // performs a complete filter process (fixed-pivot method)
     fn tick_pivotal(&mut self, input: f32x4) -> f32x4 {
         // perform filter process
-        let out = self.run_svf_pivotal(input * f32x4::splat(self.params.drive.get() + 1.));
+        let out = self.run_svf_pivotal(input * f32x4::splat(self.params.drive.value + 1.));
         // update ic1eq and ic2eq for next sample
         self.update_state();
         out
@@ -274,12 +302,12 @@ impl SVF {
     // performs a complete filter process (Newton's method)
     pub fn tick_newton(&mut self, input: f32x4) -> f32x4 {
         // perform filter process
-        let mut out = self.run_svf_newton(input * f32x4::splat(self.params.drive.get() + 1.));
+        let mut out = self.run_svf_newton(input * f32x4::splat(self.params.drive.value + 1.));
         // staturating the output and adding some gain compensation for drive
         // should be similar to the EDP Wasp filter
         // TODO: check if tanh distortion feels too strong. If so, implement a simd_asinh or smth
         out = tanh_levien(out * f32x4::splat(0.5))
-            * f32x4::splat(2. / (self.params.drive.get() * 0.5 + 1.));
+            * f32x4::splat(2. / (self.params.drive.value * 0.5 + 1.));
         // update ic1eq and ic2eq for next sample
         self.update_state();
 
@@ -424,32 +452,32 @@ impl SVF {
     /// here the output is chosen to give the specified type of filter
     #[inline(always)]
     fn get_output(&self, input: f32x4, k: f32x4) -> f32x4 {
-        match self.params.mode.get() {
-            0 => self.vout[1],                            // lowpass
-            1 => input - k * self.vout[0] - self.vout[1], // highpass
-            2 => self.vout[0],                            // bandpass
-            3 => input - k * self.vout[0],                // notch
+        match self.params.mode.value() {
+            SvfMode::LP => self.vout[1],                            // lowpass
+            SvfMode::HP => input - k * self.vout[0] - self.vout[1], // highpass
+            SvfMode::BP1 => self.vout[0],                            // bandpass
+            SvfMode::Notch => input - k * self.vout[0],                // notch
             //3 => input - 2. * k * self.vout[1], // allpass
-            4 => k * self.vout[0], // bandpass (normalized peak gain)
-            _ => input - f32x4::splat(2.) * self.vout[1] - k * self.vout[0], // peak / resonator thingy
+            SvfMode::BP2 => k * self.vout[0], // bandpass (normalized peak gain)
+            // _ => input - f32x4::splat(2.) * self.vout[1] - k * self.vout[0], // peak / resonator thingy
         }
     }
 }
-impl Default for SVF {
-    fn default() -> Self {
-        Self {
-            params: Arc::new(FilterParameters::default()),
-            vout: [f32x4::splat(0.); 2],
-            s: [f32x4::splat(0.); 2],
-        }
-    }
-}
-impl Default for LadderFilter {
-    fn default() -> Self {
-        Self {
-            params: Arc::new(FilterParameters::default()),
-            vout: [f32x4::splat(0.); 4],
-            s: [f32x4::splat(0.); 4],
-        }
-    }
-}
+// impl Default for SVF {
+//     fn default() -> Self {
+//         Self {
+//             params: Arc::new(FilterParams::new()),
+//             vout: [f32x4::splat(0.); 2],
+//             s: [f32x4::splat(0.); 2],
+//         }
+//     }
+// }
+// impl Default for LadderFilter {
+//     fn default() -> Self {
+//         Self {
+//             params: Arc::new(FilterParams::default()),
+//             vout: [f32x4::splat(0.); 4],
+//             s: [f32x4::splat(0.); 4],
+//         }
+//     }
+// }
