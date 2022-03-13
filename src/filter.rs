@@ -1,6 +1,9 @@
 // use crate::filter_parameters::FilterParameters;
 // use crate::filter_params_nih::{FilterParams, SvfMode};
-use crate::{utils::AtomicOps, filter_params_nih::{FilterParams, SvfMode}};
+use crate::{
+    filter_params_nih::{FilterParams, SvfMode},
+    utils::AtomicOps,
+};
 // use packed_simd::f32x4;
 use core_simd::f32x4;
 use std::sync::Arc;
@@ -126,7 +129,7 @@ impl LadderFilter {
         self.vout[1] = g1 * (g * a[2] * self.vout[0] + self.s[1]);
         self.vout[2] = g2 * (g * a[3] * self.vout[1] + self.s[2]);
 
-        self.vout[self.params.slope.value() as usize ]
+        self.vout[self.params.slope.value() as usize]
     }
     // linear version without distortion
     pub fn run_filter_linear(&mut self, input: f32x4) -> f32x4 {
@@ -455,11 +458,11 @@ impl SVF {
         match self.params.mode.value() {
             SvfMode::LP => self.vout[1],                            // lowpass
             SvfMode::HP => input - k * self.vout[0] - self.vout[1], // highpass
-            SvfMode::BP1 => self.vout[0],                            // bandpass
-            SvfMode::Notch => input - k * self.vout[0],                // notch
+            SvfMode::BP1 => self.vout[0],                           // bandpass
+            SvfMode::Notch => input - k * self.vout[0],             // notch
             //3 => input - 2. * k * self.vout[1], // allpass
             SvfMode::BP2 => k * self.vout[0], // bandpass (normalized peak gain)
-            // _ => input - f32x4::splat(2.) * self.vout[1] - k * self.vout[0], // peak / resonator thingy
+                                              // _ => input - f32x4::splat(2.) * self.vout[1] - k * self.vout[0], // peak / resonator thingy
         }
     }
 }

@@ -6,11 +6,8 @@
 use super::utils::*;
 use std::{f32::consts::PI, sync::atomic::AtomicBool};
 // use std::sync::atomic::Ordering;
-use nih_plug::{prelude::*};
-use std::{
-    pin::Pin,
-    sync::Arc,
-};
+use nih_plug::prelude::*;
+use std::{pin::Pin, sync::Arc};
 
 #[derive(Params)]
 pub struct FilterParams {
@@ -29,19 +26,16 @@ pub struct FilterParams {
 
     #[id = "circuit"]
     pub filter_type: EnumParam<Circuits>,
-   
+
     pub g: AtomicF32,
     pub sample_rate: AtomicF32,
     pub zeta: AtomicF32,
     pub k_ladder: AtomicF32,
-    
 }
 
 impl FilterParams {
     pub fn new(should_update_filter: Arc<AtomicBool>) -> Self {
         let a = Self {
-            
-
             // Smoothed parameters don't need the callback as we can just look at whether the
             // smoother is still smoothing
             // TODO: Need a callback here I think to update g?
@@ -60,27 +54,22 @@ impl FilterParams {
             .with_value_to_string(formatters::f32_rounded(0))
             .with_callback(Arc::new({
                 let should_update_filter = should_update_filter.clone();
-                move |_| {
-                should_update_filter.store(true, std::sync::atomic::Ordering::Release)
-            }})),
+                move |_| should_update_filter.store(true, std::sync::atomic::Ordering::Release)
+            })),
 
             // resonance is a good ol' percentage
             // TODO: Need a callback here I think to update q and res?
             res: FloatParam::new(
                 "Filter Resonance",
                 0.5,
-                FloatRange::Linear {
-                    min: 0., 
-                    max: 1.,
-                },
+                FloatRange::Linear { min: 0., max: 1. },
             )
             .with_smoother(SmoothingStyle::Logarithmic(100.0))
             .with_value_to_string(formatters::f32_rounded(2))
             .with_callback(Arc::new({
                 let should_update_filter = should_update_filter.clone();
-                move |_| {
-                should_update_filter.store(true, std::sync::atomic::Ordering::Release)
-            }})),
+                move |_| should_update_filter.store(true, std::sync::atomic::Ordering::Release)
+            })),
             drive: FloatParam::new(
                 "Drive",
                 0.0,
@@ -93,23 +82,20 @@ impl FilterParams {
             // This needs quite a bit of smoothing to avoid artifacts
             .with_smoother(SmoothingStyle::Logarithmic(100.0))
             .with_unit(" dB")
-            .with_value_to_string(formatters::f32_rounded(0)),
-
+            .with_value_to_string(formatters::f32_rounded(2)),
 
             mode: EnumParam::new("Mode", SvfMode::LP),
-                // .with_callback(Arc::new(move |_| {
-                //     should_update_filters.store(true, Ordering::Release)
-                // })),
-
+            // .with_callback(Arc::new(move |_| {
+            //     should_update_filters.store(true, Ordering::Release)
+            // })),
             slope: EnumParam::new("Slope", LadderSlope::LP24),
-            
+
             filter_type: EnumParam::new("Filter type", Circuits::Ladder),
 
             k_ladder: AtomicF32::new(0.),
             zeta: AtomicF32::new(0.),
             g: AtomicF32::new(0.),
             sample_rate: AtomicF32::new(48000.),
-            
         };
         a.g.set((PI * a.cutoff.value / (a.sample_rate.get())).tan());
         a.set_resonances();
@@ -134,10 +120,6 @@ impl FilterParams {
     // }
 }
 
-
-
-
-
 #[derive(Enum, Debug, PartialEq)]
 pub enum SvfMode {
     LP,
@@ -158,8 +140,6 @@ pub enum Circuits {
     SVF,
     Ladder,
 }
-
-
 
 // pub struct FilterParameters {
 //     pub g: AtomicF32,
