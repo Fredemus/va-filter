@@ -8,9 +8,9 @@ edition = "2018"
 [lib]
 name = "svf_gui"
 crate-type = ["cdylib"]
-# [[bin]]
-# name = "svf_gui_bin"
-# path = "src/bin.rs"
+[[bin]]
+name = "svf_gui_bin"
+path = "src/bin.rs"
 [dependencies]
 # vst = { git = "https://github.com/rust-dsp/rust-vst" }
 nih_plug = { git = "https://github.com/robbert-vdh/nih-plug", features = ["assert_process_allocs"] }

@@ -13,6 +13,7 @@ const STYLE: &str = include_str!("style.css");
 pub const WINDOW_WIDTH: u32 = 512;
 pub const WINDOW_HEIGHT: u32 = 512;
 
+#[allow(dead_code)]
 pub fn create_vizia_editor<U>(update: U) -> Option<Box<dyn Editor>>
 where
     U: Fn(&mut Context, Arc<dyn GuiContext>) + 'static + Send + Sync,

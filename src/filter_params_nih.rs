@@ -96,7 +96,7 @@ impl FilterParams {
             g: AtomicF32::new(0.),
             sample_rate: AtomicF32::new(48000.),
         };
-        a.g.set((PI * a.cutoff.value / (a.sample_rate.get())).tan());
+        a.update_g(a.cutoff.value);
         a.set_resonances(a.res.value);
         a
     }
@@ -106,8 +106,7 @@ impl FilterParams {
         self.k_ladder.set(res.powi(2) * 3.8 - 0.2);
     }
     pub fn update_g(&self, val: f32) {
-        self.g
-            .set((PI * val / (self.sample_rate.get())).tan());
+        self.g.set((PI * val / (self.sample_rate.get())).tan());
     }
     // pub fn get_param<P: Param>(&self, index: usize) -> Box<dyn Param<Plain = f32>>
     // {

@@ -162,14 +162,13 @@ impl Plugin for VST {
             let processed = match self.params.filter_type.value() {
                 filter_params_nih::Circuits::SVF => self.svf.tick_newton(frame),
                 filter_params_nih::Circuits::Ladder => self.ladder.tick_newton(frame),
-            }; 
-            
+            };
+
             // let processed = self.ladder.tick_linear(frame);
             let frame_out = *processed.as_array();
             // let frame_out = *frame.as_array();
             *channel_samples.get_mut(0).unwrap() = frame_out[0];
             *channel_samples.get_mut(1).unwrap() = frame_out[1];
-
         }
 
         ProcessStatus::Normal

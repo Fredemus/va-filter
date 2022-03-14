@@ -342,7 +342,8 @@ fn make_steppy_knob<'a, L1, L2>(
             cx,
             // UiData::params.map(move |params| params.get_parameter_text(param_index)),
             param_text,
-        ).width(Pixels(100.));
+        )
+        .width(Pixels(100.));
     })
     .child_space(Stretch(1.0))
     .row_between(Pixels(10.0));
