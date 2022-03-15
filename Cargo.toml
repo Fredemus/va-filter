@@ -31,3 +31,7 @@ std_float = { git = "https://github.com/rust-lang/portable-simd" }
 # data serialization for presets 
 # serde = { version = "1.0.130", features = ["derive"] }
 bincode = "1.3.3"
+
+
+[workspace]
+members = ["xtask"]
