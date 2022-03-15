@@ -35,6 +35,8 @@ pub struct UiData {
 
 #[derive(Debug)]
 pub enum ParamChangeEvent {
+    BeginSet(i32),
+    EndSet(i32),
     AllParams(i32, f32),
     CircuitEvent(String),
     ChangeBodeView(),
@@ -65,6 +67,27 @@ impl Model for UiData {
                     // self.params.set_parameter(*parameter_index, *new_value);
                     // }
                 }
+                ParamChangeEvent::BeginSet(parameter_index) => {
+                    match *parameter_index {
+                        0 => setter.begin_set_parameter(&self.params.cutoff),
+                        1 => setter.begin_set_parameter(&self.params.res),
+                        2 => setter.begin_set_parameter(&self.params.drive),
+                        3 => setter.begin_set_parameter(&self.params.filter_type),
+                        4 => setter.begin_set_parameter(&self.params.mode),
+                        _ => setter.begin_set_parameter(&self.params.slope),
+                    }
+                }
+                ParamChangeEvent::EndSet(parameter_index) => {
+                    match *parameter_index {
+                        0 => setter.end_set_parameter(&self.params.cutoff),
+                        1 => setter.end_set_parameter(&self.params.res),
+                        2 => setter.end_set_parameter(&self.params.drive),
+                        3 => setter.end_set_parameter(&self.params.filter_type),
+                        4 => setter.end_set_parameter(&self.params.mode),
+                        _ => setter.end_set_parameter(&self.params.slope),
+                    }
+                }
+
 
                 ParamChangeEvent::CircuitEvent(circuit_name) => {
                     if circuit_name == "SVF" {
@@ -272,13 +295,23 @@ where
                 .value(lens)
                 .class("track")
             },
-        )
-        .on_changing(move |cx, val| {
+        ).on_changing(move |cx, val| {
             cx.emit(
                 // setter.set_parameter_normalized(param, val);
                 ParamChangeEvent::AllParams(param_index, val),
             )
-        });
+        }).on_press(move |cx| {
+            cx.emit(
+                // setter.set_parameter_normalized(param, val);
+                ParamChangeEvent::BeginSet(param_index),
+            )
+        }).on_release(move |cx| {
+            cx.emit(
+                // setter.set_parameter_normalized(param, val);
+                ParamChangeEvent::EndSet(param_index),
+            )
+        })
+        ;
 
         Label::new(cx, param_text).width(Pixels(100.));
     })

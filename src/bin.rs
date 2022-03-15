@@ -40,7 +40,6 @@ struct ParamSetGuy();
 
 impl GuiContext for ParamSetGuy {
     unsafe fn raw_begin_set_parameter(&self, _param: nih_plug::param::internals::ParamPtr) {
-        unimplemented!()
     }
 
     unsafe fn raw_set_parameter_normalized(
@@ -52,7 +51,6 @@ impl GuiContext for ParamSetGuy {
     }
 
     unsafe fn raw_end_set_parameter(&self, _param: nih_plug::param::internals::ParamPtr) {
-        unimplemented!()
     }
 
     unsafe fn raw_default_normalized_param_value(

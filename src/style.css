@@ -24,8 +24,9 @@
 .bode {
     height: 200px;
     width: 360px;
-    color: #ffb74d;
-    child-space: 1s;
+    color: #1eafaf;
+    /* color: #ffb74d; */
+     child-space: 1s;
     border-width: 1px;
     border-color: white;
 }
@@ -89,5 +90,5 @@ knob .tick {
 }
 
 knob .track {
-    background-color: #ffb74d;
+    background-color: #1eafaf;
 }
