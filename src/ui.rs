@@ -2,6 +2,7 @@
 mod plot;
 use crate::filter_params_nih::Circuits;
 use nih_plug::context::GuiContext;
+use nih_plug::param::internals::ParamPtr;
 use plot::{get_amplitude_response, get_phase_response};
 // use crate::editor::{get_amplitude_response, get_phase_response};
 use crate::utils::*;
@@ -25,7 +26,7 @@ use std::f32::consts::PI;
 
 #[derive(Lens)]
 pub struct UiData {
-    pub context: Arc<dyn GuiContext>,
+    pub gui_context: Arc<dyn GuiContext>,
     params: Pin<Arc<FilterParams>>,
     // host: Option<HostCallback>,
     filter_circuits: Vec<String>,
@@ -35,9 +36,10 @@ pub struct UiData {
 
 #[derive(Debug)]
 pub enum ParamChangeEvent {
-    BeginSet(i32),
-    EndSet(i32),
-    AllParams(i32, f32),
+    BeginSet(ParamPtr),
+    EndSet(ParamPtr),
+    SetParam(ParamPtr, f32),
+    
     CircuitEvent(String),
     ChangeBodeView(),
 }
@@ -45,50 +47,18 @@ pub enum ParamChangeEvent {
 impl Model for UiData {
     fn event(&mut self, _cx: &mut Context, event: &mut Event) {
         if let Some(param_change_event) = event.message.downcast() {
-            let setter = ParamSetter::new(self.context.as_ref());
+            let setter = ParamSetter::new(self.gui_context.as_ref());
             match param_change_event {
-                ParamChangeEvent::AllParams(parameter_index, new_value) => {
-                    match *parameter_index {
-                        0 => setter.set_parameter_normalized(&self.params.cutoff, *new_value),
-                        1 => setter.set_parameter_normalized(&self.params.res, *new_value),
-                        2 => setter.set_parameter_normalized(&self.params.drive, *new_value),
-                        3 => setter.set_parameter_normalized(&self.params.filter_type, *new_value),
-                        4 => setter.set_parameter_normalized(&self.params.mode, *new_value),
-                        _ => setter.set_parameter_normalized(&self.params.slope, *new_value),
-                    }
-                    // host needs to know that the parameter should/has changed
-                    // if let Some(host) = self.host {
-                    //     host.begin_edit(*parameter_index);
-                    //     host.automate(*parameter_index, *new_value);
-                    //     host.end_edit(*parameter_index);
-                    // }
-                    // // set_parameter is on the PluginParameters trait
-                    // else {
-                    // self.params.set_parameter(*parameter_index, *new_value);
-                    // }
+                ParamChangeEvent::SetParam(param_ptr, new_value) => {
+                    unsafe { self.gui_context.raw_set_parameter_normalized(*param_ptr, *new_value) };
                 }
-                ParamChangeEvent::BeginSet(parameter_index) => {
-                    match *parameter_index {
-                        0 => setter.begin_set_parameter(&self.params.cutoff),
-                        1 => setter.begin_set_parameter(&self.params.res),
-                        2 => setter.begin_set_parameter(&self.params.drive),
-                        3 => setter.begin_set_parameter(&self.params.filter_type),
-                        4 => setter.begin_set_parameter(&self.params.mode),
-                        _ => setter.begin_set_parameter(&self.params.slope),
-                    }
+                
+                ParamChangeEvent::BeginSet(param_ptr) => {
+                    unsafe { self.gui_context.raw_begin_set_parameter(*param_ptr) };
                 }
-                ParamChangeEvent::EndSet(parameter_index) => {
-                    match *parameter_index {
-                        0 => setter.end_set_parameter(&self.params.cutoff),
-                        1 => setter.end_set_parameter(&self.params.res),
-                        2 => setter.end_set_parameter(&self.params.drive),
-                        3 => setter.end_set_parameter(&self.params.filter_type),
-                        4 => setter.end_set_parameter(&self.params.mode),
-                        _ => setter.end_set_parameter(&self.params.slope),
-                    }
+                ParamChangeEvent::EndSet(param_ptr) => {
+                    unsafe { self.gui_context.raw_end_set_parameter(*param_ptr) };
                 }
-
-
                 ParamChangeEvent::CircuitEvent(circuit_name) => {
                     if circuit_name == "SVF" {
                         setter.set_parameter_normalized(&self.params.filter_type, 0.);
@@ -108,7 +78,7 @@ impl Model for UiData {
 
 pub fn plugin_gui(cx: &mut Context, params: Pin<Arc<FilterParams>>, context: Arc<dyn GuiContext>) {
     UiData {
-        context: context.clone(),
+        gui_context: context.clone(),
         params: params.clone(),
         // host: state.host,
         filter_circuits: vec!["SVF".to_string(), "Transistor Ladder".to_string()],
@@ -166,32 +136,32 @@ pub fn plugin_gui(cx: &mut Context, params: Pin<Arc<FilterParams>>, context: Arc
             // UiData::params.filter_type;
             // Cutoff
             // make_knob(cx, 0);
+            let param_lens = UiData::params.map(|params| params.cutoff.as_ptr());
             make_knob(
                 cx,
-                0,
                 "Cut",
                 UiData::params.map(|params| params.cutoff.normalized_value()),
                 UiData::params.map(|params| params.cutoff.to_string()),
-                &params.cutoff,
+                params.cutoff.as_ptr(),
+                // param_lens
+                
             );
             // Resonance
             // make_knob(cx, 1);
             make_knob(
                 cx,
-                1,
                 "Res",
                 UiData::params.map(|params| params.res.normalized_value()),
                 UiData::params.map(|params| params.res.to_string()),
-                &params.res,
+                params.res.as_ptr(),
             );
             // Drive
             make_knob(
                 cx,
-                2,
                 "Drive",
                 UiData::params.map(|params| params.drive.normalized_value()),
                 UiData::params.map(|params| params.drive.to_string()),
-                &params.drive,
+                params.drive.as_ptr(),
             );
             // Mode/ Slope
             Binding::new(
@@ -204,23 +174,23 @@ pub fn plugin_gui(cx: &mut Context, params: Pin<Arc<FilterParams>>, context: Arc
                         let steps = 5;
                         make_steppy_knob(
                             cx,
-                            4,
                             steps,
                             270.,
                             "Mode",
                             UiData::params.map(|params| params.mode.normalized_value()),
                             UiData::params.map(|params| params.mode.to_string()),
+                            params.mode.as_ptr()
                         );
                     } else {
                         let steps = 4;
                         make_steppy_knob(
                             cx,
-                            5,
                             steps,
                             270.,
                             "Slope",
                             UiData::params.map(|params| params.slope.normalized_value()),
                             UiData::params.map(|params| params.slope.to_string()),
+                            params.slope.as_ptr()
                         );
                         // let param = &UiData::params.get(cx).slope;
                         // let steps = (param.max - param.min + 1.) as usize;
@@ -243,18 +213,20 @@ pub fn plugin_gui(cx: &mut Context, params: Pin<Arc<FilterParams>>, context: Arc
 }
 // makes a knob linked to a parameter
 // fn make_knob<'a, P: Param>(cx: &mut Context, param: &'a P, setter: &'a ParamSetter<'a>) // -> Handle<VStack>
-fn make_knob<'a, L1, L2, P: Param>(
+fn make_knob<'a, L1, L2>(
     cx: &mut Context,
-    param_index: i32,
     name: &str,
     norm_val: L1,
     param_text: L2,
-    param: &'a P,
+    // param: &'a P,
+    param_ptr: nih_plug::param::internals::ParamPtr,
+    // param_lens: L
 )
 // -> Handle<VStack>
 where
     L1: Lens<Target = f32>,
     L2: Lens<Target = String>,
+    // L: Lens<Target = ParamPtr>,
 {
     VStack::new(cx, move |cx| {
         Label::new(
@@ -263,7 +235,8 @@ where
             //     // params.get_parameter_name(param_index);
             //     param.to_string()
             // })
-            name,
+            // param_lens.map(|param| param.name()),
+            name
         );
 
         Knob::custom(
@@ -298,17 +271,18 @@ where
         ).on_changing(move |cx, val| {
             cx.emit(
                 // setter.set_parameter_normalized(param, val);
-                ParamChangeEvent::AllParams(param_index, val),
+                // ParamChangeEvent::AllParams(param_index, val),
+                ParamChangeEvent::SetParam(param_ptr, val),
             )
         }).on_press(move |cx| {
             cx.emit(
                 // setter.set_parameter_normalized(param, val);
-                ParamChangeEvent::BeginSet(param_index),
+                ParamChangeEvent::BeginSet(param_ptr),
             )
         }).on_release(move |cx| {
             cx.emit(
                 // setter.set_parameter_normalized(param, val);
-                ParamChangeEvent::EndSet(param_index),
+                ParamChangeEvent::EndSet(param_ptr),
             )
         })
         ;
@@ -321,12 +295,12 @@ where
 // using Knob::custom() to make a stepped knob with tickmarks indicating the steps
 fn make_steppy_knob<'a, L1, L2>(
     cx: &mut Context,
-    param_index: i32,
     steps: usize,
     arc_len: f32,
     name: &str,
     norm_val: L1,
     param_text: L2,
+    param_ptr: nih_plug::param::internals::ParamPtr
 ) where
     L1: Lens<Target = f32>,
     L2: Lens<Target = String>,
@@ -368,8 +342,20 @@ fn make_steppy_knob<'a, L1, L2>(
                 .value(lens)
                 .class("tick")
             },
-        )
-        .on_changing(move |cx, val| cx.emit(ParamChangeEvent::AllParams(param_index, val)));
+        ).on_changing(move |cx, val| {
+            cx.emit(
+                ParamChangeEvent::SetParam(param_ptr, val),
+            )
+        }).on_press(move |cx| {
+            cx.emit(
+                ParamChangeEvent::BeginSet(param_ptr),
+            )
+        }).on_release(move |cx| {
+            cx.emit(
+                ParamChangeEvent::EndSet(param_ptr),
+            )
+        })
+        ;
 
         Label::new(
             cx,
