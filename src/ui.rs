@@ -136,32 +136,24 @@ pub fn plugin_gui(cx: &mut Context, params: Pin<Arc<FilterParams>>, context: Arc
             // UiData::params.filter_type;
             // Cutoff
             // make_knob(cx, 0);
-            let param_lens = UiData::params.map(|params| params.cutoff.as_ptr());
             make_knob(
                 cx,
-                "Cut",
-                UiData::params.map(|params| params.cutoff.normalized_value()),
-                UiData::params.map(|params| params.cutoff.to_string()),
                 params.cutoff.as_ptr(),
-                // param_lens
+                |params| &params.cutoff,
                 
             );
             // Resonance
             // make_knob(cx, 1);
             make_knob(
                 cx,
-                "Res",
-                UiData::params.map(|params| params.res.normalized_value()),
-                UiData::params.map(|params| params.res.to_string()),
                 params.res.as_ptr(),
+                |params| &params.res,
             );
-            // Drive
+            // // Drive
             make_knob(
                 cx,
-                "Drive",
-                UiData::params.map(|params| params.drive.normalized_value()),
-                UiData::params.map(|params| params.drive.to_string()),
                 params.drive.as_ptr(),
+                |params| &params.drive,
             );
             // Mode/ Slope
             Binding::new(
@@ -176,10 +168,8 @@ pub fn plugin_gui(cx: &mut Context, params: Pin<Arc<FilterParams>>, context: Arc
                             cx,
                             steps,
                             270.,
-                            "Mode",
-                            UiData::params.map(|params| params.mode.normalized_value()),
-                            UiData::params.map(|params| params.mode.to_string()),
-                            params.mode.as_ptr()
+                            params.mode.as_ptr(),
+                            |params| &params.mode,
                         );
                     } else {
                         let steps = 4;
@@ -187,10 +177,8 @@ pub fn plugin_gui(cx: &mut Context, params: Pin<Arc<FilterParams>>, context: Arc
                             cx,
                             steps,
                             270.,
-                            "Slope",
-                            UiData::params.map(|params| params.slope.normalized_value()),
-                            UiData::params.map(|params| params.slope.to_string()),
-                            params.slope.as_ptr()
+                            params.slope.as_ptr(),
+                            |params| &params.slope,
                         );
                         // let param = &UiData::params.get(cx).slope;
                         // let steps = (param.max - param.min + 1.) as usize;
@@ -213,30 +201,22 @@ pub fn plugin_gui(cx: &mut Context, params: Pin<Arc<FilterParams>>, context: Arc
 }
 // makes a knob linked to a parameter
 // fn make_knob<'a, P: Param>(cx: &mut Context, param: &'a P, setter: &'a ParamSetter<'a>) // -> Handle<VStack>
-fn make_knob<'a, L1, L2>(
+fn make_knob<P, F>(
     cx: &mut Context,
-    name: &str,
-    norm_val: L1,
-    param_text: L2,
-    // param: &'a P,
     param_ptr: nih_plug::param::internals::ParamPtr,
-    // param_lens: L
+    params_to_param: F,
 )
-// -> Handle<VStack>
+-> Handle<VStack>
 where
-    L1: Lens<Target = f32>,
-    L2: Lens<Target = String>,
+    P: Param,
+    F: 'static + Fn(&Pin<Arc<FilterParams>>) -> &P + Copy,
     // L: Lens<Target = ParamPtr>,
 {
     VStack::new(cx, move |cx| {
+        // doesn't need to be a lens
         Label::new(
             cx,
-            // UiData::params.map(move |params| {
-            //     // params.get_parameter_name(param_index);
-            //     param.to_string()
-            // })
-            // param_lens.map(|param| param.name()),
-            name
+            UiData::params.map(move |params| params_to_param(params).name())
         );
 
         Knob::custom(
@@ -244,7 +224,7 @@ where
             // UiData::params.get(cx).get_parameter_default(param_index),
             0.5,
             // params.get(cx).get_parameter(param_index),
-            norm_val,
+            UiData::params.map(move |params| params_to_param(params).normalized_value()),
             move |cx, lens| {
                 TickKnob::new(
                     cx,
@@ -287,29 +267,26 @@ where
         })
         ;
 
-        Label::new(cx, param_text).width(Pixels(100.));
+        Label::new(cx, UiData::params.map(move |params| params_to_param(params).to_string())).width(Pixels(100.));
     })
     .child_space(Stretch(1.0))
-    .row_between(Pixels(10.0));
+    .row_between(Pixels(10.0))
 }
 // using Knob::custom() to make a stepped knob with tickmarks indicating the steps
-fn make_steppy_knob<'a, L1, L2>(
+fn make_steppy_knob<'a, P, F>(
     cx: &mut Context,
     steps: usize,
     arc_len: f32,
-    name: &str,
-    norm_val: L1,
-    param_text: L2,
-    param_ptr: nih_plug::param::internals::ParamPtr
+    param_ptr: nih_plug::param::internals::ParamPtr,
+    params_to_param: F,
 ) where
-    L1: Lens<Target = f32>,
-    L2: Lens<Target = String>,
+    P: Param,
+    F: 'static + Fn(&Pin<Arc<FilterParams>>) -> &P + Copy,
 {
     VStack::new(cx, move |cx| {
         Label::new(
             cx,
-            // UiData::params.map(move |params| params.get_parameter_name(param_index)),
-            name,
+            UiData::params.map(move |params| params_to_param(params).name())
         );
 
         Knob::custom(
@@ -318,7 +295,7 @@ fn make_steppy_knob<'a, L1, L2>(
             // UiData::params.map(move |params| {
             //     params.get_parameter(param_index)
             // }),
-            norm_val,
+            UiData::params.map(move |params| params_to_param(params).normalized_value()),
             move |cx, lens| {
                 let mode = KnobMode::Discrete(steps);
                 Ticks::new(
@@ -360,7 +337,7 @@ fn make_steppy_knob<'a, L1, L2>(
         Label::new(
             cx,
             // UiData::params.map(move |params| params.get_parameter_text(param_index)),
-            param_text,
+            UiData::params.map(move |params| params_to_param(params).to_string()),
         )
         .width(Pixels(100.));
     })

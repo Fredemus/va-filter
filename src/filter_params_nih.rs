@@ -40,7 +40,7 @@ impl FilterParams {
             // smoother is still smoothing
             // TODO: Need a callback here I think to update g?
             cutoff: FloatParam::new(
-                "Filter Frequency",
+                "Cutoff",
                 1000.0,
                 FloatRange::Skewed {
                     min: 5.0, // This must never reach 0
@@ -59,7 +59,7 @@ impl FilterParams {
 
             // TODO: Need a callback here I think to update q and res?
             res: FloatParam::new(
-                "Filter Resonance",
+                "Res",
                 0.5,
                 FloatRange::Linear { min: 0., max: 1. },
             )
