@@ -53,10 +53,4 @@ impl GuiContext for ParamSetGuy {
     unsafe fn raw_end_set_parameter(&self, _param: nih_plug::param::internals::ParamPtr) {
     }
 
-    unsafe fn raw_default_normalized_param_value(
-        &self,
-        _param: nih_plug::param::internals::ParamPtr,
-    ) -> f32 {
-        todo!()
-    }
 }

@@ -103,7 +103,7 @@ pub fn plugin_gui(cx: &mut Context, params: Pin<Arc<FilterParams>>, context: Arc
                 HStack::new(cx, move |cx|{
                     Label::new(cx, UiData::choice).left(Auto);
                     Label::new(cx, ICON_DOWN_OPEN).class("arrow");
-                }),
+                }).class("title"),
                 move |cx| {
                     // List of options
                     List::new(cx, UiData::filter_circuits, move |cx, _, item| {
@@ -203,7 +203,7 @@ pub fn plugin_gui(cx: &mut Context, params: Pin<Arc<FilterParams>>, context: Arc
 // fn make_knob<'a, P: Param>(cx: &mut Context, param: &'a P, setter: &'a ParamSetter<'a>) // -> Handle<VStack>
 fn make_knob<P, F>(
     cx: &mut Context,
-    param_ptr: nih_plug::param::internals::ParamPtr,
+    param_ptr: ParamPtr,
     params_to_param: F,
 )
 -> Handle<VStack>

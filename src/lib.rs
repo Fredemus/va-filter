@@ -173,12 +173,6 @@ impl Plugin for VST {
 
         ProcessStatus::Normal
     }
-
-    fn initialize_block_smoothers(&mut self, max_block_size: usize) {
-        for param in self.params().param_map().values_mut() {
-            unsafe { param.initialize_block_smoother(max_block_size) };
-        }
-    }
 }
 
 impl Vst3Plugin for VST {

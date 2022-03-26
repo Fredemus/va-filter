@@ -33,6 +33,7 @@
 
 dropdown .title {
     background-color: #101010;
+    /* color: #C2C2C2; */
     height: 30px;
     width: 200px;
     child-left: 5px;
@@ -40,6 +41,7 @@ dropdown .title {
     child-top: 1s;
     child-bottom: 1s;
     col-between: 5px;
+    border-width: 0px;
 }
 
 dropdown .arrow {
