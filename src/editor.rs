@@ -54,6 +54,10 @@ impl Editor for ViziaEditor {
     fn set_scale_factor(&self, _factor: f32) -> bool {
         todo!()
     }
+
+    fn param_values_changed(&self) {
+        todo!()
+    }
 }
 
 struct ViziaEditorHandle {
