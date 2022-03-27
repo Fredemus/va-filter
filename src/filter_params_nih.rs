@@ -51,7 +51,7 @@ impl FilterParams {
             // This needs quite a bit of smoothing to avoid artifacts
             .with_smoother(SmoothingStyle::Logarithmic(20.0))
             .with_unit(" Hz")
-            .with_value_to_string(formatters::f32_rounded(0))
+            .with_value_to_string(formatters::v2s_f32_rounded(0))
             .with_callback(Arc::new({
                 let should_update_filter = should_update_filter.clone();
                 move |_| should_update_filter.store(true, std::sync::atomic::Ordering::Release)
@@ -64,7 +64,7 @@ impl FilterParams {
                 FloatRange::Linear { min: 0., max: 1. },
             )
             .with_smoother(SmoothingStyle::Linear(20.0))
-            .with_value_to_string(formatters::f32_rounded(2))
+            .with_value_to_string(formatters::v2s_f32_rounded(2))
             .with_callback(Arc::new({
                 let should_update_filter = should_update_filter.clone();
                 move |_| should_update_filter.store(true, std::sync::atomic::Ordering::Release)
@@ -82,7 +82,7 @@ impl FilterParams {
             // This needs quite a bit of smoothing to avoid artifacts
             .with_smoother(SmoothingStyle::Logarithmic(100.0))
             .with_unit(" dB")
-            .with_value_to_string(formatters::f32_gain_to_db(2)),
+            .with_value_to_string(formatters::v2s_f32_gain_to_db(2)),
 
             mode: EnumParam::new("Mode", SvfMode::LP),
             // .with_callback(Arc::new(move |_| {
