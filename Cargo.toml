@@ -17,7 +17,7 @@ nih_plug = { git = "https://github.com/robbert-vdh/nih-plug", features = ["asser
 # baseview = { git = "https://github.com/RustAudio/baseview.git", rev = "d399c1275522ae75f5a82caadd904df2685c8660" }
 baseview = { git = "https://github.com/RustAudio/baseview.git", rev = "b3712638bacb3fdf2883cb5aa3f6caed0e91ac8c"} # newest
 vizia = {git = "https://github.com/vizia/vizia", branch = "main", features = ["baseview"], default-features = false}
-femtovg = {version = "0.3.0", default-features = false}
+femtovg = {git = "https://github.com/femtovg/femtovg", rev = "87fe627794f3f793d8e3a338c838a2f8e8a8aa9d", default-features = false }
 
 raw-window-handle = "0.3"
 num = "0.4.0"

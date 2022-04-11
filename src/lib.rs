@@ -18,7 +18,7 @@ use core_simd::f32x4;
 
 // use vst::api::Events;
 // use vst::event::Event;
-use std::{pin::Pin, sync::Arc};
+use std::sync::Arc;
 
 use nih_plug::{nih_export_vst3, prelude::*};
 
@@ -38,7 +38,7 @@ mod ui;
 
 struct VST {
     // Store a handle to the plugin's parameter object.
-    params: Pin<Arc<FilterParams>>,
+    params: Arc<FilterParams>,
     ladder: filter::LadderFilter,
     svf: filter::SVF,
     // used for constructing the editor in get_editor
@@ -56,7 +56,7 @@ impl Default for VST {
         let svf = SVF::new(params.clone());
         let ladder = LadderFilter::new(params.clone());
         Self {
-            params: Pin::new(params.clone()),
+            params: params.clone(),
             svf,
             ladder,
             should_update_filter,
@@ -91,10 +91,11 @@ impl Plugin for VST {
     const DEFAULT_NUM_INPUTS: u32 = 2;
     const DEFAULT_NUM_OUTPUTS: u32 = 2;
 
-    const ACCEPTS_MIDI: bool = false;
+    // const ACCEPTS_MIDI: bool = false;
+    const MIDI_INPUT: MidiConfig = MidiConfig::Basic;
 
-    fn params(&self) -> Pin<&dyn Params> {
-        self.params.as_ref()
+    fn params(&self) -> Arc<dyn Params> {
+        self.params.clone()
     }
 
     fn editor(&self) -> Option<Box<dyn Editor>> {

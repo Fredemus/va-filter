@@ -7,7 +7,7 @@ use super::utils::*;
 use std::{f32::consts::PI, sync::atomic::AtomicBool};
 // use std::sync::atomic::Ordering;
 use nih_plug::prelude::*;
-use std::{pin::Pin, sync::Arc};
+use std::sync::Arc;
 
 #[derive(Params)]
 pub struct FilterParams {
@@ -58,17 +58,13 @@ impl FilterParams {
             })),
 
             // TODO: Need a callback here I think to update q and res?
-            res: FloatParam::new(
-                "Res",
-                0.5,
-                FloatRange::Linear { min: 0., max: 1. },
-            )
-            .with_smoother(SmoothingStyle::Linear(20.0))
-            .with_value_to_string(formatters::v2s_f32_rounded(2))
-            .with_callback(Arc::new({
-                let should_update_filter = should_update_filter.clone();
-                move |_| should_update_filter.store(true, std::sync::atomic::Ordering::Release)
-            })),
+            res: FloatParam::new("Res", 0.5, FloatRange::Linear { min: 0., max: 1. })
+                .with_smoother(SmoothingStyle::Linear(20.0))
+                .with_value_to_string(formatters::v2s_f32_rounded(2))
+                .with_callback(Arc::new({
+                    let should_update_filter = should_update_filter.clone();
+                    move |_| should_update_filter.store(true, std::sync::atomic::Ordering::Release)
+                })),
             // TODO: with_value_to_string should actually convert it to db
             drive: FloatParam::new(
                 "Drive",

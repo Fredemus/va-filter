@@ -13,7 +13,6 @@ use femtovg::RenderTarget;
 use femtovg::{Paint, Path};
 use nih_plug::prelude::{Param, ParamSetter};
 use std::cell::RefCell;
-use std::pin::Pin;
 use std::rc::Rc;
 use std::sync::Arc;
 use vizia::*;
@@ -27,7 +26,7 @@ use std::f32::consts::PI;
 #[derive(Lens)]
 pub struct UiData {
     pub gui_context: Arc<dyn GuiContext>,
-    params: Pin<Arc<FilterParams>>,
+    params: Arc<FilterParams>,
     // host: Option<HostCallback>,
     filter_circuits: Vec<String>,
     choice: String,
@@ -39,7 +38,7 @@ pub enum ParamChangeEvent {
     BeginSet(ParamPtr),
     EndSet(ParamPtr),
     SetParam(ParamPtr, f32),
-    
+
     CircuitEvent(String),
     ChangeBodeView(),
 }
@@ -50,9 +49,12 @@ impl Model for UiData {
             let setter = ParamSetter::new(self.gui_context.as_ref());
             match param_change_event {
                 ParamChangeEvent::SetParam(param_ptr, new_value) => {
-                    unsafe { self.gui_context.raw_set_parameter_normalized(*param_ptr, *new_value) };
+                    unsafe {
+                        self.gui_context
+                            .raw_set_parameter_normalized(*param_ptr, *new_value)
+                    };
                 }
-                
+
                 ParamChangeEvent::BeginSet(param_ptr) => {
                     unsafe { self.gui_context.raw_begin_set_parameter(*param_ptr) };
                 }
@@ -76,7 +78,7 @@ impl Model for UiData {
     }
 }
 
-pub fn plugin_gui(cx: &mut Context, params: Pin<Arc<FilterParams>>, context: Arc<dyn GuiContext>) {
+pub fn plugin_gui(cx: &mut Context, params: Arc<FilterParams>, context: Arc<dyn GuiContext>) {
     UiData {
         gui_context: context.clone(),
         params: params.clone(),
@@ -136,50 +138,29 @@ pub fn plugin_gui(cx: &mut Context, params: Pin<Arc<FilterParams>>, context: Arc
             // UiData::params.filter_type;
             // Cutoff
             // make_knob(cx, 0);
-            make_knob(
-                cx,
-                params.cutoff.as_ptr(),
-                |params| &params.cutoff,
-                
-            );
+            make_knob(cx, params.cutoff.as_ptr(), |params| &params.cutoff);
             // Resonance
             // make_knob(cx, 1);
-            make_knob(
-                cx,
-                params.res.as_ptr(),
-                |params| &params.res,
-            );
+            make_knob(cx, params.res.as_ptr(), |params| &params.res);
             // // Drive
-            make_knob(
-                cx,
-                params.drive.as_ptr(),
-                |params| &params.drive,
-            );
+            make_knob(cx, params.drive.as_ptr(), |params| &params.drive);
             // Mode/ Slope
             Binding::new(
                 cx,
                 UiData::params.map(|params| params.filter_type.value() as usize),
                 move |cx, ft| {
-                    if *ft.get(cx) == 0 {
+                    if ft.get(cx) == 0 {
                         // let param = &UiData::params.get(cx).mode;
                         // let steps = (param.max - param.min + 1.) as usize;
                         let steps = 5;
-                        make_steppy_knob(
-                            cx,
-                            steps,
-                            270.,
-                            params.mode.as_ptr(),
-                            |params| &params.mode,
-                        );
+                        make_steppy_knob(cx, steps, 270., params.mode.as_ptr(), |params| {
+                            &params.mode
+                        });
                     } else {
                         let steps = 4;
-                        make_steppy_knob(
-                            cx,
-                            steps,
-                            270.,
-                            params.slope.as_ptr(),
-                            |params| &params.slope,
-                        );
+                        make_steppy_knob(cx, steps, 270., params.slope.as_ptr(), |params| {
+                            &params.slope
+                        });
                         // let param = &UiData::params.get(cx).slope;
                         // let steps = (param.max - param.min + 1.) as usize;
                         // make_steppy_knob(cx, 5, steps, 270.);
@@ -189,6 +170,8 @@ pub fn plugin_gui(cx: &mut Context, params: Pin<Arc<FilterParams>>, context: Arc
         })
         .class("knobs");
 
+        // Comment in HStack to make bodeplot disappear
+        // HStack::new(cx, |cx| {
         BodePlot::new(cx)
             .class("bode")
             .text("Bode Plot")
@@ -196,27 +179,23 @@ pub fn plugin_gui(cx: &mut Context, params: Pin<Arc<FilterParams>>, context: Arc
             .on_press(|cx| {
                 cx.emit(ParamChangeEvent::ChangeBodeView());
             });
+        // });
     })
     .class("container");
 }
 // makes a knob linked to a parameter
 // fn make_knob<'a, P: Param>(cx: &mut Context, param: &'a P, setter: &'a ParamSetter<'a>) // -> Handle<VStack>
-fn make_knob<P, F>(
-    cx: &mut Context,
-    param_ptr: ParamPtr,
-    params_to_param: F,
-)
--> Handle<VStack>
+fn make_knob<P, F>(cx: &mut Context, param_ptr: ParamPtr, params_to_param: F) -> Handle<VStack>
 where
     P: Param,
-    F: 'static + Fn(&Pin<Arc<FilterParams>>) -> &P + Copy,
+    F: 'static + Fn(&Arc<FilterParams>) -> &P + Copy,
     // L: Lens<Target = ParamPtr>,
 {
     VStack::new(cx, move |cx| {
         // doesn't need to be a lens
         Label::new(
             cx,
-            UiData::params.map(move |params| params_to_param(params).name())
+            UiData::params.map(move |params| params_to_param(params).name()),
         );
 
         Knob::custom(
@@ -248,26 +227,32 @@ where
                 .value(lens)
                 .class("track")
             },
-        ).on_changing(move |cx, val| {
+        )
+        .on_changing(move |cx, val| {
             cx.emit(
                 // setter.set_parameter_normalized(param, val);
                 // ParamChangeEvent::AllParams(param_index, val),
                 ParamChangeEvent::SetParam(param_ptr, val),
             )
-        }).on_press(move |cx| {
+        })
+        .on_press(move |cx| {
             cx.emit(
                 // setter.set_parameter_normalized(param, val);
                 ParamChangeEvent::BeginSet(param_ptr),
             )
-        }).on_release(move |cx| {
+        })
+        .on_release(move |cx| {
             cx.emit(
                 // setter.set_parameter_normalized(param, val);
                 ParamChangeEvent::EndSet(param_ptr),
             )
-        })
-        ;
+        });
 
-        Label::new(cx, UiData::params.map(move |params| params_to_param(params).to_string())).width(Pixels(100.));
+        Label::new(
+            cx,
+            UiData::params.map(move |params| params_to_param(params).to_string()),
+        )
+        .width(Pixels(100.));
     })
     .child_space(Stretch(1.0))
     .row_between(Pixels(10.0))
@@ -281,12 +266,12 @@ fn make_steppy_knob<'a, P, F>(
     params_to_param: F,
 ) where
     P: Param,
-    F: 'static + Fn(&Pin<Arc<FilterParams>>) -> &P + Copy,
+    F: 'static + Fn(&Arc<FilterParams>) -> &P + Copy,
 {
     VStack::new(cx, move |cx| {
         Label::new(
             cx,
-            UiData::params.map(move |params| params_to_param(params).name())
+            UiData::params.map(move |params| params_to_param(params).name()),
         );
 
         Knob::custom(
@@ -319,20 +304,10 @@ fn make_steppy_knob<'a, P, F>(
                 .value(lens)
                 .class("tick")
             },
-        ).on_changing(move |cx, val| {
-            cx.emit(
-                ParamChangeEvent::SetParam(param_ptr, val),
-            )
-        }).on_press(move |cx| {
-            cx.emit(
-                ParamChangeEvent::BeginSet(param_ptr),
-            )
-        }).on_release(move |cx| {
-            cx.emit(
-                ParamChangeEvent::EndSet(param_ptr),
-            )
-        })
-        ;
+        )
+        .on_changing(move |cx, val| cx.emit(ParamChangeEvent::SetParam(param_ptr, val)))
+        .on_press(move |cx| cx.emit(ParamChangeEvent::BeginSet(param_ptr)))
+        .on_release(move |cx| cx.emit(ParamChangeEvent::EndSet(param_ptr)));
 
         Label::new(
             cx,
@@ -354,7 +329,7 @@ impl BodePlot {
         Self {
             image: Rc::new(RefCell::new(None)),
         }
-        .build2(cx, |_| {})
+        .build(cx, |_| {})
     }
 }
 

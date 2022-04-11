@@ -1,5 +1,5 @@
 #![feature(portable_simd)]
-use std::{pin::Pin, sync::Arc};
+use std::sync::Arc;
 
 use nih_plug::context::GuiContext;
 use vizia::{Application, WindowDescription};
@@ -31,7 +31,7 @@ fn main() {
             .expect("no style sheet found");
 
         // plugin_gui(cx, Arc::clone(&params));
-        plugin_gui(cx, Pin::new(Arc::clone(&params)), param_set_guy.clone());
+        plugin_gui(cx, Arc::clone(&params), param_set_guy.clone());
     })
     .run();
 }
@@ -39,8 +39,7 @@ fn main() {
 struct ParamSetGuy();
 
 impl GuiContext for ParamSetGuy {
-    unsafe fn raw_begin_set_parameter(&self, _param: nih_plug::param::internals::ParamPtr) {
-    }
+    unsafe fn raw_begin_set_parameter(&self, _param: nih_plug::param::internals::ParamPtr) {}
 
     unsafe fn raw_set_parameter_normalized(
         &self,
@@ -50,7 +49,17 @@ impl GuiContext for ParamSetGuy {
         param.set_normalized_value(normalized);
     }
 
-    unsafe fn raw_end_set_parameter(&self, _param: nih_plug::param::internals::ParamPtr) {
+    unsafe fn raw_end_set_parameter(&self, _param: nih_plug::param::internals::ParamPtr) {}
+
+    fn request_resize(&self) -> bool {
+        todo!()
     }
 
+    fn get_state(&self) -> nih_plug::prelude::PluginState {
+        todo!()
+    }
+
+    fn set_state(&self, _state: nih_plug::prelude::PluginState) {
+        todo!()
+    }
 }

@@ -5,7 +5,7 @@ use crate::{
     utils::AtomicOps,
 };
 // use packed_simd::f32x4;
-use core_simd::f32x4;
+use core_simd::*;
 use std::sync::Arc;
 use std_float::*;
 
@@ -30,7 +30,7 @@ fn simd_cosh(x: f32x4) -> f32x4 {
 }
 #[inline]
 fn simd_asinh(x: f32x4) -> f32x4 {
-    let mask = x.lanes_gt(f32x4::splat(0.));
+    let mask = x.simd_gt(f32x4::splat(0.));
     // let val = (x.abs() + ((x * x) + f32x4::splat(1.0)).sqrt()).ln();
     let mut val = x.abs() + ((x * x) + f32x4::splat(1.0)).sqrt();
     val = f32x4::from_array(val.to_array().map(f32::ln));
@@ -100,7 +100,7 @@ impl LadderFilter {
         for n in 0..base.len() {
             // hopefully this should cook down to the original when not 0,
             // and 1 when 0
-            let mask = base[n].lanes_ne(f32x4::splat(0.));
+            let mask = base[n].simd_ne(f32x4::splat(0.));
             a[n] = tanh_levien(base[n]) / base[n];
             // since the line above can become NaN or other stuff when a value in base[n] is 0,
             // replace values where a[n] is 0.
@@ -181,10 +181,10 @@ impl LadderFilter {
         let mut n_iterations = 0;
 
         // f32x4.lt(max_error) returns a mask.
-        while residue[0].abs().lanes_gt(max_error).any()
-            || residue[1].abs().lanes_gt(max_error).any()
-            || residue[2].abs().lanes_gt(max_error).any()
-            || residue[3].abs().lanes_gt(max_error).any()
+        while residue[0].abs().simd_gt(max_error).any()
+            || residue[1].abs().simd_gt(max_error).any()
+            || residue[2].abs().simd_gt(max_error).any()
+            || residue[3].abs().simd_gt(max_error).any()
         // && n_iterations < 9
         {
             n_iterations += 1;
@@ -347,7 +347,7 @@ impl SVF {
         let est_source_a2 = self.get_estimate(0, est_type, input);
         // employing fixed-pivot method
         // a[2] first, since it involves the antisaturator
-        let mask1 = est_source_a2.lanes_ne(f32x4::splat(0.));
+        let mask1 = est_source_a2.simd_ne(f32x4::splat(0.));
         // a2 is clipped with the inverse of the diode anti-saturator
         // a[2] = (v_t * simd_asinh(est_source_a2 / i_s)) / est_source_a2;
         a[2] = simd_asinh(est_source_a2) / est_source_a2;
@@ -360,7 +360,7 @@ impl SVF {
             self.get_estimate(0, est_type, input),
         ];
         for n in 0..est_source_rest.len() {
-            let mask = est_source_rest[n].lanes_ne(f32x4::splat(0.));
+            let mask = est_source_rest[n].simd_ne(f32x4::splat(0.));
             a[n] = tanh_levien(est_source_rest[n]) / est_source_rest[n];
             // since the line above can become NaN or other stuff when a value in base[n] is 0,
             // replace values where a[n] is 0.
@@ -413,8 +413,8 @@ impl SVF {
 
         let max_error = f32x4::splat(0.00001);
         let mut n_iterations = 0;
-        while (residue[0].abs().lanes_gt(max_error).any()
-            || residue[0].abs().lanes_gt(max_error).any())
+        while (residue[0].abs().simd_gt(max_error).any()
+            || residue[0].abs().simd_gt(max_error).any())
             && n_iterations < 9
         {
             // terminate if error doesn't improve after 10 iterations
