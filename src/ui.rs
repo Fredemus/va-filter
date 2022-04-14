@@ -195,7 +195,7 @@ where
         // doesn't need to be a lens
         Label::new(
             cx,
-            UiData::params.map(move |params| params_to_param(params).name()),
+            UiData::params.map(move |params| params_to_param(params).name().to_owned()),
         );
 
         Knob::custom(
@@ -271,7 +271,7 @@ fn make_steppy_knob<'a, P, F>(
     VStack::new(cx, move |cx| {
         Label::new(
             cx,
-            UiData::params.map(move |params| params_to_param(params).name()),
+            UiData::params.map(move |params| params_to_param(params).name().to_owned()),
         );
 
         Knob::custom(
