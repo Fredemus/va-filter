@@ -170,16 +170,9 @@ pub fn plugin_gui(cx: &mut Context, params: Arc<FilterParams>, context: Arc<dyn 
         })
         .class("knobs");
 
-        // Comment in HStack to make bodeplot disappear
-        // HStack::new(cx, |cx| {
-        BodePlot::new(cx)
-            .class("bode")
-            .text("Bode Plot")
-            .overflow(Overflow::Visible)
-            .on_press(|cx| {
-                cx.emit(ParamChangeEvent::ChangeBodeView());
-            });
-        // });
+        BodePlot::new(cx).class("bode").on_press(|cx| {
+            cx.emit(ParamChangeEvent::ChangeBodeView());
+        });
     })
     .class("container");
 }
@@ -334,7 +327,8 @@ impl BodePlot {
 }
 
 impl View for BodePlot {
-    fn draw(&self, cx: &mut Context, canvas: &mut Canvas) {
+    fn draw(&self, cx: &mut DrawContext<'_>, canvas: &mut Canvas) {
+        let current = cx.current();
         if let Some(ui_data) = cx.data::<UiData>() {
             let params = ui_data.params.clone();
 
@@ -408,7 +402,7 @@ impl View for BodePlot {
                 }
             }
 
-            let bounds = cx.cache.get_bounds(cx.current);
+            let bounds = cx.cache().get_bounds(current);
 
             let image_id = if let Some(image_id) = *self.image.borrow() {
                 image_id
@@ -427,18 +421,12 @@ impl View for BodePlot {
 
             canvas.set_render_target(RenderTarget::Image(image_id));
 
-            let background_color = cx
-                .style
-                .background_color
-                .get(cx.current)
+            let background_color: femtovg::Color = cx
+                .background_color(current)
                 .cloned()
-                .unwrap_or_default();
-            let color = cx
-                .style
-                .font_color
-                .get(cx.current)
-                .cloned()
-                .unwrap_or_default();
+                .unwrap_or_default()
+                .into();
+            let color: femtovg::Color = cx.font_color(current).cloned().unwrap_or_default().into();
 
             // Fill background
             canvas.clear_rect(0, 0, width as u32, height as u32, background_color.into());
@@ -462,6 +450,8 @@ impl View for BodePlot {
             paint.set_line_width(line_width);
             paint.set_line_join(femtovg::LineJoin::Round);
             paint.set_line_cap(femtovg::LineCap::Square);
+            canvas.save();
+            canvas.reset_scissor();
             canvas.stroke_path(&mut path, paint);
 
             // making a cool background gradient
@@ -484,8 +474,8 @@ impl View for BodePlot {
             path2.line_to(0., height as f32 * 0.4 + line_width / 2.0);
             canvas.fill_path(&mut path2, bg);
 
+            canvas.restore();
             canvas.set_render_target(RenderTarget::Screen);
-
             let mut path = Path::new();
             path.rect(bounds.x, bounds.y, bounds.w, bounds.h);
             canvas.fill_path(
