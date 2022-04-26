@@ -4,7 +4,7 @@ use nih_plug::{
     plugin::{Editor, ParentWindowHandle},
 };
 use std::sync::Arc;
-use vizia::{Application, WindowDescription};
+use vizia::Application;
 
 pub use vizia::*;
 
@@ -35,13 +35,13 @@ impl Editor for ViziaEditor {
     ) -> Box<dyn std::any::Any + Send + Sync> {
         let update = self.update.clone();
 
-        let window_description =
-            WindowDescription::new().with_inner_size(WINDOW_WIDTH, WINDOW_HEIGHT);
-        let window = Application::new(window_description, move |cx| {
+        let window = Application::new(move |cx| {
             cx.add_theme(STYLE);
 
             (update)(cx, context.clone());
         })
+        .inner_size((WINDOW_WIDTH, WINDOW_HEIGHT))
+        .title("Hello Plugin")
         .open_parented(&parent);
 
         Box::new(ViziaEditorHandle { window })

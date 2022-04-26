@@ -11,7 +11,7 @@ use femtovg::ImageFlags;
 use femtovg::ImageId;
 use femtovg::RenderTarget;
 use femtovg::{Paint, Path};
-use nih_plug::prelude::{Param, ParamSetter};
+use nih_plug::prelude::Param;
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::Arc;
@@ -45,36 +45,40 @@ pub enum ParamChangeEvent {
 
 impl Model for UiData {
     fn event(&mut self, _cx: &mut Context, event: &mut Event) {
-        if let Some(param_change_event) = event.message.downcast() {
-            let setter = ParamSetter::new(self.gui_context.as_ref());
-            match param_change_event {
-                ParamChangeEvent::SetParam(param_ptr, new_value) => {
+        // let setter = ParamSetter::new(self.gui_context.as_ref());
+        event.map(|event, _| match event {
+            ParamChangeEvent::SetParam(param_ptr, new_value) => {
+                unsafe {
+                    self.gui_context
+                        .raw_set_parameter_normalized(*param_ptr, *new_value)
+                };
+            }
+
+            ParamChangeEvent::BeginSet(param_ptr) => {
+                unsafe { self.gui_context.raw_begin_set_parameter(*param_ptr) };
+            }
+            ParamChangeEvent::EndSet(param_ptr) => {
+                unsafe { self.gui_context.raw_end_set_parameter(*param_ptr) };
+            }
+            ParamChangeEvent::CircuitEvent(circuit_name) => {
+                self.choice = circuit_name.to_owned();
+                if circuit_name == "SVF" {
                     unsafe {
                         self.gui_context
-                            .raw_set_parameter_normalized(*param_ptr, *new_value)
+                            .raw_set_parameter_normalized(self.params.filter_type.as_ptr(), 0.)
+                    };
+                } else {
+                    // self.params.set_parameter(3, 1.);
+                    unsafe {
+                        self.gui_context
+                            .raw_set_parameter_normalized(self.params.filter_type.as_ptr(), 1.)
                     };
                 }
-
-                ParamChangeEvent::BeginSet(param_ptr) => {
-                    unsafe { self.gui_context.raw_begin_set_parameter(*param_ptr) };
-                }
-                ParamChangeEvent::EndSet(param_ptr) => {
-                    unsafe { self.gui_context.raw_end_set_parameter(*param_ptr) };
-                }
-                ParamChangeEvent::CircuitEvent(circuit_name) => {
-                    if circuit_name == "SVF" {
-                        setter.set_parameter_normalized(&self.params.filter_type, 0.);
-                    } else {
-                        // self.params.set_parameter(3, 1.);
-                        setter.set_parameter_normalized(&self.params.filter_type, 1.);
-                    }
-                    self.choice = circuit_name.to_string();
-                }
-                ParamChangeEvent::ChangeBodeView() => {
-                    self.show_phase = !self.show_phase;
-                }
             }
-        }
+            ParamChangeEvent::ChangeBodeView() => {
+                self.show_phase = !self.show_phase;
+            }
+        })
     }
 }
 
@@ -214,7 +218,8 @@ where
                     false,
                     Percentage(100.0),
                     Percentage(10.),
-                    270.,
+                    -135.,
+                    135.,
                     KnobMode::Continuous,
                 )
                 .value(lens)

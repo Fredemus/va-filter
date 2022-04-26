@@ -2,7 +2,7 @@
 use std::sync::Arc;
 
 use nih_plug::context::GuiContext;
-use vizia::{Application, WindowDescription};
+use vizia::Application;
 
 mod editor;
 use editor::{WINDOW_HEIGHT, WINDOW_WIDTH};
@@ -22,17 +22,16 @@ fn main() {
     let params = Arc::new(FilterParams::new(should_update_filter));
     // let state = Arc::new(EditorState::new(params.clone(), None));
     let param_set_guy = Arc::new(ParamSetGuy {});
-    let window_description = WindowDescription::new()
-        .with_inner_size(WINDOW_WIDTH, WINDOW_HEIGHT)
-        .with_title("Hello Plugin");
 
-    Application::new(window_description, move |cx| {
+    Application::new(move |cx| {
         cx.add_stylesheet("src/style.css")
             .expect("no style sheet found");
 
         // plugin_gui(cx, Arc::clone(&params));
         plugin_gui(cx, Arc::clone(&params), param_set_guy.clone());
     })
+    .inner_size((WINDOW_WIDTH, WINDOW_HEIGHT))
+    .title("Hello Plugin")
     .run();
 }
 // dummmy GuiContext for the standalone version
@@ -60,6 +59,10 @@ impl GuiContext for ParamSetGuy {
     }
 
     fn set_state(&self, _state: nih_plug::prelude::PluginState) {
+        todo!()
+    }
+
+    fn plugin_api(&self) -> nih_plug::context::PluginApi {
         todo!()
     }
 }
