@@ -24,14 +24,16 @@
 .bode {
     height: 200px;
     width: 360px;
-    color: #ffb74d;
-    child-space: 1s;
+    color: #1eafaf;
+    /* color: #ffb74d; */
+     child-space: 1s;
     border-width: 1px;
     border-color: white;
 }
 
 dropdown .title {
     background-color: #101010;
+    /* color: #C2C2C2; */
     height: 30px;
     width: 200px;
     child-left: 5px;
@@ -39,6 +41,7 @@ dropdown .title {
     child-top: 1s;
     child-bottom: 1s;
     col-between: 5px;
+    border-width: 0px;
 }
 
 dropdown .arrow {
@@ -89,5 +92,5 @@ knob .tick {
 }
 
 knob .track {
-    background-color: #ffb74d;
+    background-color: #1eafaf;
 }

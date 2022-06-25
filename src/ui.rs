@@ -1,27 +1,33 @@
-use crate::editor::EditorState;
-use crate::editor::{get_amplitude_response, get_phase_response};
+// use crate::editor::EditorState;
+mod plot;
+use crate::filter_params_nih::Circuits;
+use nih_plug::context::GuiContext;
+use nih_plug::param::internals::ParamPtr;
+use plot::{get_amplitude_response, get_phase_response};
+// use crate::editor::{get_amplitude_response, get_phase_response};
 use crate::utils::*;
-use crate::FilterParameters;
+use crate::FilterParams;
 use femtovg::ImageFlags;
 use femtovg::ImageId;
 use femtovg::RenderTarget;
 use femtovg::{Paint, Path};
+use nih_plug::prelude::Param;
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::Arc;
 use vizia::*;
-
-use vst::host::Host;
-use vst::plugin::HostCallback;
-use vst::plugin::PluginParameters;
+// use vst::host::Host;
+// use vst::plugin::HostCallback;
+// use vst::plugin::PluginParameters;
 const ICON_DOWN_OPEN: &str = "\u{e75c}";
 
 use std::f32::consts::PI;
 
 #[derive(Lens)]
 pub struct UiData {
-    params: Arc<FilterParameters>,
-    host: Option<HostCallback>,
+    pub gui_context: Arc<dyn GuiContext>,
+    params: Arc<FilterParams>,
+    // host: Option<HostCallback>,
     filter_circuits: Vec<String>,
     choice: String,
     show_phase: bool,
@@ -29,50 +35,60 @@ pub struct UiData {
 
 #[derive(Debug)]
 pub enum ParamChangeEvent {
-    AllParams(i32, f32),
+    BeginSet(ParamPtr),
+    EndSet(ParamPtr),
+    SetParam(ParamPtr, f32),
+
     CircuitEvent(String),
     ChangeBodeView(),
 }
 
 impl Model for UiData {
     fn event(&mut self, _cx: &mut Context, event: &mut Event) {
-        if let Some(param_change_event) = event.message.downcast() {
-            match param_change_event {
-                ParamChangeEvent::AllParams(parameter_index, new_value) => {
-                    // host needs to know that the parameter should/has changed
-                    if let Some(host) = self.host {
-                        host.begin_edit(*parameter_index);
-                        host.automate(*parameter_index, *new_value);
-                        host.end_edit(*parameter_index);
-                    }
-                    // set_parameter is on the PluginParameters trait
-                    else {
-                        self.params.set_parameter(*parameter_index, *new_value);
-                    }
-                }
+        // let setter = ParamSetter::new(self.gui_context.as_ref());
+        event.map(|event, _| match event {
+            ParamChangeEvent::SetParam(param_ptr, new_value) => {
+                unsafe {
+                    self.gui_context
+                        .raw_set_parameter_normalized(*param_ptr, *new_value)
+                };
+            }
 
-                ParamChangeEvent::CircuitEvent(circuit_name) => {
-                    if circuit_name == "SVF" {
-                        self.params.set_parameter(3, 0.);
-                    } else {
-                        self.params.set_parameter(3, 1.);
-                    }
-                    self.choice = circuit_name.to_string();
-                }
-                ParamChangeEvent::ChangeBodeView() => {
-                    self.show_phase = !self.show_phase;
+            ParamChangeEvent::BeginSet(param_ptr) => {
+                unsafe { self.gui_context.raw_begin_set_parameter(*param_ptr) };
+            }
+            ParamChangeEvent::EndSet(param_ptr) => {
+                unsafe { self.gui_context.raw_end_set_parameter(*param_ptr) };
+            }
+            ParamChangeEvent::CircuitEvent(circuit_name) => {
+                self.choice = circuit_name.to_owned();
+                if circuit_name == "SVF" {
+                    unsafe {
+                        self.gui_context
+                            .raw_set_parameter_normalized(self.params.filter_type.as_ptr(), 0.)
+                    };
+                } else {
+                    // self.params.set_parameter(3, 1.);
+                    unsafe {
+                        self.gui_context
+                            .raw_set_parameter_normalized(self.params.filter_type.as_ptr(), 1.)
+                    };
                 }
             }
-        }
+            ParamChangeEvent::ChangeBodeView() => {
+                self.show_phase = !self.show_phase;
+            }
+        })
     }
 }
 
-pub fn plugin_gui(cx: &mut Context, state: Arc<EditorState>) {
+pub fn plugin_gui(cx: &mut Context, params: Arc<FilterParams>, context: Arc<dyn GuiContext>) {
     UiData {
-        params: state.params.clone(),
-        host: state.host,
+        gui_context: context.clone(),
+        params: params.clone(),
+        // host: state.host,
         filter_circuits: vec!["SVF".to_string(), "Transistor Ladder".to_string()],
-        choice: if state.params.filter_type.get() == 0 {
+        choice: if params.filter_type.value() == Circuits::SVF {
             "SVF".to_string()
         } else {
             "Transistor Ladder".to_string()
@@ -93,7 +109,7 @@ pub fn plugin_gui(cx: &mut Context, state: Arc<EditorState>) {
                 HStack::new(cx, move |cx|{
                     Label::new(cx, UiData::choice).left(Auto);
                     Label::new(cx, ICON_DOWN_OPEN).class("arrow");
-                }),
+                }).class("title"),
                 move |cx| {
                     // List of options
                     List::new(cx, UiData::filter_circuits, move |cx, _, item| {
@@ -123,57 +139,68 @@ pub fn plugin_gui(cx: &mut Context, state: Arc<EditorState>) {
 
         // The filter control knobs
         HStack::new(cx, |cx| {
+            // UiData::params.filter_type;
             // Cutoff
-            make_knob(cx, 0);
+            // make_knob(cx, 0);
+            make_knob(cx, params.cutoff.as_ptr(), |params| &params.cutoff);
             // Resonance
-            make_knob(cx, 1);
-            // Drive
-            make_knob(cx, 2);
+            // make_knob(cx, 1);
+            make_knob(cx, params.res.as_ptr(), |params| &params.res);
+            // // Drive
+            make_knob(cx, params.drive.as_ptr(), |params| &params.drive);
             // Mode/ Slope
             Binding::new(
                 cx,
-                UiData::params.map(|params| params.filter_type.get()),
+                UiData::params.map(|params| params.filter_type.value() as usize),
                 move |cx, ft| {
-                    if *ft.get(cx) == 0 {
-                        let param = &UiData::params.get(cx).mode;
-                        let steps = (param.max - param.min + 1.) as usize;
-
-                        make_steppy_knob(cx, 4, steps, 270.);
+                    if ft.get(cx) == 0 {
+                        // let param = &UiData::params.get(cx).mode;
+                        // let steps = (param.max - param.min + 1.) as usize;
+                        let steps = 5;
+                        make_steppy_knob(cx, steps, 270., params.mode.as_ptr(), |params| {
+                            &params.mode
+                        });
                     } else {
-                        let param = &UiData::params.get(cx).slope;
-                        let steps = (param.max - param.min + 1.) as usize;
-                        make_steppy_knob(cx, 5, steps, 270.);
+                        let steps = 4;
+                        make_steppy_knob(cx, steps, 270., params.slope.as_ptr(), |params| {
+                            &params.slope
+                        });
+                        // let param = &UiData::params.get(cx).slope;
+                        // let steps = (param.max - param.min + 1.) as usize;
+                        // make_steppy_knob(cx, 5, steps, 270.);
                     }
                 },
             );
         })
         .class("knobs");
 
-        BodePlot::new(cx)
-            .class("bode")
-            .text("Bode Plot")
-            .overflow(Overflow::Visible)
-            .on_press(|cx| {
-                cx.emit(ParamChangeEvent::ChangeBodeView());
-            });
+        BodePlot::new(cx).class("bode").on_press(|cx| {
+            cx.emit(ParamChangeEvent::ChangeBodeView());
+        });
     })
     .class("container");
 }
 // makes a knob linked to a parameter
-fn make_knob(cx: &mut Context, param_index: i32) -> Handle<VStack> {
+// fn make_knob<'a, P: Param>(cx: &mut Context, param: &'a P, setter: &'a ParamSetter<'a>) // -> Handle<VStack>
+fn make_knob<P, F>(cx: &mut Context, param_ptr: ParamPtr, params_to_param: F) -> Handle<VStack>
+where
+    P: Param,
+    F: 'static + Fn(&Arc<FilterParams>) -> &P + Copy,
+    // L: Lens<Target = ParamPtr>,
+{
     VStack::new(cx, move |cx| {
+        // doesn't need to be a lens
         Label::new(
             cx,
-            UiData::params.map(move |params| params.get_parameter_name(param_index)),
+            UiData::params.map(move |params| params_to_param(params).name().to_owned()),
         );
 
         Knob::custom(
             cx,
-            UiData::params.get(cx).get_parameter_default(param_index),
+            // UiData::params.get(cx).get_parameter_default(param_index),
+            0.5,
             // params.get(cx).get_parameter(param_index),
-            UiData::params.map(move |params| {
-                params.get_parameter(param_index)
-            }),
+            UiData::params.map(move |params| params_to_param(params).normalized_value()),
             move |cx, lens| {
                 TickKnob::new(
                     cx,
@@ -191,42 +218,67 @@ fn make_knob(cx: &mut Context, param_index: i32) -> Handle<VStack> {
                     false,
                     Percentage(100.0),
                     Percentage(10.),
-                    270.,
+                    -135.,
+                    135.,
                     KnobMode::Continuous,
                 )
                 .value(lens)
                 .class("track")
             },
         )
-        .on_changing(move |cx, val| cx.emit(ParamChangeEvent::AllParams(param_index, val)));
+        .on_changing(move |cx, val| {
+            cx.emit(
+                // setter.set_parameter_normalized(param, val);
+                // ParamChangeEvent::AllParams(param_index, val),
+                ParamChangeEvent::SetParam(param_ptr, val),
+            )
+        })
+        .on_press(move |cx| {
+            cx.emit(
+                // setter.set_parameter_normalized(param, val);
+                ParamChangeEvent::BeginSet(param_ptr),
+            )
+        })
+        .on_release(move |cx| {
+            cx.emit(
+                // setter.set_parameter_normalized(param, val);
+                ParamChangeEvent::EndSet(param_ptr),
+            )
+        });
 
         Label::new(
             cx,
-            UiData::params.map(move |params| params.get_parameter_text(param_index)),
-        );
+            UiData::params.map(move |params| params_to_param(params).to_string()),
+        )
+        .width(Pixels(100.));
     })
     .child_space(Stretch(1.0))
     .row_between(Pixels(10.0))
 }
 // using Knob::custom() to make a stepped knob with tickmarks indicating the steps
-fn make_steppy_knob(
+fn make_steppy_knob<'a, P, F>(
     cx: &mut Context,
-    param_index: i32,
     steps: usize,
     arc_len: f32,
-) -> Handle<VStack> {
+    param_ptr: nih_plug::param::internals::ParamPtr,
+    params_to_param: F,
+) where
+    P: Param,
+    F: 'static + Fn(&Arc<FilterParams>) -> &P + Copy,
+{
     VStack::new(cx, move |cx| {
         Label::new(
             cx,
-            UiData::params.map(move |params| params.get_parameter_name(param_index)),
+            UiData::params.map(move |params| params_to_param(params).name().to_owned()),
         );
 
         Knob::custom(
             cx,
-            UiData::params.get(cx).get_parameter_default(param_index),
-            UiData::params.map(move |params| {
-                params.get_parameter(param_index)
-            }),
+            0.5,
+            // UiData::params.map(move |params| {
+            //     params.get_parameter(param_index)
+            // }),
+            UiData::params.map(move |params| params_to_param(params).normalized_value()),
             move |cx, lens| {
                 let mode = KnobMode::Discrete(steps);
                 Ticks::new(
@@ -251,15 +303,19 @@ fn make_steppy_knob(
                 .class("tick")
             },
         )
-        .on_changing(move |cx, val| cx.emit(ParamChangeEvent::AllParams(param_index, val)));
+        .on_changing(move |cx, val| cx.emit(ParamChangeEvent::SetParam(param_ptr, val)))
+        .on_press(move |cx| cx.emit(ParamChangeEvent::BeginSet(param_ptr)))
+        .on_release(move |cx| cx.emit(ParamChangeEvent::EndSet(param_ptr)));
 
         Label::new(
             cx,
-            UiData::params.map(move |params| params.get_parameter_text(param_index)),
-        );
+            // UiData::params.map(move |params| params.get_parameter_text(param_index)),
+            UiData::params.map(move |params| params_to_param(params).to_string()),
+        )
+        .width(Pixels(100.));
     })
     .child_space(Stretch(1.0))
-    .row_between(Pixels(10.0))
+    .row_between(Pixels(10.0));
 }
 
 pub struct BodePlot {
@@ -271,12 +327,13 @@ impl BodePlot {
         Self {
             image: Rc::new(RefCell::new(None)),
         }
-        .build2(cx, |_| {})
+        .build(cx, |_| {})
     }
 }
 
 impl View for BodePlot {
-    fn draw(&self, cx: &mut Context, canvas: &mut Canvas) {
+    fn draw(&self, cx: &mut DrawContext<'_>, canvas: &mut Canvas) {
+        let current = cx.current();
         if let Some(ui_data) = cx.data::<UiData>() {
             let params = ui_data.params.clone();
 
@@ -289,13 +346,13 @@ impl View for BodePlot {
             let min;
             //
             if ui_data.show_phase {
-                if params.filter_type.get() == 0 {
-                    let mode = params.mode.get();
+                if params.filter_type.value() == Circuits::SVF {
+                    let mode = params.mode.value() as usize;
                     amps = get_phase_response(
-                        params.cutoff.get(),
+                        params.cutoff.value,
                         params.zeta.get(),
                         mode,
-                        params.filter_type.get(),
+                        params.filter_type.value() as usize,
                         width,
                     );
                     if mode == 0 {
@@ -311,14 +368,14 @@ impl View for BodePlot {
                     }
                 } else {
                     amps = get_phase_response(
-                        params.cutoff.get(),
+                        params.cutoff.value,
                         // 2.,
                         params.k_ladder.get(),
-                        params.slope.get(),
-                        params.filter_type.get(),
+                        params.slope.value() as usize,
+                        params.filter_type.value() as usize,
                         width,
                     );
-                    if params.slope.get() > 1 {
+                    if params.slope.value() as usize > 1 {
                         max = PI;
                         min = -PI;
                     } else {
@@ -330,27 +387,27 @@ impl View for BodePlot {
                 // min and max amplitude values that will be rendered
                 min = -60.0;
                 max = 40.0;
-                if params.filter_type.get() == 0 {
+                if params.filter_type.value() == Circuits::SVF {
                     amps = get_amplitude_response(
-                        params.cutoff.get(),
+                        params.cutoff.value,
                         params.zeta.get(),
-                        params.mode.get(),
-                        params.filter_type.get(),
+                        params.mode.value() as usize,
+                        params.filter_type.value() as usize,
                         width,
                     );
                 } else {
                     amps = get_amplitude_response(
-                        params.cutoff.get(),
+                        params.cutoff.value,
                         // 2.,
                         params.k_ladder.get(),
-                        params.slope.get(),
-                        params.filter_type.get(),
+                        params.slope.value() as usize,
+                        params.filter_type.value() as usize,
                         width,
                     );
                 }
             }
 
-            let bounds = cx.cache.get_bounds(cx.current);
+            let bounds = cx.cache().get_bounds(current);
 
             let image_id = if let Some(image_id) = *self.image.borrow() {
                 image_id
@@ -369,18 +426,12 @@ impl View for BodePlot {
 
             canvas.set_render_target(RenderTarget::Image(image_id));
 
-            let background_color = cx
-                .style
-                .background_color
-                .get(cx.current)
+            let background_color: femtovg::Color = cx
+                .background_color(current)
                 .cloned()
-                .unwrap_or_default();
-            let color = cx
-                .style
-                .font_color
-                .get(cx.current)
-                .cloned()
-                .unwrap_or_default();
+                .unwrap_or_default()
+                .into();
+            let color: femtovg::Color = cx.font_color(current).cloned().unwrap_or_default().into();
 
             // Fill background
             canvas.clear_rect(0, 0, width as u32, height as u32, background_color.into());
@@ -404,6 +455,8 @@ impl View for BodePlot {
             paint.set_line_width(line_width);
             paint.set_line_join(femtovg::LineJoin::Round);
             paint.set_line_cap(femtovg::LineCap::Square);
+            canvas.save();
+            canvas.reset_scissor();
             canvas.stroke_path(&mut path, paint);
 
             // making a cool background gradient
@@ -426,8 +479,8 @@ impl View for BodePlot {
             path2.line_to(0., height as f32 * 0.4 + line_width / 2.0);
             canvas.fill_path(&mut path2, bg);
 
+            canvas.restore();
             canvas.set_render_target(RenderTarget::Screen);
-
             let mut path = Path::new();
             path.rect(bounds.x, bounds.y, bounds.w, bounds.h);
             canvas.fill_path(
