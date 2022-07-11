@@ -83,6 +83,8 @@ impl Model for UiData {
 }
 
 pub fn plugin_gui(cx: &mut Context, params: Arc<FilterParams>, context: Arc<dyn GuiContext>) {
+    // let _shutup = crate::filter::NewSVF::new(params.clone());
+
     UiData {
         gui_context: context.clone(),
         params: params.clone(),

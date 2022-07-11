@@ -41,6 +41,8 @@ struct VST {
     params: Arc<FilterParams>,
     ladder: filter::LadderFilter,
     svf: filter::SVF,
+
+    svf_new: filter::NewSVF,
     // used for constructing the editor in get_editor
     // host: Option<HostCallback>,
     /// If this is set at the start of the processing cycle, then the filter coefficients should be
@@ -54,10 +56,12 @@ impl Default for VST {
         let should_update_filter = Arc::new(std::sync::atomic::AtomicBool::new(false));
         let params = Arc::new(FilterParams::new(should_update_filter.clone()));
         let svf = SVF::new(params.clone());
+        let svf_new = filter::NewSVF::new(params.clone());
         let ladder = LadderFilter::new(params.clone());
         Self {
             params: params.clone(),
             svf,
+            svf_new,
             ladder,
             should_update_filter,
             // host: None,
@@ -161,7 +165,8 @@ impl Plugin for VST {
             ]);
             // let mut samples = unsafe { channel_samples.to_simd_unchecked() };
             let processed = match self.params.filter_type.value() {
-                filter_params_nih::Circuits::SVF => self.svf.tick_newton(frame),
+                // filter_params_nih::Circuits::SVF => self.svf.tick_newton(frame),
+                filter_params_nih::Circuits::SVF => self.svf_new.tick_dk(*channel_samples.get_mut(0).unwrap()),
                 filter_params_nih::Circuits::Ladder => self.ladder.tick_newton(frame),
             };
 

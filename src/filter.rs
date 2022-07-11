@@ -258,6 +258,443 @@ impl LadderFilter {
         out
     }
 }
+
+pub struct NewSVF {
+    pub params: Arc<FilterParams>,
+    vout: [f32; 2],
+    s: [f32; 2],
+
+
+    // used to find the nonlinear contributions
+    dq: [[f32; 2]; 2],
+    eq: [f32; 2],
+    fq: [[f32; 4]; 8],
+    // dq, eq are actually much larger, pexps are used to reduce them
+    pexps: [[f32; 2]; 8],
+
+    // used to update the capacitor states
+    a: [[f32; 2]; 2],
+    b: [f32; 2],
+    c: [[f32; 4]; 2],
+
+    // used to find the output values
+    dy: [[f32; 2]; 2],
+    ey: [f32; 2],
+    fy: [[f32; 4]; 2],
+
+    solver: DKSolver,
+
+}
+
+impl NewSVF {
+
+
+    pub fn new(params: Arc<FilterParams>) -> Self {
+        let pexps = [[ 0.        ,  1.        ],
+        [ 0.34013605, -0.34013605],
+        [ 1.        ,  0.        ],
+        [ 0.        , -0.22675737],
+        [-1.        ,  0.        ],
+        [ 0.        , -1.        ],
+        [ 1.        ,  0.        ],
+        [ 0.        ,  1.        ]];
+        let fq = [[ 0.  ,  0.  ,  1.  ,  0.  ],
+        [ 8.82,  0.  ,  0.  ,  0.  ],
+        [-1.  ,  0.  ,  0.  ,  0.  ],
+        [ 0.  ,  8.82,  0.  ,  0.  ],
+        [ 1.  ,  0.  ,  0.  ,  0.  ],
+        [-3.  , -2.  ,  1.  ,  1.  ],
+        [-1.  ,  0.  ,  0.  ,  0.  ],
+        [ 0.  ,  0.  ,  0.  ,  1.  ]];
+        Self {
+            params,
+            vout: [0.; 2],
+            s: [0.; 2],
+
+            dq: [[-9589.77913964,   242.39343474],
+                [9428.18351647,  6527.84911239]],
+            eq: [-0.01211967, -0.32639246],
+            fq,
+            pexps,
+
+            a: [[ 0.91795583, -0.04847869],
+            [-0.04847869,  0.96643451]],
+            b: [7.27180304e-06, 1.67827426e-06],
+            c:  [[0.0002, 0.    , 0.    , 0.    ],
+                [0.    , 0.0002, 0.    , 0.    ]],
+
+            dy: [[  242.39343474, -9832.17257438],
+                [-9589.77913964,   242.39343474]],
+            ey: [-0.00839137, -0.01211967],
+            fy: [[ 0., -1.,  0.,  0.],
+                [-1.,  0.,  0.,  0.]],
+
+            solver: DKSolver::new([0.; N_P], [0.; N_N], &pexps, fq)
+        }
+    }
+
+
+    pub fn tick_dk(&mut self, input: f32) -> f32x4 {
+        // let p = dot(dq, s) + dot(eq, input);
+        let mut p = [0.; 2];
+        // find the
+        p[0] = self.dq[0][0] * self.s[0] + self.dq[0][1] * self.s[1] +  self.eq[0] * input;
+        p[1] = self.dq[1][0] * self.s[0] + self.dq[1][1] * self.s[1] +  self.eq[1] * input;
+        
+        // 
+        self.nonlinear_contribs(p);
+
+        // self.vout = dot(dy, s) + dot(ey, input) + dot(fy, self.solver.z)
+        // TODO: add in fy * z
+        self.vout[0] = self.dy[0][0] * self.s[0] + self.dy[0][1] * self.s[1] +  self.ey[0] * input;
+        self.vout[1] = self.dy[1][0] * self.s[0] + self.dy[1][1] * self.s[1] +  self.ey[1] * input;
+        for i in 0..2 {
+            for j in 0..4 {
+                self.vout[i] +=  self.solver.z[j] * self.fy[i][j];
+            }
+        }
+        let s1_update = self.a[1][0] * self.s[0] + self.a[1][1] * self.s[1];
+        self.s[0] = self.a[0][0] * self.s[0] + self.a[0][1] * self.s[1] +  self.b[0] * input;
+        self.s[1] = s1_update + self.b[1] * input;
+        // THE ERROR IS IN THIS FOR LOOP!!!
+        // correct formula: self.s[1] = self.a[1][0] * self.s[0] + self.a[1][1] * self.s[1] +  self.b[1] * input + self.solver.z[1] * self.c[1][1]
+        for i in 0..2 {
+            for j in 0..4 {
+                self.s[i] +=  self.solver.z[j] * self.c[i][j];
+            }
+        }
+        // let out = self.get_output(input, self.params.zeta.get());
+        let out = self.vout[0];
+        f32x4::from_array([out, out, 0., 0.])
+        // self.s = dot(a, s) + dot(b, input) + dot(c, self.solver.z);
+    }
+
+    fn nonlinear_contribs(&mut self, p: [f32; 2]) {
+        self.solver.set_p(p, &self.pexps);
+
+        // self.solver.tmp_np[0] =  self.solver.tmp_np[0] - self.solver.last_p[0];
+        // self.solver.tmp_np[1] = self.solver.tmp_np[1] - self.solver.last_p[1];
+        self.solver.tmp_np[0] = p[0] - self.solver.last_p[0];
+        // FIXME: slight discrepancy in last_p[1], which seems to "spread out" to make convergence fail
+        self.solver.tmp_np[1] = p[1] - self.solver.last_p[1];
+
+        for i in 0..4 {
+            self.solver.tmp_nn[i] = 0.;
+            for j in 0..self.solver.tmp_np.len() {
+                self.solver.tmp_nn[i] += self.solver.last_jp[i][j] * self.solver.tmp_np[j];
+            }
+        }
+
+        self.solver.tmp_nn = self.solver.solve_linear_equation(self.solver.tmp_nn);
+
+        // self.solver.z = self.solver.last_z - self.solver.tmp_nn;
+        for i in 0..self.solver.z.len() {
+            self.solver.z[i] = self.solver.last_z[i] - self.solver.tmp_nn[i];
+        }
+        // verified above this line
+        let mut resmaxabs = 1.;
+        for _plsconverge in 0..50 {
+            self.solver.evaluate_nonlinearities(self.solver.z, self.fq, 0.6293835652464929/*self.params.g.get() * 0.0001 * 2. * 44100.*/);
+
+            let maybe_resmaxabs = self.solver.residue.iter().max_by(|x, y| x.abs().partial_cmp(&y.abs()).expect(&format!("shit: {:?}", self.solver.residue)));
+            if let Some(resm) = maybe_resmaxabs {
+                resmaxabs = *resm;
+            }   
+            else {
+                panic!("how does it fail with this residue?: {:?}",self.solver.residue)
+            }
+
+            self.solver.set_lin_solver(self.solver.j);
+            if resmaxabs.abs() < 1e-4 {
+                break;
+            }
+
+            // update z with the linsolver according to the residue
+            self.solver.tmp_nn = self.solver.solve_linear_equation(self.solver.residue);
+
+            for i in 0..self.solver.z.len() {
+                self.solver.z[i] = self.solver.z[i] - self.solver.tmp_nn[i];
+            }
+            // self.solver.z = self.solver.z - self.solver.tmp_nn;
+
+        }
+        if resmaxabs.abs() < 1e-4 {
+            self.solver.set_jp(&self.pexps);
+            self.solver.set_extrapolation_origin(p, self.solver.z, self.solver.jp);
+        }
+        else {
+            panic!("failed to converge. residue: {:?}", self.solver.residue);
+        }
+
+    }
+    // TODO: I've somehow managed to swap the outputs, so just swap them here maybe? Or take the time to flip a bunch of matrices
+    #[inline(always)]
+    fn get_output(&self, input: f32, k: f32) -> f32 {
+        match self.params.mode.value() {
+            SvfMode::LP => self.vout[1],                            // lowpass
+            SvfMode::HP => input - k * self.vout[0] - self.vout[1], // highpass
+            SvfMode::BP1 => self.vout[0],                           // bandpass
+            SvfMode::Notch => input - k * self.vout[0],             // notch
+            //3 => input - 2. * k * self.vout[1], // allpass
+            SvfMode::BP2 => k * self.vout[0], // bandpass (normalized peak gain)
+                                              // _ => input - f32x4::splat(2.) * self.vout[1] - k * self.vout[0], // peak / resonator thingy
+        }
+    }
+
+}
+
+/// solves the nonlinear contributions in the SVF using Newton's method
+// TODO: could be made to work with multiple circuits with constructing with n_n, n_p and moving eval_nonlinear to a trait
+const N_N: usize = 4;
+const N_P: usize = 2;
+struct DKSolver {
+// struct DKSolver<const n_n: usize, const n_p: usize> {
+    // current solution of nonlinear contributions
+    z: [f32; N_N],
+    last_z: [f32; N_N],
+    last_p: [f32; N_P],
+
+    // last value of jacobian * p?
+    last_jp: [[f32; N_P]; N_N],
+
+    // temporary storage. Evaluate if necessary
+    tmp_nn: [f32; N_N],
+    tmp_np: [f32; N_P],
+
+    // TODO: how to store the linear solver and the Nleq
+
+    // used by the linearization
+    factors: [[f32; N_N]; N_N],
+    // indices for pivot columns for linearization
+    ipiv: [usize; N_N],
+
+    // used by the nonlinear equations
+
+    // full jacobian for the circuit
+    j: [[f32; N_N]; N_N],
+    // full jacobian product for the circuit
+    jp: [[f32; N_P]; N_N],
+    // TODO: rename these 2, to p and Jq i think but verify
+    /// was called scratch0 before
+    // TODO: FIXME: these 2 are the wrong size! Needs to be 8 and 4, 8 why? <- because of p but how to define/explain
+    // p: [f32; N_P],
+    // jq: [[f32; N_N]; N_P],
+    p_full: [f32; N_N * N_P],
+    // jq: [[f32; N_N]; N_N * N_P],
+    jq: [[f32; N_N * N_P]; N_N],
+    residue: [f32; N_N],
+
+
+}
+
+impl DKSolver {
+
+    fn new(initial_p: [f32; N_P], initial_z: [f32; N_N], pexps: &[[f32; 2];N_N * N_P], fq: [[f32; N_N]; N_N * N_P]) -> Self {
+        let mut a = Self {
+            z: [0.; N_N],
+            last_z: [0.; N_N],
+            last_p: [0.; N_P],
+            last_jp: [[0.; N_P]; N_N],
+            tmp_nn: [0.; N_N],
+            tmp_np: [0.; N_P],
+            factors: [[0.; N_N]; N_N],
+            ipiv: [0; N_N],
+            j: [[0.; N_N]; N_N],
+            jp: [[0.; N_P]; N_N],
+            p_full: [0.; N_N * N_P],
+            jq: [[0.; N_N * N_P]; N_N],
+            residue: [0.; N_N],
+        };
+        a.set_p(initial_p, pexps);
+        a.evaluate_nonlinearities(initial_z, fq, 0.6293835652464929);
+        a.set_lin_solver(a.j);
+        a.set_jp(pexps);
+        a.set_extrapolation_origin(initial_p, initial_z, a.jp);
+        a
+    }
+
+    fn set_p(&mut self, p: [f32; 2], pexps: &[[f32; 2];N_N * N_P]) {
+        self.p_full = [0.; N_N * N_P];
+        for i in 0..8 {
+            for j in 0..2 {
+                self.p_full[i] += p[j] * pexps[i][j];
+            }
+        }
+    }
+
+    fn set_jp(&mut self, pexps: &[[f32; 2];N_N * N_P]) {
+        // goal shape: (4,2)
+        // np.dot(self.jq, pexps)
+        // not verified but I think it's right
+        for i in 0..4 {
+            for j in 0..2 {
+                self.jp[i][j] = 0.;
+                for k in 0..8 {
+                    self.jp[i][j] += self.jq[i][k] * pexps[k][j];
+                }
+            }
+        }
+    }
+
+    // prepare the solver for next sample by storing the current solution, so it can be used as an initial guess
+    // NOTE: this generally works very well but can lead to slow convergence on sudden discontinuities, e.g. the jump in a saw wave
+    // In that case maybe a guess from the capacitor states would be better
+    fn set_extrapolation_origin(&mut self, p: [f32; N_P], z: [f32; 4], jp: [[f32; 2]; 4]) {
+
+        self.last_jp = jp;
+        self.last_p = p;
+        self.last_z = z;
+    }
+    // this entire function could be removed by just using a linearization directly but it would make updating the model(s) require a lot more manual work
+    fn set_lin_solver(&mut self, new_jacobian: [[f32; N_N]; N_N]) {
+        const M: usize = N_N;
+        const N: usize = N_N;
+
+        self.factors = new_jacobian;
+        // sort of a lower-upper factorization
+        for k in 0..N_N {
+            let mut kp = k;
+            let mut amax = 0.0;
+            for i in k..M {
+                let absi = self.factors[i][k].abs();
+                if absi > amax {
+                    kp = i;
+                    amax = absi;
+                }
+            }
+            self.ipiv[k] = kp;
+            if self.factors[kp][k] != 0.0 {
+                if k != kp {
+                    // interchange values
+                    for i in 0..N {
+                        let tmp = self.factors[k][i];
+                        self.factors[k][i] = self.factors[kp][i];
+                        self.factors[kp][i] = tmp;
+                    }
+                }
+                // scale first column
+                // let fkk_inv =  1. / self.factors[k][k];
+                self.factors[k][k] = 1. / self.factors[k][k];
+                for i in k+1..M {
+                    self.factors[i][k] *= self.factors[k][k];
+                }
+
+            }
+            else {
+                panic!("shouldn't happen");
+            }
+            // update rest of factors
+            for j in k+1..N {
+                for i in k+1..M {
+                    self.factors[i][j] -= self.factors[i][k] * self.factors[k][j];
+                }
+            }
+        }
+    }
+    /// based on dgetrs, solve A * X = B with A being lower-upper factorized
+    fn solve_linear_equation(&self, x: [f32; N_N]) -> [f32; N_N] {
+        let mut x_temp = x;
+        for i in 0..N_N {
+            // x[i], x[self.ipiv[i]] =
+            x_temp.swap(i, self.ipiv[i]);
+        }
+        for j in 0..N_N {
+            let xj = x_temp[j];
+            for i in j+1..N_N {
+                x_temp[i] -= self.factors[i][j] * xj;
+            }
+        }
+        // This loop is wrong somehow
+        // TODO: verify this range, should be 3-2-1-0
+        for j in (0..N_N).rev() {
+            x_temp[j] = self.factors[j][j] * x_temp[j];
+            for i in 0..j {
+                x_temp[i] -= self.factors[i][j] * x_temp[j];
+            }
+        }
+        x_temp
+    }
+
+    fn evaluate_nonlinearities(&mut self, z: [f32; N_N], fq: [[f32; N_N]; N_N * N_P], g: f32) {
+        // TODO: better way of finding dot-product between fq and z
+        let mut dot_p = [0.; 8];
+        let mut q = self.p_full;
+        for i in 0..8 {
+            for j in 0..4 {
+                dot_p[i] += z[j] * fq[i][j];
+            }
+            q[i] += dot_p[i];
+        }
+        // let q = self.p_full + dot_p;
+        // println!("g: {g}");
+        // println!("q: {:?}", q);
+        // println!("p_full: {:?}", self.p_full);
+        // println!("z: {:?}", z);
+        let (res1, jq1) = self.eval_ota(&q[0..2], g);
+        let (res2, jq2) = self.eval_ota(&q[2..4], g);
+
+        let (res3, jq3) = self.eval_diode(&q[4..6]);
+        let (res4, jq4) = self.eval_diode(&q[6..8]);
+
+        // TODO: consider simplifying jq
+        self.jq[0][0] = jq1[0];
+        self.jq[0][1] = jq1[1];
+
+        self.jq[1][2] = jq2[0];
+        self.jq[1][3] = jq2[1];
+
+        self.jq[2][4] = jq3[0];
+        self.jq[2][5] = jq3[1];
+        self.jq[3][6] = jq4[0];
+        self.jq[3][7] = jq4[1];
+
+        // update j to the matrix product fq * jq
+        for i in 0..self.jq.len() {
+            for j in 0..N_N {
+                self.j[i][j] = 0.;
+                for k in 0..8 {
+                    self.j[i][j] += self.jq[i][k] * fq[k][j];
+                }
+            }
+        }
+        self.residue = [res1, res2, res3, res4];
+
+    }
+
+    // TODO: remove g from this when switching to the new analytic matrices
+    fn eval_ota(&self, q: &[f32], g: f32)  -> (f32, [f32; 2]) {
+        let v_in = q[0];
+        let i_out = q[1];
+        // TODO: switch to tanh approximation
+        let tanh_vin = v_in.tanh();
+        let residue = g * tanh_vin + i_out;
+
+        let jacobian = [g * (1. - tanh_vin * tanh_vin), 1.0];
+
+        (residue, jacobian)
+    }
+    // simple shockley diode equation
+    fn eval_diode(&self, q: &[f32])  -> (f32, [f32; 2]) {
+        // thermal voltage
+        const V_T_INV: f32 = 1.0/25e-3;
+        // the diode's saturation current. Could make this a function parameter to have slightly mismatched diodes or something
+        const I_S: f32 = 1e-15;
+
+        let v_in = q[0];
+        let i_out = q[1];
+        let ex = (v_in * V_T_INV).exp();
+
+        let residue = I_S * (ex - 1.) - i_out;
+
+        let jacobian = [I_S * V_T_INV * ex, -1.0];
+
+        (residue, jacobian)
+    }
+
+}
+
+
+
 // this is a 2-pole filter with resonance, which is why there's 2 states and vouts
 pub struct SVF {
     pub params: Arc<FilterParams>,
@@ -484,3 +921,16 @@ impl SVF {
 //         }
 //     }
 // }
+
+
+#[test]
+fn test() {
+    let should_update_filter = Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let params = Arc::new(FilterParams::new(should_update_filter.clone()));
+
+    let mut filt = NewSVF::new(params);
+    for i in 0..10 {
+        println!("sample {i}");
+        filt.tick_dk(-1.0);
+    }
+}   
