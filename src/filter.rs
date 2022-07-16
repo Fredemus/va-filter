@@ -6,6 +6,7 @@ use crate::{
 };
 // use packed_simd::f32x4;
 use core_simd::*;
+use nih_plug::prelude::Param;
 use std::sync::Arc;
 use std_float::*;
 
@@ -264,7 +265,6 @@ pub struct NewSVF {
     vout: [f32; 2],
     s: [f32; 2],
 
-
     // used to find the nonlinear contributions
     dq: [[f32; 2]; 2],
     eq: [f32; 2],
@@ -283,84 +283,111 @@ pub struct NewSVF {
     fy: [[f32; 4]; 2],
 
     solver: DKSolver,
-
 }
 
 impl NewSVF {
-
-
     pub fn new(params: Arc<FilterParams>) -> Self {
-        let pexps = [[ 0.        ,  1.        ],
-        [ 0.34013605, -0.34013605],
-        [ 1.        ,  0.        ],
-        [ 0.        , -0.22675737],
-        [-1.        ,  0.        ],
-        [ 0.        , -1.        ],
-        [ 1.        ,  0.        ],
-        [ 0.        ,  1.        ]];
-        let fq = [[ 0.  ,  0.  ,  1.  ,  0.  ],
-        [ 8.82,  0.  ,  0.  ,  0.  ],
-        [-1.  ,  0.  ,  0.  ,  0.  ],
-        [ 0.  ,  8.82,  0.  ,  0.  ],
-        [ 1.  ,  0.  ,  0.  ,  0.  ],
-        [-3.  , -2.  ,  1.  ,  1.  ],
-        [-1.  ,  0.  ,  0.  ,  0.  ],
-        [ 0.  ,  0.  ,  0.  ,  1.  ]];
+        let g = params.g.get();
+        let fs = params.sample_rate.get();
+        let res = params.zeta.get();
+        let res = 5.;
+        let pexps = [
+            [0., 0.],
+            [0., 0.],
+            [0., 1.],
+            [0., 0.],
+            [0., -1.],
+            [1., 0.],
+            [0., 1.],
+            [0., 0.],
+        ];
+        let fq = [
+            [1., 0., 0., 0.],
+            [0., 1. / (2. * fs * g), 0., 0.],
+            [0., -1. / (2. * fs), 0., 0.],
+            [0., 0., 1. / (2. * fs * g), 0.],
+            [0., 1. / (2. * fs), 0., 0.],
+            [1., -res / (2. * fs), -1. / fs, 1.],
+            [0., -1. / (2. * fs), 0., 0.],
+            [0., 0., 0., 1.],
+        ];
         Self {
             params,
             vout: [0.; 2],
             s: [0.; 2],
 
-            dq: [[-9589.77913964,   242.39343474],
-                [9428.18351647,  6527.84911239]],
-            eq: [-0.01211967, -0.32639246],
+            dq: [[-res, -2.], [-1., 0.]],
+            eq: [1., 0.],
             fq,
             pexps,
 
-            a: [[ 0.91795583, -0.04847869],
-            [-0.04847869,  0.96643451]],
-            b: [7.27180304e-06, 1.67827426e-06],
-            c:  [[0.0002, 0.    , 0.    , 0.    ],
-                [0.    , 0.0002, 0.    , 0.    ]],
+            a: [[1., 0.], [0., 1.]],
+            b: [0., 0.],
+            c: [[0., 1. / fs, 0., 0.], [0., 0., 1. / fs, 0.]],
 
-            dy: [[  242.39343474, -9832.17257438],
-                [-9589.77913964,   242.39343474]],
-            ey: [-0.00839137, -0.01211967],
-            fy: [[ 0., -1.,  0.,  0.],
-                [-1.,  0.,  0.,  0.]],
+            dy: [[0., -1.], [-1., 0.]],
+            ey: [0.0, 0.0],
+            fy: [[0., 0., -1. / (2. * fs), 0.], [0., -1. / (2. * fs), 0., 0.]],
 
-            solver: DKSolver::new([0.; N_P], [0.; N_N], &pexps, fq)
+            solver: DKSolver::new([0.; N_P], [0.; N_N], &pexps, fq),
         }
     }
 
+    pub fn update_matrices(&mut self) {
+        let fs = self.params.sample_rate.get();
+        // FIXME: roll 1/m * fs into g
+        let g = self.params.g.get();
+        let res = self.params.zeta.get();
+
+        // TODO: no need to set the entire matrix but lazy rn
+        self.fq = [
+            [1., 0., 0., 0.],
+            [0., 1. / (2. * fs * g), 0., 0.],
+            [0., -1. / (2. * fs), 0., 0.],
+            [0., 0., 1. / (2. * fs * g), 0.],
+            [0., 1. / (2. * fs), 0., 0.],
+            [1., -res / (2. * fs), -1. / fs, 1.],
+            [0., -1. / (2. * fs), 0., 0.],
+            [0., 0., 0., 1.],
+        ];
+
+        self.dq[0][0] = -res;
+
+        self.c[0][1] = 1. / fs;
+        self.c[1][2] = 1. / fs;
+
+        self.fy[0][2] = -1. / (2. * fs);
+        self.fy[1][1] = -1. / (2. * fs);
+    }
 
     pub fn tick_dk(&mut self, input: f32) -> f32x4 {
+        let input = input * (self.params.drive.value + 1.);
+
         // let p = dot(dq, s) + dot(eq, input);
         let mut p = [0.; 2];
         // find the
-        p[0] = self.dq[0][0] * self.s[0] + self.dq[0][1] * self.s[1] +  self.eq[0] * input;
-        p[1] = self.dq[1][0] * self.s[0] + self.dq[1][1] * self.s[1] +  self.eq[1] * input;
-        
-        // 
+        p[0] = self.dq[0][0] * self.s[0] + self.dq[0][1] * self.s[1] + self.eq[0] * input;
+        p[1] = self.dq[1][0] * self.s[0] + self.dq[1][1] * self.s[1] + self.eq[1] * input;
+
+        //
         self.nonlinear_contribs(p);
 
         // self.vout = dot(dy, s) + dot(ey, input) + dot(fy, self.solver.z)
         // TODO: add in fy * z
-        self.vout[0] = self.dy[0][0] * self.s[0] + self.dy[0][1] * self.s[1] +  self.ey[0] * input;
-        self.vout[1] = self.dy[1][0] * self.s[0] + self.dy[1][1] * self.s[1] +  self.ey[1] * input;
+        self.vout[0] = self.dy[0][0] * self.s[0] + self.dy[0][1] * self.s[1] + self.ey[0] * input;
+        self.vout[1] = self.dy[1][0] * self.s[0] + self.dy[1][1] * self.s[1] + self.ey[1] * input;
         for i in 0..2 {
             for j in 0..4 {
-                self.vout[i] +=  self.solver.z[j] * self.fy[i][j];
+                self.vout[i] += self.solver.z[j] * self.fy[i][j];
             }
         }
         let s1_update = self.a[1][0] * self.s[0] + self.a[1][1] * self.s[1];
-        self.s[0] = self.a[0][0] * self.s[0] + self.a[0][1] * self.s[1] +  self.b[0] * input;
+        self.s[0] = self.a[0][0] * self.s[0] + self.a[0][1] * self.s[1] + self.b[0] * input;
         self.s[1] = s1_update + self.b[1] * input;
-        // THE ERROR IS IN THIS FOR LOOP!!!
         // correct formula: self.s[1] = self.a[1][0] * self.s[0] + self.a[1][1] * self.s[1] +  self.b[1] * input + self.solver.z[1] * self.c[1][1]
         for i in 0..2 {
             for j in 0..4 {
-                self.s[i] +=  self.solver.z[j] * self.c[i][j];
+                self.s[i] += self.solver.z[j] * self.c[i][j];
             }
         }
         // let out = self.get_output(input, self.params.zeta.get());
@@ -393,15 +420,21 @@ impl NewSVF {
         }
         // verified above this line
         let mut resmaxabs = 1.;
-        for _plsconverge in 0..50 {
-            self.solver.evaluate_nonlinearities(self.solver.z, self.fq, 0.6293835652464929/*self.params.g.get() * 0.0001 * 2. * 44100.*/);
+        for _plsconverge in 0..2000 {
+            self.solver.evaluate_nonlinearities(self.solver.z, self.fq);
 
-            let maybe_resmaxabs = self.solver.residue.iter().max_by(|x, y| x.abs().partial_cmp(&y.abs()).expect(&format!("shit: {:?}", self.solver.residue)));
+            let maybe_resmaxabs = self.solver.residue.iter().max_by(|x, y| {
+                x.abs()
+                    .partial_cmp(&y.abs())
+                    .expect(&format!("shit, residue is NaN: {:?}", self.solver.residue))
+            });
             if let Some(resm) = maybe_resmaxabs {
                 resmaxabs = *resm;
-            }   
-            else {
-                panic!("how does it fail with this residue?: {:?}",self.solver.residue)
+            } else {
+                panic!(
+                    "how does it fail with this residue?: {:?}",
+                    self.solver.residue
+                )
             }
 
             self.solver.set_lin_solver(self.solver.j);
@@ -416,16 +449,16 @@ impl NewSVF {
                 self.solver.z[i] = self.solver.z[i] - self.solver.tmp_nn[i];
             }
             // self.solver.z = self.solver.z - self.solver.tmp_nn;
-
         }
+        // if resmaxabs.abs() < 0.000123 {
         if resmaxabs.abs() < 1e-4 {
             self.solver.set_jp(&self.pexps);
-            self.solver.set_extrapolation_origin(p, self.solver.z, self.solver.jp);
+            self.solver
+                .set_extrapolation_origin(p, self.solver.z, self.solver.jp);
+        } else {
+            // panic!("failed to converge. residue: {:?}", self.solver.residue);
+            println!("failed to converge. residue: {:?}", self.solver.residue);
         }
-        else {
-            panic!("failed to converge. residue: {:?}", self.solver.residue);
-        }
-
     }
     // TODO: I've somehow managed to swap the outputs, so just swap them here maybe? Or take the time to flip a bunch of matrices
     #[inline(always)]
@@ -440,7 +473,6 @@ impl NewSVF {
                                               // _ => input - f32x4::splat(2.) * self.vout[1] - k * self.vout[0], // peak / resonator thingy
         }
     }
-
 }
 
 /// solves the nonlinear contributions in the SVF using Newton's method
@@ -448,7 +480,7 @@ impl NewSVF {
 const N_N: usize = 4;
 const N_P: usize = 2;
 struct DKSolver {
-// struct DKSolver<const n_n: usize, const n_p: usize> {
+    // struct DKSolver<const n_n: usize, const n_p: usize> {
     // current solution of nonlinear contributions
     z: [f32; N_N],
     last_z: [f32; N_N],
@@ -461,8 +493,6 @@ struct DKSolver {
     tmp_nn: [f32; N_N],
     tmp_np: [f32; N_P],
 
-    // TODO: how to store the linear solver and the Nleq
-
     // used by the linearization
     factors: [[f32; N_N]; N_N],
     // indices for pivot columns for linearization
@@ -474,22 +504,21 @@ struct DKSolver {
     j: [[f32; N_N]; N_N],
     // full jacobian product for the circuit
     jp: [[f32; N_P]; N_N],
-    // TODO: rename these 2, to p and Jq i think but verify
-    /// was called scratch0 before
-    // TODO: FIXME: these 2 are the wrong size! Needs to be 8 and 4, 8 why? <- because of p but how to define/explain
-    // p: [f32; N_P],
-    // jq: [[f32; N_N]; N_P],
+    // p expanded to the inputs of the nonlinear elements
     p_full: [f32; N_N * N_P],
-    // jq: [[f32; N_N]; N_N * N_P],
+    // ?
     jq: [[f32; N_N * N_P]; N_N],
+    // the errors of the root-finding for the nonlinear elements
     residue: [f32; N_N],
-
-
 }
 
 impl DKSolver {
-
-    fn new(initial_p: [f32; N_P], initial_z: [f32; N_N], pexps: &[[f32; 2];N_N * N_P], fq: [[f32; N_N]; N_N * N_P]) -> Self {
+    fn new(
+        initial_p: [f32; N_P],
+        initial_z: [f32; N_N],
+        pexps: &[[f32; 2]; N_N * N_P],
+        fq: [[f32; N_N]; N_N * N_P],
+    ) -> Self {
         let mut a = Self {
             z: [0.; N_N],
             last_z: [0.; N_N],
@@ -506,14 +535,14 @@ impl DKSolver {
             residue: [0.; N_N],
         };
         a.set_p(initial_p, pexps);
-        a.evaluate_nonlinearities(initial_z, fq, 0.6293835652464929);
+        a.evaluate_nonlinearities(initial_z, fq);
         a.set_lin_solver(a.j);
         a.set_jp(pexps);
         a.set_extrapolation_origin(initial_p, initial_z, a.jp);
         a
     }
 
-    fn set_p(&mut self, p: [f32; 2], pexps: &[[f32; 2];N_N * N_P]) {
+    fn set_p(&mut self, p: [f32; 2], pexps: &[[f32; 2]; N_N * N_P]) {
         self.p_full = [0.; N_N * N_P];
         for i in 0..8 {
             for j in 0..2 {
@@ -522,7 +551,7 @@ impl DKSolver {
         }
     }
 
-    fn set_jp(&mut self, pexps: &[[f32; 2];N_N * N_P]) {
+    fn set_jp(&mut self, pexps: &[[f32; 2]; N_N * N_P]) {
         // goal shape: (4,2)
         // np.dot(self.jq, pexps)
         // not verified but I think it's right
@@ -540,7 +569,6 @@ impl DKSolver {
     // NOTE: this generally works very well but can lead to slow convergence on sudden discontinuities, e.g. the jump in a saw wave
     // In that case maybe a guess from the capacitor states would be better
     fn set_extrapolation_origin(&mut self, p: [f32; N_P], z: [f32; 4], jp: [[f32; 2]; 4]) {
-
         self.last_jp = jp;
         self.last_p = p;
         self.last_z = z;
@@ -575,17 +603,15 @@ impl DKSolver {
                 // scale first column
                 // let fkk_inv =  1. / self.factors[k][k];
                 self.factors[k][k] = 1. / self.factors[k][k];
-                for i in k+1..M {
+                for i in k + 1..M {
                     self.factors[i][k] *= self.factors[k][k];
                 }
-
-            }
-            else {
+            } else {
                 panic!("shouldn't happen");
             }
             // update rest of factors
-            for j in k+1..N {
-                for i in k+1..M {
+            for j in k + 1..N {
+                for i in k + 1..M {
                     self.factors[i][j] -= self.factors[i][k] * self.factors[k][j];
                 }
             }
@@ -600,7 +626,7 @@ impl DKSolver {
         }
         for j in 0..N_N {
             let xj = x_temp[j];
-            for i in j+1..N_N {
+            for i in j + 1..N_N {
                 x_temp[i] -= self.factors[i][j] * xj;
             }
         }
@@ -615,7 +641,7 @@ impl DKSolver {
         x_temp
     }
 
-    fn evaluate_nonlinearities(&mut self, z: [f32; N_N], fq: [[f32; N_N]; N_N * N_P], g: f32) {
+    fn evaluate_nonlinearities(&mut self, z: [f32; N_N], fq: [[f32; N_N]; N_N * N_P]) {
         // TODO: better way of finding dot-product between fq and z
         let mut dot_p = [0.; 8];
         let mut q = self.p_full;
@@ -630,8 +656,8 @@ impl DKSolver {
         // println!("q: {:?}", q);
         // println!("p_full: {:?}", self.p_full);
         // println!("z: {:?}", z);
-        let (res1, jq1) = self.eval_ota(&q[0..2], g);
-        let (res2, jq2) = self.eval_ota(&q[2..4], g);
+        let (res1, jq1) = self.eval_ota(&q[0..2]);
+        let (res2, jq2) = self.eval_ota(&q[2..4]);
 
         let (res3, jq3) = self.eval_diode(&q[4..6]);
         let (res4, jq4) = self.eval_diode(&q[6..8]);
@@ -658,25 +684,24 @@ impl DKSolver {
             }
         }
         self.residue = [res1, res2, res3, res4];
-
     }
 
     // TODO: remove g from this when switching to the new analytic matrices
-    fn eval_ota(&self, q: &[f32], g: f32)  -> (f32, [f32; 2]) {
+    fn eval_ota(&self, q: &[f32]) -> (f32, [f32; 2]) {
         let v_in = q[0];
         let i_out = q[1];
         // TODO: switch to tanh approximation
         let tanh_vin = v_in.tanh();
-        let residue = g * tanh_vin + i_out;
-
-        let jacobian = [g * (1. - tanh_vin * tanh_vin), 1.0];
+        let residue = tanh_vin + i_out;
+        // just a thought: could it be "helped along" by `if jacobian[0] == 0. { jacobian[0] = v_in.signum() * 1e-6}`?
+        let jacobian = [(1. - tanh_vin * tanh_vin), 1.0];
 
         (residue, jacobian)
     }
     // simple shockley diode equation
-    fn eval_diode(&self, q: &[f32])  -> (f32, [f32; 2]) {
+    fn eval_diode(&self, q: &[f32]) -> (f32, [f32; 2]) {
         // thermal voltage
-        const V_T_INV: f32 = 1.0/25e-3;
+        const V_T_INV: f32 = 1.0 / 25e-3;
         // the diode's saturation current. Could make this a function parameter to have slightly mismatched diodes or something
         const I_S: f32 = 1e-15;
 
@@ -690,10 +715,7 @@ impl DKSolver {
 
         (residue, jacobian)
     }
-
 }
-
-
 
 // this is a 2-pole filter with resonance, which is why there's 2 states and vouts
 pub struct SVF {
@@ -922,15 +944,23 @@ impl SVF {
 //     }
 // }
 
-
 #[test]
-fn test() {
+fn test_stepresponse() {
     let should_update_filter = Arc::new(std::sync::atomic::AtomicBool::new(false));
     let params = Arc::new(FilterParams::new(should_update_filter.clone()));
-
-    let mut filt = NewSVF::new(params);
-    for i in 0..10 {
+    // params.cutoff.set_plain_value(1000.);
+    params.sample_rate.set(44100.);
+    params.update_g(1000.);
+    params.zeta.set(5.);
+    let mut filt = NewSVF::new(params.clone());
+    filt.update_matrices();
+    println!("should be 1.5889e-04: {}", filt.fq[1][1]);
+    for i in 0..1000 {
         println!("sample {i}");
         filt.tick_dk(-1.0);
+        println!("val lp: {}", filt.vout[1]);
+        if filt.vout[1] < 0. {
+            panic!("sample {} got negative", i)
+        }
     }
-}   
+}
