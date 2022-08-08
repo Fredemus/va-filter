@@ -3,6 +3,8 @@ use num::complex::Complex;
 
 use std::f32::consts::PI;
 
+use crate::filter_params_nih::Circuits;
+
 pub fn lin_to_db(gain: f32) -> f32 {
     gain.log10() * 20.0
 }
@@ -16,7 +18,7 @@ fn get_filter_bode(
     cutoff: f32,
     k: f32,
     mode: usize,
-    filter_type: usize,
+    filter_type: Circuits,
     len: usize,
 ) -> Vec<Complex<f32>> {
     let g = cutoff;
@@ -34,8 +36,19 @@ fn get_filter_bode(
     let j = Complex::new(0., 1.);
     let mut curr_s: Complex<f32>;
     match filter_type {
+        // transistor ladder filter
+        Circuits::Ladder => {
+            for i in 0..len {
+                curr_s = frequencies[i] * j;
+                // could potentially be optimized, i think
+                array[i] = ((1. + k) * (1. + curr_s / g).powi(3 - mode as i32))
+                / (k + (1. + curr_s / g).powi(4));
+                // array[i] =
+                //     ((1. + curr_s / g).powi(3 - mode as i32)) / (k + (1. + curr_s / g).powi(4));
+            }
+        }
         // state variable filter
-        0 => {
+        Circuits::SVF => {
             // let k = res.powf(0.2) * (0.05 - 10.) + 10.;
             match mode {
                 0 => {
@@ -78,18 +91,14 @@ fn get_filter_bode(
                 _ => (),
             }
         }
-        // transistor ladder filter
-        1 => {
+        // TODO: should use resonance slightly differently
+        Circuits::SallenKey => {
             for i in 0..len {
                 curr_s = frequencies[i] * j;
-                // could potentially be optimized, i think
-                array[i] = ((1. + k) * (1. + curr_s / g).powi(3 - mode as i32))
-                    / (k + (1. + curr_s / g).powi(4));
-                // array[i] =
-                //     ((1. + curr_s / g).powi(3 - mode as i32)) / (k + (1. + curr_s / g).powi(4));
+                array[i] = g.powi(2) / ((curr_s).powi(2) + k * g * curr_s + g.powi(2));
             }
         }
-        _ => (),
+        
     }
     return array;
 }
@@ -98,7 +107,7 @@ pub fn get_amplitude_response(
     cutoff: f32,
     k: f32,
     mode: usize,
-    filter_type: usize,
+    filter_type: Circuits,
     len: usize,
 ) -> Vec<f32> {
     let array = get_filter_bode(cutoff, k, mode, filter_type, len);
@@ -107,7 +116,7 @@ pub fn get_amplitude_response(
         amplitudes[i] = lin_to_db(array[i].norm());
     }
     // make notch draw a lil nicer at high q-factors (the problem is that there might not be a freq sample at the cutoff)
-    if filter_type == 0 && mode == 3 {
+    if filter_type == Circuits::SVF && mode == 3 {
         let min = amplitudes
             .iter()
             .enumerate()
@@ -117,7 +126,7 @@ pub fn get_amplitude_response(
         amplitudes[min] = -200.;
     }
     // round max reso value to the correct, for same reason as above
-    else if filter_type == 0 && mode != 4 && k < 0.5 {
+    else if filter_type == Circuits::SVF && mode != 4 && k < 0.5 {
         let max = amplitudes
             .iter()
             .enumerate()
@@ -134,7 +143,7 @@ pub fn get_phase_response(
     cutoff: f32,
     k: f32,
     mode: usize,
-    filter_type: usize,
+    filter_type: Circuits,
     len: usize,
 ) -> Vec<f32> {
     let array = get_filter_bode(cutoff, k, mode, filter_type, len);
@@ -171,7 +180,7 @@ pub fn get_phase_response(
 #[test]
 fn test_cutoff_value() {
     let len = 1000;
-    let amplitudes = get_amplitude_response(25.1425 * 2., 1. / 0.707, 0, 0, len);
+    let amplitudes = get_amplitude_response(25.1425 * 2., 1. / 0.707, 0, Circuits::SVF, len);
     // println!("{:?}", amplitudes.iter().max().unwrap());
 
     let mut frequencies = vec![1.; len];
@@ -191,7 +200,7 @@ fn test_cutoff_value() {
 #[test]
 fn test_ladder_value() {
     let len = 1000;
-    let amplitudes = get_amplitude_response(25.1425, 3.99, 3, 1, len);
+    let amplitudes = get_amplitude_response(25.1425, 3.99, 3, Circuits::Ladder, len);
     // println!("{:?}", amplitudes.iter().max().unwrap());
 
     let mut frequencies = vec![1.; len];
@@ -212,12 +221,4 @@ fn test_ladder_value() {
     );
     println!("current lowest: {}", frequencies[0]);
     println!("current highest: {}", frequencies[999]);
-}
-#[test]
-fn db_print() {
-    println!("{}", lin_to_db(0.1));
-}
-#[test]
-fn pr_print() {
-    println!("{:?}", get_phase_response(10000., 0.707, 1, 1, 1000));
 }

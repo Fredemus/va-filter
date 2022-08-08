@@ -36,13 +36,13 @@ use filter_params_nih::FilterParams;
 mod filter;
 mod ui;
 
-struct VST {
+pub(crate) struct VaFilter {
     // Store a handle to the plugin's parameter object.
     params: Arc<FilterParams>,
     ladder: filter::LadderFilter,
     svf: filter::SVF,
 
-    svf_new: filter::NewSVF,
+    sallenkey: filter::SallenKey,
     // used for constructing the editor in get_editor
     // host: Option<HostCallback>,
     /// If this is set at the start of the processing cycle, then the filter coefficients should be
@@ -51,40 +51,25 @@ struct VST {
     should_update_filter: Arc<std::sync::atomic::AtomicBool>,
 }
 
-impl Default for VST {
+impl Default for VaFilter {
     fn default() -> Self {
         let should_update_filter = Arc::new(std::sync::atomic::AtomicBool::new(false));
         let params = Arc::new(FilterParams::new(should_update_filter.clone()));
         let svf = SVF::new(params.clone());
-        let svf_new = filter::NewSVF::new(params.clone());
+        let sallenkey = filter::SallenKey::new(params.clone());
         let ladder = LadderFilter::new(params.clone());
         Self {
             params: params.clone(),
             svf,
-            svf_new,
+            sallenkey,
             ladder,
             should_update_filter,
             // host: None,
         }
     }
 }
-impl VST {
-    // fn process_midi_event(&self, data: [u8; 3]) {
-    //     match data[0] {
-    //         // controller change
-    //         0xB0 => {
-    //             // mod wheel
-    //             if data[1] == 1 {
-    //                 // TODO: Might want to use hostcallback to automate here
-    //                 self.params.set_parameter(0, data[2] as f32 / 127.)
-    //             }
-    //         }
-    //         _ => (),
-    //     }
-    // }
-}
 
-impl Plugin for VST {
+impl Plugin for VaFilter {
     const NAME: &'static str = "Va Filter";
     const VENDOR: &'static str = "???";
     const URL: &'static str = "???";
@@ -95,8 +80,7 @@ impl Plugin for VST {
     const DEFAULT_NUM_INPUTS: u32 = 2;
     const DEFAULT_NUM_OUTPUTS: u32 = 2;
 
-    // const ACCEPTS_MIDI: bool = false;
-    const MIDI_INPUT: MidiConfig = MidiConfig::Basic;
+    const MIDI_INPUT: MidiConfig = MidiConfig::None;
 
     fn params(&self) -> Arc<dyn Params> {
         self.params.clone()
@@ -141,19 +125,18 @@ impl Plugin for VST {
                 )
                 .is_ok()
             {
-                // println!("ladder k {}", self.params.k_ladder.get());
-                // println!("filter mode {:?}", self.params.filter_type.value());
-                // println!("slope {:?}", self.params.slope.value() as usize);
                 self.params.update_g(self.params.cutoff.value);
                 self.params.set_resonances(self.params.res.value);
             }
             if self.params.cutoff.smoothed.is_smoothing() {
                 let cut_smooth = self.params.cutoff.smoothed.next();
                 self.params.update_g(cut_smooth);
+                self.sallenkey.update_matrices();
             }
             if self.params.res.smoothed.is_smoothing() {
                 let res_smooth = self.params.res.smoothed.next();
                 self.params.set_resonances(res_smooth);
+                self.sallenkey.update_matrices();
             }
 
             // channel_samples[0];
@@ -166,7 +149,8 @@ impl Plugin for VST {
             // let mut samples = unsafe { channel_samples.to_simd_unchecked() };
             let processed = match self.params.filter_type.value() {
                 // filter_params_nih::Circuits::SVF => self.svf.tick_newton(frame),
-                filter_params_nih::Circuits::SVF => self.svf_new.tick_dk(*channel_samples.get_mut(0).unwrap()),
+                filter_params_nih::Circuits::SallenKey => self.sallenkey.tick_dk(frame),
+                filter_params_nih::Circuits::SVF => self.svf.tick_newton(frame),
                 filter_params_nih::Circuits::Ladder => self.ladder.tick_newton(frame),
             };
 
@@ -181,9 +165,10 @@ impl Plugin for VST {
     }
 }
 
-impl Vst3Plugin for VST {
+impl Vst3Plugin for VaFilter {
     const VST3_CLASS_ID: [u8; 16] = *b"Va-filter       ";
     const VST3_CATEGORIES: &'static str = "Fx|Filter";
 }
 
-nih_export_vst3!(VST);
+nih_export_vst3!(VaFilter);
+

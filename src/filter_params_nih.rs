@@ -68,10 +68,10 @@ impl FilterParams {
             // TODO: with_value_to_string should actually convert it to db
             drive: FloatParam::new(
                 "Drive",
-                0.0,
+                1.0,
                 FloatRange::Skewed {
-                    min: 0.0, // This must never reach 0
-                    max: 14.8490,
+                    min: 1.0, // This must never reach 0
+                    max: 15.8490,
                     factor: FloatRange::skew_factor(-2.5),
                 },
             )
@@ -91,7 +91,8 @@ impl FilterParams {
             k_ladder: AtomicF32::new(0.),
             zeta: AtomicF32::new(0.),
             g: AtomicF32::new(0.),
-            sample_rate: AtomicF32::new(48000.),
+            // sample_rate: AtomicF32::new(48000.),
+            sample_rate: AtomicF32::new(44100.),
         };
         a.update_g(a.cutoff.value);
         a.set_resonances(a.res.value);
@@ -130,8 +131,9 @@ pub enum LadderSlope {
     LP18,
     LP24,
 }
-#[derive(Enum, Debug, PartialEq)]
+#[derive(Enum, Debug, PartialEq, Clone, Copy)]
 pub enum Circuits {
     SVF,
     Ladder,
+    SallenKey,
 }

@@ -29,7 +29,6 @@ pub struct UiData {
     params: Arc<FilterParams>,
     // host: Option<HostCallback>,
     filter_circuits: Vec<String>,
-    choice: String,
     show_phase: bool,
 }
 
@@ -39,7 +38,7 @@ pub enum ParamChangeEvent {
     EndSet(ParamPtr),
     SetParam(ParamPtr, f32),
 
-    CircuitEvent(String),
+    CircuitEvent(usize),
     ChangeBodeView(),
 }
 
@@ -60,20 +59,30 @@ impl Model for UiData {
             ParamChangeEvent::EndSet(param_ptr) => {
                 unsafe { self.gui_context.raw_end_set_parameter(*param_ptr) };
             }
-            ParamChangeEvent::CircuitEvent(circuit_name) => {
-                self.choice = circuit_name.to_owned();
-                if circuit_name == "SVF" {
-                    unsafe {
-                        self.gui_context
-                            .raw_set_parameter_normalized(self.params.filter_type.as_ptr(), 0.)
-                    };
-                } else {
-                    // self.params.set_parameter(3, 1.);
-                    unsafe {
-                        self.gui_context
-                            .raw_set_parameter_normalized(self.params.filter_type.as_ptr(), 1.)
-                    };
-                }
+            // ParamChangeEvent::CircuitEvent(circuit_name) => {
+            //     self.choice = circuit_name.to_owned();
+            //     if circuit_name == "SVF" {
+            //         unsafe {
+            //             self.gui_context
+            //                 .raw_set_parameter_normalized(self.params.filter_type.as_ptr(), 0.)
+            //         };
+            //     } else {
+            //         // self.params.set_parameter(3, 1.);
+            //         unsafe {
+            //             self.gui_context
+            //                 .raw_set_parameter_normalized(self.params.filter_type.as_ptr(), 1.)
+            //         };
+            //     }
+            // }
+            ParamChangeEvent::CircuitEvent(idx) => {
+                // self.choice = self
+                // self.choice = circuit_name.to_owned();
+                unsafe { self.gui_context.raw_begin_set_parameter(self.params.filter_type.as_ptr()) };
+                unsafe {
+                    self.gui_context
+                        .raw_set_parameter_normalized(self.params.filter_type.as_ptr(), *idx as f32 / 2.)
+                };
+                unsafe { self.gui_context.raw_end_set_parameter(self.params.filter_type.as_ptr()) };
             }
             ParamChangeEvent::ChangeBodeView() => {
                 self.show_phase = !self.show_phase;
@@ -89,12 +98,12 @@ pub fn plugin_gui(cx: &mut Context, params: Arc<FilterParams>, context: Arc<dyn 
         gui_context: context.clone(),
         params: params.clone(),
         // host: state.host,
-        filter_circuits: vec!["SVF".to_string(), "Transistor Ladder".to_string()],
-        choice: if params.filter_type.value() == Circuits::SVF {
-            "SVF".to_string()
-        } else {
-            "Transistor Ladder".to_string()
-        },
+        filter_circuits: vec!["SVF".to_string(), "Transistor Ladder".to_string(), "SallenKey".to_string()],
+        // choice: if params.filter_type.value() == Circuits::SVF {
+        //     "SVF".to_string()
+        // } else {
+        //     "Transistor Ladder".to_string()
+        // },
         show_phase: false,
     }
     .build(cx);
@@ -109,14 +118,14 @@ pub fn plugin_gui(cx: &mut Context, params: Arc<FilterParams>, context: Arc<dyn 
                 move |cx|
                 // A Label and an Icon
                 HStack::new(cx, move |cx|{
-                    Label::new(cx, UiData::choice).left(Auto);
+                    Label::new(cx, UiData::params.map(|p| p.filter_type.to_string())).left(Auto);
                     Label::new(cx, ICON_DOWN_OPEN).class("arrow");
                 }).class("title"),
                 move |cx| {
                     // List of options
-                    List::new(cx, UiData::filter_circuits, move |cx, _, item| {
+                    List::new(cx, UiData::filter_circuits, move |cx, idx, item| {
                         VStack::new(cx, move |cx| {
-                            Binding::new(cx, UiData::choice, move |cx, choice| {
+                            Binding::new(cx, UiData::params.map(|p| p.filter_type.to_string()), move |cx, choice| {
                                 let selected = *item.get(cx) == *choice.get(cx);
                                 Label::new(cx, &item.get(cx).to_string())
                                     .width(Stretch(1.0))
@@ -127,7 +136,7 @@ pub fn plugin_gui(cx: &mut Context, params: Arc<FilterParams>, context: Arc<dyn 
                                     })
                                     .on_press(move |cx| {
                                         cx.emit(ParamChangeEvent::CircuitEvent(
-                                            item.get(cx).clone(),
+                                            idx,
                                         ));
                                         cx.emit(PopupEvent::Close);
                                     });
@@ -354,7 +363,7 @@ impl View for BodePlot {
                         params.cutoff.value,
                         params.zeta.get(),
                         mode,
-                        params.filter_type.value() as usize,
+                        params.filter_type.value(),
                         width,
                     );
                     if mode == 0 {
@@ -374,7 +383,7 @@ impl View for BodePlot {
                         // 2.,
                         params.k_ladder.get(),
                         params.slope.value() as usize,
-                        params.filter_type.value() as usize,
+                        params.filter_type.value(),
                         width,
                     );
                     if params.slope.value() as usize > 1 {
@@ -389,24 +398,26 @@ impl View for BodePlot {
                 // min and max amplitude values that will be rendered
                 min = -60.0;
                 max = 40.0;
-                if params.filter_type.value() == Circuits::SVF {
-                    amps = get_amplitude_response(
-                        params.cutoff.value,
-                        params.zeta.get(),
-                        params.mode.value() as usize,
-                        params.filter_type.value() as usize,
-                        width,
-                    );
-                } else {
+                if params.filter_type.value() == Circuits::Ladder {
                     amps = get_amplitude_response(
                         params.cutoff.value,
                         // 2.,
                         params.k_ladder.get(),
                         params.slope.value() as usize,
-                        params.filter_type.value() as usize,
+                        params.filter_type.value(),
                         width,
                     );
+                } else {
+                    amps = get_amplitude_response(
+                        params.cutoff.value,
+                        params.zeta.get(),
+                        params.mode.value() as usize,
+                        params.filter_type.value(),
+                        width,
+                    );
+                    
                 }
+                // TODO: should prolly cover SallenKey, has its own reso formula
             }
 
             let bounds = cx.cache().get_bounds(current);
