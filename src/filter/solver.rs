@@ -173,7 +173,8 @@ impl<const N_N: usize, const N_P: usize, const P_LEN: usize> DKSolver<N_N, N_P, 
         let v_in = q[0];
         let v_out = q[1];
         // TODO: switch to tanh approximation
-        let tanh_vin = v_in.tanh();
+        let tanh_vin = super::tanh_levien_nosimd(v_in);
+        // let tanh_vin = v_in.tanh();
         let residue = tanh_vin - v_out;
         // just a thought: could it be "helped along" by `if jacobian[0] == 0. { jacobian[0] = v_in.signum() * 1e-6}`?
         let jacobian = [(1. - tanh_vin * tanh_vin), -1.0];
@@ -185,8 +186,8 @@ impl<const N_N: usize, const N_P: usize, const P_LEN: usize> DKSolver<N_N, N_P, 
         // thermal voltage
         const V_T_INV: f32 = 1.0 / 25e-3;
         // the diode's saturation current. Could make this a function parameter to have slightly mismatched diodes or something
-        // const I_S: f32 = 1e-15;
-        const I_S: f32 = 1e-12;
+        const I_S: f32 = 1e-15;
+        // const I_S: f32 = 1e-12;
 
         let v_in = q[0];
         let i_out = q[1];

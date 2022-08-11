@@ -42,7 +42,7 @@ fn get_filter_bode(
                 curr_s = frequencies[i] * j;
                 // could potentially be optimized, i think
                 array[i] = ((1. + k) * (1. + curr_s / g).powi(3 - mode as i32))
-                / (k + (1. + curr_s / g).powi(4));
+                    / (k + (1. + curr_s / g).powi(4));
                 // array[i] =
                 //     ((1. + curr_s / g).powi(3 - mode as i32)) / (k + (1. + curr_s / g).powi(4));
             }
@@ -98,7 +98,6 @@ fn get_filter_bode(
                 array[i] = g.powi(2) / ((curr_s).powi(2) + k * g * curr_s + g.powi(2));
             }
         }
-        
     }
     return array;
 }

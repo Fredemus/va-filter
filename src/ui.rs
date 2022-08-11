@@ -59,30 +59,23 @@ impl Model for UiData {
             ParamChangeEvent::EndSet(param_ptr) => {
                 unsafe { self.gui_context.raw_end_set_parameter(*param_ptr) };
             }
-            // ParamChangeEvent::CircuitEvent(circuit_name) => {
-            //     self.choice = circuit_name.to_owned();
-            //     if circuit_name == "SVF" {
-            //         unsafe {
-            //             self.gui_context
-            //                 .raw_set_parameter_normalized(self.params.filter_type.as_ptr(), 0.)
-            //         };
-            //     } else {
-            //         // self.params.set_parameter(3, 1.);
-            //         unsafe {
-            //             self.gui_context
-            //                 .raw_set_parameter_normalized(self.params.filter_type.as_ptr(), 1.)
-            //         };
-            //     }
-            // }
             ParamChangeEvent::CircuitEvent(idx) => {
                 // self.choice = self
                 // self.choice = circuit_name.to_owned();
-                unsafe { self.gui_context.raw_begin_set_parameter(self.params.filter_type.as_ptr()) };
                 unsafe {
                     self.gui_context
-                        .raw_set_parameter_normalized(self.params.filter_type.as_ptr(), *idx as f32 / 2.)
+                        .raw_begin_set_parameter(self.params.filter_type.as_ptr())
                 };
-                unsafe { self.gui_context.raw_end_set_parameter(self.params.filter_type.as_ptr()) };
+                unsafe {
+                    self.gui_context.raw_set_parameter_normalized(
+                        self.params.filter_type.as_ptr(),
+                        *idx as f32 / 2.,
+                    )
+                };
+                unsafe {
+                    self.gui_context
+                        .raw_end_set_parameter(self.params.filter_type.as_ptr())
+                };
             }
             ParamChangeEvent::ChangeBodeView() => {
                 self.show_phase = !self.show_phase;
@@ -98,7 +91,11 @@ pub fn plugin_gui(cx: &mut Context, params: Arc<FilterParams>, context: Arc<dyn 
         gui_context: context.clone(),
         params: params.clone(),
         // host: state.host,
-        filter_circuits: vec!["SVF".to_string(), "Transistor Ladder".to_string(), "SallenKey".to_string()],
+        filter_circuits: vec![
+            "SVF".to_string(),
+            "Transistor Ladder".to_string(),
+            "SallenKey".to_string(),
+        ],
         // choice: if params.filter_type.value() == Circuits::SVF {
         //     "SVF".to_string()
         // } else {
@@ -125,22 +122,24 @@ pub fn plugin_gui(cx: &mut Context, params: Arc<FilterParams>, context: Arc<dyn 
                     // List of options
                     List::new(cx, UiData::filter_circuits, move |cx, idx, item| {
                         VStack::new(cx, move |cx| {
-                            Binding::new(cx, UiData::params.map(|p| p.filter_type.to_string()), move |cx, choice| {
-                                let selected = *item.get(cx) == *choice.get(cx);
-                                Label::new(cx, &item.get(cx).to_string())
-                                    .width(Stretch(1.0))
-                                    .background_color(if selected {
-                                        Color::from("#c28919")
-                                    } else {
-                                        Color::transparent()
-                                    })
-                                    .on_press(move |cx| {
-                                        cx.emit(ParamChangeEvent::CircuitEvent(
-                                            idx,
-                                        ));
-                                        cx.emit(PopupEvent::Close);
-                                    });
-                            });
+                            Binding::new(
+                                cx,
+                                UiData::params.map(|p| p.filter_type.to_string()),
+                                move |cx, choice| {
+                                    let selected = *item.get(cx) == *choice.get(cx);
+                                    Label::new(cx, &item.get(cx).to_string())
+                                        .width(Stretch(1.0))
+                                        .background_color(if selected {
+                                            Color::from("#c28919")
+                                        } else {
+                                            Color::transparent()
+                                        })
+                                        .on_press(move |cx| {
+                                            cx.emit(ParamChangeEvent::CircuitEvent(idx));
+                                            cx.emit(PopupEvent::Close);
+                                        });
+                                },
+                            );
                         });
                     });
                 },
@@ -415,7 +414,6 @@ impl View for BodePlot {
                         params.filter_type.value(),
                         width,
                     );
-                    
                 }
                 // TODO: should prolly cover SallenKey, has its own reso formula
             }

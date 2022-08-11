@@ -1,33 +1,40 @@
-use crate::{filter::DKSolver, filter_params_nih::FilterParams, utils::AtomicOps};
+use crate::{
+    filter::DKSolver,
+    filter_params_nih::{FilterParams, SvfMode},
+    utils::AtomicOps,
+};
 // use packed_simd::f32x4;
 use core_simd::*;
 use std::sync::Arc;
 use std_float::*;
 
+// FIXME: something's wrong, reso doesn't do what it should huge DC offset
+
 use core_simd::f32x4;
 
-const N_P: usize = 2;
+const N_P: usize = 3;
 const N_N: usize = 4;
 const P_LEN: usize = 8;
-const N_OUTS: usize = 1;
+const N_OUTS: usize = 2;
+const N_STATES: usize = 2;
 const TOL: f32 = 1e-4;
-
-pub struct SallenKey {
+/// 2-pole state-variable filter 
+pub struct Svf {
     pub params: Arc<FilterParams>,
     pub vout: [f32; N_OUTS],
-    pub s: [f32; 2],
+    pub s: [f32; N_STATES],
 
     // used to find the nonlinear contributions
     dq: [[f32; 2]; N_P],
     eq: [f32; N_P],
-    pub fq: [[f32; N_N]; P_LEN],
+    pub fq: [[f32; 4]; P_LEN],
     // dq, eq are actually much larger, pexps are used to reduce them
     pexps: [[f32; N_P]; P_LEN],
 
     // used to update the capacitor states
-    a: [[f32; 2]; 2],
-    b: [f32; 2],
-    c: [[f32; 4]; 2],
+    a: [[f32; 2]; N_STATES],
+    b: [f32; N_STATES],
+    c: [[f32; 4]; N_STATES],
 
     // used to find the output values
     // dy: [[f32; 2]; 2],
@@ -38,7 +45,7 @@ pub struct SallenKey {
     solver: DKSolver<N_N, N_P, P_LEN>,
 }
 
-impl SallenKey {
+impl Svf {
     pub fn new(params: Arc<FilterParams>) -> Self {
         // TODO: pass in proper params
         let fs = params.sample_rate.get();
@@ -46,50 +53,42 @@ impl SallenKey {
         let res = 0.1;
 
         let pexps = [
-            [0., 0.],
-            [0., 0.],
-            [1., 0.],
-            [0., 0.],
-            [0., -1.],
-            [0., 1.],
-            [0., 1.],
-            [0., 0.],
+            [1., 0., 0.],
+            [0., 0., 0.],
+            [0., 1., 0.],
+            [0., 0., 0.],
+            [0., 0., 0.],
+            [0., 0., 1.],
+            [0., 0., 0.],
+            [0., 0., 0.],
         ];
         let fq = [
+            [g, -1., 0., 0.],
             [0., 1., 0., 0.],
+            [0., g, -1., 0.],
             [0., 0., 1., 0.],
-            [
-                -2. * g * ((res - 1.) / (4. * res) - 0.25) * (1. / (2. * g) + 0.5),
-                0.,
-                2. * g * (1. / (2. * g) + 0.5) - 1.,
-                0.,
-            ],
-            [(res - 1.) / (4. * res) - 0.25, 0., 0., 0.],
-            [-0.25, -1., -(g + 1.), 0.],
-            [1.25, 1., g + 1., 1.],
-            [0.25, 1., g + 1., 0.],
+            [0., -1., 0., 0.],
+            [1., res, 2., 1.],
+            [0., 1., 0., 0.],
             [0., 0., 0., 1.],
         ];
         let mut a = Self {
             params,
-            vout: [0.; 1],
+            vout: [0.; N_OUTS],
             s: [0.; 2],
 
-            dq: [[0., 1.], [-1., 0.]],
-            eq: [0., -g],
+            dq: [[-1., 0.], [0., -1.], [0., 0.]],
+            eq: [0., 0., 1.],
             fq,
             pexps,
 
             a: [[1., 0.], [0., 1.]],
-            b: [2. * g, 0.],
-            c: [
-                [0., 0., -2. * g, 0.],
-                [-2. * g * ((res - 1.) / (4. * res) - 0.25), 0., 2. * g, 0.],
-            ],
+            b: [0., 0.],
+            c: [[-2. * g, 0., 0., 0.], [0., -2. * g, 0., 0.]],
 
-            dy: [[0., 0.]],
-            ey: [0.],
-            fy: [[(res - 1.) / (4. * res) - 0.25, 0., 0., 0.]],
+            dy: [[0., 0.], [0., 0.]],
+            ey: [0., 0.],
+            fy: [[0., 0., 1., 0.], [0., 1., 0., 0.]],
 
             solver: DKSolver::new(),
         };
@@ -104,51 +103,27 @@ impl SallenKey {
     }
     pub fn update_matrices(&mut self) {
         // let fs = self.params.sample_rate.get();
-        // FIXME: roll 1/m * fs into g
         let g = self.params.g.get();
-        let res = (self.params.res.value * 0.8).clamp(0.01, 0.99);
-        // println!("res: {res}");
-        // println!("res: {g}");
-        // TODO: no need to set the entire matrix but lazy rn
-        self.fq = [
-            [0., 1., 0., 0.],
-            [0., 0., 1., 0.],
-            [
-                -2. * g * ((res - 1.) / (4. * res) - 0.25) * (1. / (2. * g) + 0.5),
-                0.,
-                2. * g * (1. / (2. * g) + 0.5) - 1.,
-                0.,
-            ],
-            [(res - 1.) / (4. * res) - 0.25, 0., 0., 0.],
-            [-0.25, -1., -g - 1., 0.],
-            [1.25, 1., g + 1., 1.],
-            [0.25, 1., g + 1., 0.],
-            [0., 0., 0., 1.],
-        ];
+        let res = self.params.zeta.get();
 
-        // dbg!(self.pexps);
+        self.fq[0][0] = g;
+        self.fq[2][1] = g;
+        self.fq[5][1] = res;
 
-        self.b[0] = 2. * g;
-
-        self.c[0][2] = -2. * g;
-        self.c[1][0] = -2. * g * ((res - 1.) / (4. * res) - 0.25);
-        self.c[1][2] = 2. * g;
-
-        self.eq[1] = -g;
-
-        self.fy[0][0] = (res - 1.) / (4. * res) - 0.25;
+        self.c[0][0] = -2. * g;
+        self.c[1][1] = -2. * g;
     }
-
+    // TODO: pls roll the updates into for loops
     pub fn tick_dk(&mut self, input: f32x4) -> f32x4 {
         let input_l = input.as_array()[0];
         let input = input_l * (self.params.drive.value);
 
         // let p = dot(dq, s) + dot(eq, input);
-        let mut p = [0.; 2];
+        let mut p = [0.; N_P];
         // find the
         p[0] = self.dq[0][0] * self.s[0] + self.dq[0][1] * self.s[1] + self.eq[0] * input;
         p[1] = self.dq[1][0] * self.s[0] + self.dq[1][1] * self.s[1] + self.eq[1] * input;
-        // p[2] = self.dq[2][0] * self.s[0] + self.dq[2][1] * self.s[1] + self.eq[2] * input;
+        p[2] = self.dq[2][0] * self.s[0] + self.dq[2][1] * self.s[1] + self.eq[2] * input;
 
         //
         // self.nonlinear_contribs(p);
@@ -157,6 +132,7 @@ impl SallenKey {
         // self.vout = dot(dy, s) + dot(ey, input) + dot(fy, self.solver.z)
         // TODO: add in fy * z
         self.vout[0] = self.dy[0][0] * self.s[0] + self.dy[0][1] * self.s[1] + self.ey[0] * input;
+        self.vout[1] = self.dy[1][0] * self.s[0] + self.dy[1][1] * self.s[1] + self.ey[1] * input;
 
         // self.vout[1] = self.dy[1][0] * self.s[0] + self.dy[1][1] * self.s[1] + self.ey[1] * input;
         for i in 0..N_OUTS {
@@ -173,8 +149,8 @@ impl SallenKey {
                 self.s[i] += self.solver.z[j] * self.c[i][j];
             }
         }
-        // let out = self.get_output(input, self.params.zeta.get());
-        let out = self.vout[0];
+        let out = self.get_output(input, self.params.zeta.get());
+        // let out = self.vout[0];
         f32x4::from_array([out, out, 0., 0.])
         // self.s = dot(a, s) + dot(b, input) + dot(c, self.solver.z);
     }
@@ -210,14 +186,14 @@ impl SallenKey {
     }
 
     // uses newton's method to find the nonlinear contributions in the circuit. Not guaranteed to converge
-    fn nonlinear_contribs(&mut self, p: [f32; N_P]) -> [f32; N_N] {
+    fn nonlinear_contribs(&mut self, p: [f32; N_P]) {
         self.solver.set_p(p, &self.pexps);
 
         // self.solver.tmp_np[0] =  self.solver.tmp_np[0] - self.solver.last_p[0];
         // self.solver.tmp_np[1] = self.solver.tmp_np[1] - self.solver.last_p[1];
         self.solver.tmp_np[0] = p[0] - self.solver.last_p[0];
-        // FIXME: slight discrepancy in last_p[1], which seems to "spread out" to make convergence fail
         self.solver.tmp_np[1] = p[1] - self.solver.last_p[1];
+        self.solver.tmp_np[2] = p[2] - self.solver.last_p[2];
         // dbg!(self.solver.tmp_nn);
         for i in 0..N_N {
             self.solver.tmp_nn[i] = 0.;
@@ -232,7 +208,6 @@ impl SallenKey {
         for i in 0..self.solver.z.len() {
             self.solver.z[i] = self.solver.last_z[i] - self.solver.tmp_nn[i];
         }
-        // let mut resmaxabs = 0.;
         for _plsconverge in 0..500 {
             self.evaluate_nonlinearities(self.solver.z, self.fq);
 
@@ -243,9 +218,11 @@ impl SallenKey {
                         self.solver.resmaxabs = x.abs();
                     }
                 } else {
-                    // if any of the residue have become NaN/inf, stop early with big residue
+                    // if any of the residue have become NaN/inf, stop early.
+                    // If using the homotopy solver, it will kick in and find an alternate, slower path to convergence
                     // self.solver.resmaxabs = ;
-                    return self.solver.z;
+                    // return self.solver.z;
+                    return;
                 }
             }
 
@@ -262,15 +239,17 @@ impl SallenKey {
             }
             // self.solver.z = self.solver.z - self.solver.tmp_nn;
         }
+        // self.solver.resmaxabs = resmaxabs;
         if self.solver.resmaxabs < TOL {
             self.solver.set_jp(&self.pexps);
             self.solver
                 .set_extrapolation_origin(p, self.solver.z, self.solver.jp);
-        } else {
-            // panic!("failed to converge. residue: {:?}", self.solver.residue);
-            // println!("failed to converge. residue: {:?}", self.solver.residue);
         }
-        self.solver.z
+        // else {
+        // panic!("failed to converge. residue: {:?}", self.solver.residue);
+        // println!("failed to converge. residue: {:?}", self.solver.residue);
+        // }
+        // return self.solver.z;
     }
 
     fn evaluate_nonlinearities(&mut self, z: [f32; N_N], fq: [[f32; N_N]; P_LEN]) {
@@ -306,15 +285,38 @@ impl SallenKey {
         for i in 0..self.solver.jq.len() {
             for j in 0..N_N {
                 self.solver.j[i][j] = 0.;
-                for k in 0..8 {
+                for k in 0..P_LEN {
                     self.solver.j[i][j] += self.solver.jq[i][k] * fq[k][j];
                 }
             }
         }
         self.solver.residue = [res1, res2, res3, res4];
     }
+    // highpass and notch doesn't work right, likely because `input` isn't quite defined right. Prolly doesn't need to be subtracted?
+    fn _get_output_old(&self, input: f32, k: f32) -> f32 {
+        match self.params.mode.value() {
+            SvfMode::LP => self.vout[0],                            // lowpass
+            SvfMode::HP => input - k * self.vout[1] - self.vout[0], // highpass
+            SvfMode::BP1 => self.vout[1],                           // bandpass
+            SvfMode::Notch => input - k * self.vout[1],             // notch
+            //3 => input - 2. * k * self.vout[1], // allpass
+            SvfMode::BP2 => k * self.vout[1], // bandpass (normalized peak gain)
+                                              // _ => input - f32x4::splat(2.) * self.vout[1] - k * self.vout[0], // peak / resonator thingy
+        }
+    }
+    // TODO: should prolly redo model to regain the nicer simpler equations here
+    fn get_output(&self, input: f32, k: f32) -> f32 {
+        match self.params.mode.value() {
+            SvfMode::LP => self.vout[0], // lowpass
+            SvfMode::HP => -0.5 * input - 0.5 * k * self.vout[1] - self.vout[0], // highpass
+            SvfMode::BP1 => self.vout[1], // bandpass
+            SvfMode::Notch => -0.5 * input - 0.5 * k * self.vout[1], // notch
+            //3 => input - 2. * k * self.vout[1], // allpass
+            SvfMode::BP2 => k * self.vout[1], // bandpass (normalized peak gain)
+                                              // _ => input - f32x4::splat(2.) * self.vout[1] - k * self.vout[0], // peak / resonator thingy
+        }
+    }
 }
-
 #[test]
 fn test_stepresponse() {
     let should_update_filter = Arc::new(std::sync::atomic::AtomicBool::new(false));
@@ -323,45 +325,13 @@ fn test_stepresponse() {
     params.sample_rate.set(44100.);
     params.update_g(1000.);
     params.zeta.set(0.1);
-    let mut filt = SallenKey::new(params.clone());
+    let mut filt = Svf::new(params.clone());
     filt.update_matrices();
     // println!("should be 1.5889e-04: {}", filt.fq[1][1]);
     let mut out = [0.; 10];
     for i in 0..10 {
         println!("sample {i}");
         filt.tick_dk(f32x4::splat(1.0));
-        out[i] = filt.vout[0];
-        // println!("val lp: {}", filt.vout[0]);
-        // println!("filter state: {:?}", filt.s);
-        // if filt.vout[0] < 0. {
-        //     panic!("sample {} got negative", i)
-        // }
-    }
-    dbg!(out);
-}
-#[test]
-fn test_sine() {
-    let should_update_filter = Arc::new(std::sync::atomic::AtomicBool::new(false));
-    let params = Arc::new(FilterParams::new(should_update_filter.clone()));
-    // params.cutoff.set_plain_value(1000.);
-    let fs = 44100.;
-    params.sample_rate.set(44100.);
-    params.update_g(1000.);
-    params.zeta.set(0.1);
-    let mut filt = SallenKey::new(params.clone());
-    filt.update_matrices();
-
-    let mut input = [0.; 10];
-    let freq = 500.;
-    for i in 0..input.len() {
-        let t = i as f32 / fs;
-        input[i] = (2. * std::f32::consts::PI * freq * t).cos();
-    }
-    // println!("should be 1.5889e-04: {}", filt.fq[1][1]);
-    let mut out = [0.; 10];
-    for i in 0..10 {
-        println!("sample {i}: input: {}", input[i]);
-        filt.tick_dk(f32x4::splat(input[i]));
         out[i] = filt.vout[0];
         // println!("val lp: {}", filt.vout[0]);
         // println!("filter state: {:?}", filt.s);

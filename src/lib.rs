@@ -1,15 +1,7 @@
-//! This zero-delay feedback filter is based on a state variable filter.
-//! It follows the following equations:
-//!
-//! Since we can't easily solve a nonlinear equation,
-//! Mystran's fixed-pivot method is used to approximate the tanh() parts.
-//! Quality can be improved a lot by oversampling a bit.
-//! Damping feedback is antisaturated, so it doesn't disappear at high gains.
-
 #![feature(portable_simd)]
 // #[macro_use]
 // extern crate vst;
-use filter::{LadderFilter, SVF};
+use filter::LadderFilter;
 // use packed_simd::f32x4;
 use core_simd::f32x4;
 // use vst::buffer::AudioBuffer;
@@ -40,7 +32,8 @@ pub(crate) struct VaFilter {
     // Store a handle to the plugin's parameter object.
     params: Arc<FilterParams>,
     ladder: filter::LadderFilter,
-    svf: filter::SVF,
+    // svf: filter::SVF,
+    svf_new: filter::Svf,
 
     sallenkey: filter::SallenKey,
     // used for constructing the editor in get_editor
@@ -55,12 +48,14 @@ impl Default for VaFilter {
     fn default() -> Self {
         let should_update_filter = Arc::new(std::sync::atomic::AtomicBool::new(false));
         let params = Arc::new(FilterParams::new(should_update_filter.clone()));
-        let svf = SVF::new(params.clone());
+        // let svf = SVF::new(params.clone());
         let sallenkey = filter::SallenKey::new(params.clone());
+        let svf_new = filter::Svf::new(params.clone());
         let ladder = LadderFilter::new(params.clone());
         Self {
             params: params.clone(),
-            svf,
+            // svf,
+            svf_new,
             sallenkey,
             ladder,
             should_update_filter,
@@ -108,6 +103,11 @@ impl Plugin for VaFilter {
         self.params.sample_rate.set(_buffer_config.sample_rate);
         true
     }
+    fn reset(&mut self) {
+        self.sallenkey.s = [0.; 2];
+        self.svf_new.s = [0.; 2];
+        self.ladder.s = [f32x4::splat(0.); 4];
+    }
 
     fn process(
         &mut self,
@@ -132,11 +132,13 @@ impl Plugin for VaFilter {
                 let cut_smooth = self.params.cutoff.smoothed.next();
                 self.params.update_g(cut_smooth);
                 self.sallenkey.update_matrices();
+                self.svf_new.update_matrices();
             }
             if self.params.res.smoothed.is_smoothing() {
                 let res_smooth = self.params.res.smoothed.next();
                 self.params.set_resonances(res_smooth);
                 self.sallenkey.update_matrices();
+                self.svf_new.update_matrices();
             }
 
             // channel_samples[0];
@@ -150,7 +152,7 @@ impl Plugin for VaFilter {
             let processed = match self.params.filter_type.value() {
                 // filter_params_nih::Circuits::SVF => self.svf.tick_newton(frame),
                 filter_params_nih::Circuits::SallenKey => self.sallenkey.tick_dk(frame),
-                filter_params_nih::Circuits::SVF => self.svf.tick_newton(frame),
+                filter_params_nih::Circuits::SVF => self.svf_new.tick_dk(frame),
                 filter_params_nih::Circuits::Ladder => self.ladder.tick_newton(frame),
             };
 
@@ -171,4 +173,3 @@ impl Vst3Plugin for VaFilter {
 }
 
 nih_export_vst3!(VaFilter);
-
