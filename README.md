@@ -21,7 +21,7 @@ It's capable of outputting all basic filter modes (lowpass, highpass, bandpass, 
 OTA core, nonlinear op-amp buffers. The Osc Oscar has BJT but I haven't looked into how to model that (in a fast/simple way) yet.
 Resonance is limited by a diode clipper on the damping feedback, boosting it when gain is high and it'd otherwise disappear because of the OTA nonlinearities.
 
-Its convergence isn't great at high drives and cutoffs, but is otherwise fine.
+Its convergence is generally good, but when both drive and cutoff is high it completely fails to converge because of the internal values of the diode models. I'm looking into a way to fix this.
 The convergence gets a lot better when oversampled 2x or more, which I recommend anyway since it distorts.
 
 
@@ -36,10 +36,10 @@ This is a 2-pole lowpass filter loosely based on the one found in the second rev
 It's able to self-oscillate and starts doing so when its resonance is above 0.8. 
 
 OTA core, nonlinear op-amp buffers.
-Resonance is limited by a diode clipper, but it disappears quite quickly at high drives, look into tweaking diode constants.
+Resonance is limited by a diode clipper, but it disappears quite quickly at high drives.
 
-Its convergence is generally good, but sometimes, especially when cutoff, resonance and drive are all very high, homotopy is needed to converge which gets very slow. I'll look into speeding this up at some point. 
-The parameter vector for the nonlinear contributions is just 2 entries long, meaning that it'd be very reasonable to create a lookup table to guarantee stable, fast runtime. 
+Its convergence is generally good, but sometimes, especially when cutoff, resonance and drive are all very high, homotopy is needed to converge which gets very slow. I'll look into speeding this up at some point. With 2x oversampling this isn't a problem.
+The parameter vector for the nonlinear contributions is just 2 entries long, meaning that it might be reasonable to create a lookup table to guarantee stable, fast runtime. 
 
 Circuit solved by Holters & Zölzer's generalization of the DK-method.
 
