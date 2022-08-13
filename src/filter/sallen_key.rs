@@ -10,7 +10,7 @@ const N_P: usize = 2;
 const N_N: usize = 4;
 const P_LEN: usize = 8;
 const N_OUTS: usize = 1;
-const TOL: f32 = 1e-4;
+const TOL: f32 = 1e-5;
 
 pub struct SallenKey {
     pub params: Arc<FilterParams>,
@@ -59,15 +59,15 @@ impl SallenKey {
             [0., 1., 0., 0.],
             [0., 0., 1., 0.],
             [
-                -2. * g * ((res - 1.) / (4. * res) - 0.25) * (1. / (2. * g) + 0.5),
+                -4. * g * ((res - 1.) / (4. * res) - 0.25) * (1. / (4. * g) + 0.5),
                 0.,
-                2. * g * (1. / (2. * g) + 0.5) - 1.,
+                4. * g * (1. / (4. * g) + 0.5) - 1.,
                 0.,
             ],
             [(res - 1.) / (4. * res) - 0.25, 0., 0., 0.],
-            [-0.25, -1., -(g + 1.), 0.],
-            [1.25, 1., g + 1., 1.],
-            [0.25, 1., g + 1., 0.],
+            [-0.25, -1., -(2. * g + 1.), 0.],
+            [1.25, 1., 2. * g + 1., 1.],
+            [0.25, 1., 2. * g + 1., 0.],
             [0., 0., 0., 1.],
         ];
         let mut a = Self {
@@ -76,15 +76,15 @@ impl SallenKey {
             s: [0.; 2],
 
             dq: [[0., 1.], [-1., 0.]],
-            eq: [0., -g],
+            eq: [0., -2. * g],
             fq,
             pexps,
 
             a: [[1., 0.], [0., 1.]],
-            b: [2. * g, 0.],
+            b: [4. * g, 0.],
             c: [
-                [0., 0., -2. * g, 0.],
-                [-2. * g * ((res - 1.) / (4. * res) - 0.25), 0., 2. * g, 0.],
+                [0., 0., -4. * g, 0.],
+                [-4. * g * ((res - 1.) / (4. * res) - 0.25), 0., 4. * g, 0.],
             ],
 
             dy: [[0., 0.]],
@@ -103,8 +103,6 @@ impl SallenKey {
         a
     }
     pub fn update_matrices(&mut self) {
-        // let fs = self.params.sample_rate.get();
-        // FIXME: roll 1/m * fs into g
         let g = self.params.g.get();
         let res = (self.params.res.value * 0.8).clamp(0.01, 0.99);
         // println!("res: {res}");
@@ -114,27 +112,27 @@ impl SallenKey {
             [0., 1., 0., 0.],
             [0., 0., 1., 0.],
             [
-                -2. * g * ((res - 1.) / (4. * res) - 0.25) * (1. / (2. * g) + 0.5),
+                -4. * g * ((res - 1.) / (4. * res) - 0.25) * (1. / (4. * g) + 0.5),
                 0.,
-                2. * g * (1. / (2. * g) + 0.5) - 1.,
+                4. * g * (1. / (4. * g) + 0.5) - 1.,
                 0.,
             ],
             [(res - 1.) / (4. * res) - 0.25, 0., 0., 0.],
-            [-0.25, -1., -g - 1., 0.],
-            [1.25, 1., g + 1., 1.],
-            [0.25, 1., g + 1., 0.],
+            [-0.25, -1., -2. * g - 1., 0.],
+            [1.25, 1., 2.*g + 1., 1.],
+            [0.25, 1., 2.*g + 1., 0.],
             [0., 0., 0., 1.],
         ];
 
         // dbg!(self.pexps);
 
-        self.b[0] = 2. * g;
+        self.b[0] = 4. * g;
 
-        self.c[0][2] = -2. * g;
-        self.c[1][0] = -2. * g * ((res - 1.) / (4. * res) - 0.25);
-        self.c[1][2] = 2. * g;
+        self.c[0][2] = -4. * g;
+        self.c[1][0] = -4. * g * ((res - 1.) / (4. * res) - 0.25);
+        self.c[1][2] = 4. * g;
 
-        self.eq[1] = -g;
+        self.eq[1] = -2. * g;
 
         self.fy[0][0] = (res - 1.) / (4. * res) - 0.25;
     }
@@ -183,7 +181,7 @@ impl SallenKey {
         self.nonlinear_contribs(p);
         // if the newton solver failed to converge, apply homotopy
         if !(self.solver.resmaxabs < TOL) {
-            println!("needs homotopy");
+            // println!("needs homotopy. p: {:?}", p);
             let mut a = 0.5;
             let mut best_a = 0.;
             while best_a < 1. {
@@ -206,6 +204,16 @@ impl SallenKey {
                     a = new_a;
                 }
             }
+            if self.solver.resmaxabs >= TOL {
+                // println!("failed to converge. residue: {:?}", self.solver.residue);
+
+                for x in &self.solver.z {
+                    if !x.is_finite() {
+                        panic!("solution contains infinite value");
+
+                    }
+                }
+            }
         }
     }
 
@@ -216,12 +224,11 @@ impl SallenKey {
         // self.solver.tmp_np[0] =  self.solver.tmp_np[0] - self.solver.last_p[0];
         // self.solver.tmp_np[1] = self.solver.tmp_np[1] - self.solver.last_p[1];
         self.solver.tmp_np[0] = p[0] - self.solver.last_p[0];
-        // FIXME: slight discrepancy in last_p[1], which seems to "spread out" to make convergence fail
         self.solver.tmp_np[1] = p[1] - self.solver.last_p[1];
         // dbg!(self.solver.tmp_nn);
         for i in 0..N_N {
             self.solver.tmp_nn[i] = 0.;
-            for j in 0..self.solver.tmp_np.len() {
+            for j in 0..N_P {
                 self.solver.tmp_nn[i] += self.solver.last_jp[i][j] * self.solver.tmp_np[j];
             }
         }
