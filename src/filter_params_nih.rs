@@ -72,7 +72,7 @@ impl FilterParams {
                 FloatRange::Skewed {
                     min: 1.0, // This must never reach 0
                     max: 15.8490,
-                    factor: FloatRange::skew_factor(-2.5),
+                    factor: FloatRange::skew_factor(-1.2),
                 },
             )
             // This needs quite a bit of smoothing to avoid artifacts
