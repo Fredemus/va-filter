@@ -1,38 +1,48 @@
+
+#[inline]
+pub fn tanh_levien_nosimd(x: f64) -> f64 {
+    let x2 = x * x;
+    let x3 = x2 * x;
+    let x5 = x3 * x2;
+    let a = x + (0.16489087 * x3) + (0.00985468 * x5);
+    // println!("a: {:?}, b: {:?}", a, b);
+    a / (1.0 + (a * a)).sqrt()
+}
 /// solves the nonlinear contributions in the SVF using Newton's method
 #[derive(Clone)]
 pub(crate) struct DKSolver<const N_N: usize, const N_P: usize, const P_LEN: usize> {
     // current solution of nonlinear contributions
-    pub z: [f32; N_N],
-    pub last_z: [f32; N_N],
-    pub last_p: [f32; N_P],
+    pub z: [f64; N_N],
+    pub last_z: [f64; N_N],
+    pub last_p: [f64; N_P],
 
     // p-vector expanded to the pins of the nonlinear elements
-    pub p_full: [f32; P_LEN],
+    pub p_full: [f64; P_LEN],
 
     // last value of jacobian * p
-    pub last_jp: [[f32; N_P]; N_N],
+    pub last_jp: [[f64; N_P]; N_N],
 
     // temporary storage. Evaluate if necessary
-    pub tmp_nn: [f32; N_N],
-    pub tmp_np: [f32; N_P],
+    pub tmp_nn: [f64; N_N],
+    pub tmp_np: [f64; N_P],
 
     // used by the linearization
-    factors: [[f32; N_N]; N_N],
+    factors: [[f64; N_N]; N_N],
     // indices for pivot columns for linearization
     ipiv: [usize; N_N],
 
     // used by the nonlinear equations
 
     // full jacobian for the circuit
-    pub j: [[f32; N_N]; N_N],
+    pub j: [[f64; N_N]; N_N],
     // full jacobian product for the circuit
-    pub jp: [[f32; N_P]; N_N],
+    pub jp: [[f64; N_P]; N_N],
 
     // ?
-    pub jq: [[f32; P_LEN]; N_N],
+    pub jq: [[f64; P_LEN]; N_N],
     // the errors of the root-finding for the nonlinear elements
-    pub residue: [f32; N_N],
-    pub resmaxabs: f32,
+    pub residue: [f64; N_N],
+    pub resmaxabs: f64,
 }
 #[allow(dead_code)]
 impl<const N_N: usize, const N_P: usize, const P_LEN: usize> DKSolver<N_N, N_P, P_LEN> {
@@ -55,7 +65,7 @@ impl<const N_N: usize, const N_P: usize, const P_LEN: usize> DKSolver<N_N, N_P, 
         }
     }
 
-    pub fn set_p(&mut self, p: [f32; N_P], pexps: &[[f32; N_P]; P_LEN]) {
+    pub fn set_p(&mut self, p: [f64; N_P], pexps: &[[f64; N_P]; P_LEN]) {
         self.p_full = [0.; P_LEN];
         for i in 0..P_LEN {
             for j in 0..N_P {
@@ -64,7 +74,7 @@ impl<const N_N: usize, const N_P: usize, const P_LEN: usize> DKSolver<N_N, N_P, 
         }
     }
 
-    pub fn set_jp(&mut self, pexps: &[[f32; N_P]; P_LEN]) {
+    pub fn set_jp(&mut self, pexps: &[[f64; N_P]; P_LEN]) {
         // dbg!(self.jq);
         for i in 0..N_N {
             for j in 0..N_P {
@@ -81,16 +91,16 @@ impl<const N_N: usize, const N_P: usize, const P_LEN: usize> DKSolver<N_N, N_P, 
     // In that case maybe a guess from the capacitor states would be better
     pub fn set_extrapolation_origin(
         &mut self,
-        p: [f32; N_P],
-        z: [f32; N_N],
-        jp: [[f32; N_P]; N_N],
+        p: [f64; N_P],
+        z: [f64; N_N],
+        jp: [[f64; N_P]; N_N],
     ) {
         self.last_jp = jp;
         self.last_p = p;
         self.last_z = z;
     }
     // this entire function could be removed by just using a linearization directly but it would make updating the model(s) require a lot more manual work
-    pub fn set_lin_solver(&mut self, new_jacobian: [[f32; N_N]; N_N]) {
+    pub fn set_lin_solver(&mut self, new_jacobian: [[f64; N_N]; N_N]) {
         // const M: usize = N_N;
         // const N: usize = N_N;
 
@@ -134,7 +144,7 @@ impl<const N_N: usize, const N_P: usize, const P_LEN: usize> DKSolver<N_N, N_P, 
         }
     }
     /// based on dgetrs, solve A * X = B with A being lower-upper factorized
-    pub fn solve_linear_equation(&self, x: [f32; N_N]) -> [f32; N_N] {
+    pub fn solve_linear_equation(&self, x: [f64; N_N]) -> [f64; N_N] {
         let mut x_temp = x;
         for i in 0..N_N {
             // x[i], x[self.ipiv[i]] =
@@ -157,7 +167,7 @@ impl<const N_N: usize, const N_P: usize, const P_LEN: usize> DKSolver<N_N, N_P, 
         x_temp
     }
 
-    pub fn eval_ota(&self, q: &[f32]) -> (f32, [f32; 2]) {
+    pub fn eval_ota(&self, q: &[f64]) -> (f64, [f64; 2]) {
         let v_in = q[0];
         let i_out = q[1];
         // TODO: switch to tanh approximation
@@ -169,11 +179,11 @@ impl<const N_N: usize, const N_P: usize, const P_LEN: usize> DKSolver<N_N, N_P, 
         (residue, jacobian)
     }
 
-    pub fn eval_opamp(&self, q: &[f32]) -> (f32, [f32; 2]) {
+    pub fn eval_opamp(&self, q: &[f64]) -> (f64, [f64; 2]) {
         let v_in = q[0];
         let v_out = q[1];
         // TODO: switch to tanh approximation
-        let tanh_vin = super::tanh_levien_nosimd(v_in);
+        let tanh_vin = tanh_levien_nosimd(v_in);
         // let tanh_vin = v_in.tanh();
         let residue = tanh_vin - v_out;
         // just a thought: could it be "helped along" by `if jacobian[0] == 0. { jacobian[0] = v_in.signum() * 1e-6}`?
@@ -181,22 +191,24 @@ impl<const N_N: usize, const N_P: usize, const P_LEN: usize> DKSolver<N_N, N_P, 
 
         (residue, jacobian)
     }
+    // TODO: the diodes end up throwing out absurdly large numbers, need f64 precision or some other way to model diode pairs
     // simple shockley diode equation
-    pub fn eval_diode(&self, q: &[f32]) -> (f32, [f32; 2]) {
+    pub fn eval_diode(&self, q: &[f64]) -> (f64, [f64; 2]) {
+        // TODO: ideality factor is probably more like ~1.9 than 1
+        const ETA : f64 = 1.88;
         // thermal voltage
-        const V_T_INV: f32 = 1.0 / 25e-3;
+        const V_T_INV: f64 = 1.0 / 25e-3;
         // the diode's saturation current. Could make this a function parameter to have slightly mismatched diodes or something
-        const I_S: f32 = 1e-15;
-        // const I_S: f32 = 1e-12;
-
+        const I_S: f64 = 1e-15;
+        // const I_S: f64 = 1e-12;
         let v_in = q[0];
         let i_out = q[1];
         let ex = (v_in * V_T_INV).exp();
-
         let residue = I_S * (ex - 1.) - i_out;
 
         let jacobian = [I_S * V_T_INV * ex, -1.0];
 
         (residue, jacobian)
     }
+    
 }

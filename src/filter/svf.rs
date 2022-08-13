@@ -17,7 +17,7 @@ const N_N: usize = 4;
 const P_LEN: usize = 8;
 const N_OUTS: usize = 2;
 const N_STATES: usize = 2;
-const TOL: f32 = 1e-4;
+const TOL: f64 = 1e-5;
 /// 2-pole state-variable filter 
 pub struct Svf {
     pub params: Arc<FilterParams>,
@@ -27,9 +27,9 @@ pub struct Svf {
     // used to find the nonlinear contributions
     dq: [[f32; 2]; N_P],
     eq: [f32; N_P],
-    pub fq: [[f32; 4]; P_LEN],
+    pub fq: [[f64; 4]; P_LEN],
     // dq, eq are actually much larger, pexps are used to reduce them
-    pexps: [[f32; N_P]; P_LEN],
+    pexps: [[f64; N_P]; P_LEN],
 
     // used to update the capacitor states
     a: [[f32; 2]; N_STATES],
@@ -51,6 +51,8 @@ impl Svf {
         let fs = params.sample_rate.get();
         let g = (std::f32::consts::PI * 1000. / (fs as f32)).tan();
         let res = 0.1;
+        let g_f64 = g as f64;
+        let res_f64 =res as f64;
 
         let pexps = [
             [1., 0., 0.],
@@ -63,12 +65,12 @@ impl Svf {
             [0., 0., 0.],
         ];
         let fq = [
-            [g, -1., 0., 0.],
+            [g_f64, -1., 0., 0.],
             [0., 1., 0., 0.],
-            [0., g, -1., 0.],
+            [0., g_f64, -1., 0.],
             [0., 0., 1., 0.],
             [0., -1., 0., 0.],
-            [1., res, 2., 1.],
+            [1., res_f64, 2., 1.],
             [0., 1., 0., 0.],
             [0., 0., 0., 1.],
         ];
@@ -101,14 +103,25 @@ impl Svf {
 
         a
     }
+    pub fn reset(&mut self) {
+        self.s = [0.; 2];
+        self.solver.set_p([0.; N_P], &self.pexps);
+        self.evaluate_nonlinearities([0.; N_N], self.fq);
+        self.solver.set_lin_solver(self.solver.j);
+        self.solver.set_jp(&self.pexps);
+        self.solver
+            .set_extrapolation_origin([0.; N_P], [0.; N_N], self.solver.jp);
+    }
     pub fn update_matrices(&mut self) {
         // let fs = self.params.sample_rate.get();
         let g = self.params.g.get();
         let res = self.params.zeta.get();
+        let g_f64 = g as f64;
+        let res_f64 =res as f64;
 
-        self.fq[0][0] = g;
-        self.fq[2][1] = g;
-        self.fq[5][1] = res;
+        self.fq[0][0] = g_f64;
+        self.fq[2][1] = g_f64;
+        self.fq[5][1] = res_f64;
 
         self.c[0][0] = -2. * g;
         self.c[1][1] = -2. * g;
@@ -121,9 +134,9 @@ impl Svf {
         // let p = dot(dq, s) + dot(eq, input);
         let mut p = [0.; N_P];
         // find the
-        p[0] = self.dq[0][0] * self.s[0] + self.dq[0][1] * self.s[1] + self.eq[0] * input;
-        p[1] = self.dq[1][0] * self.s[0] + self.dq[1][1] * self.s[1] + self.eq[1] * input;
-        p[2] = self.dq[2][0] * self.s[0] + self.dq[2][1] * self.s[1] + self.eq[2] * input;
+        p[0] = (self.dq[0][0] * self.s[0] + self.dq[0][1] * self.s[1] + self.eq[0] * input) as f64;
+        p[1] = (self.dq[1][0] * self.s[0] + self.dq[1][1] * self.s[1] + self.eq[1] * input) as f64;
+        p[2] = (self.dq[2][0] * self.s[0] + self.dq[2][1] * self.s[1] + self.eq[2] * input) as f64;
 
         //
         // self.nonlinear_contribs(p);
@@ -137,16 +150,15 @@ impl Svf {
         // self.vout[1] = self.dy[1][0] * self.s[0] + self.dy[1][1] * self.s[1] + self.ey[1] * input;
         for i in 0..N_OUTS {
             for j in 0..4 {
-                self.vout[i] += self.solver.z[j] * self.fy[i][j];
+                self.vout[i] += self.solver.z[j] as f32 * self.fy[i][j];
             }
         }
         let s1_update = self.a[1][0] * self.s[0] + self.a[1][1] * self.s[1];
         self.s[0] = self.a[0][0] * self.s[0] + self.a[0][1] * self.s[1] + self.b[0] * input;
         self.s[1] = s1_update + self.b[1] * input;
-        // correct formula: self.s[1] = self.a[1][0] * self.s[0] + self.a[1][1] * self.s[1] +  self.b[1] * input + self.solver.z[1] * self.c[1][1]
         for i in 0..2 {
             for j in 0..4 {
-                self.s[i] += self.solver.z[j] * self.c[i][j];
+                self.s[i] += self.solver.z[j] as f32 * self.c[i][j];
             }
         }
         let out = self.get_output(input, self.params.zeta.get());
@@ -155,11 +167,11 @@ impl Svf {
         // self.s = dot(a, s) + dot(b, input) + dot(c, self.solver.z);
     }
 
-    fn homotopy_solver(&mut self, p: [f32; N_P]) {
+    fn homotopy_solver(&mut self, p: [f64; N_P]) {
         self.nonlinear_contribs(p);
         // if the newton solver failed to converge, apply homotopy
         if !(self.solver.resmaxabs < TOL) {
-            println!("needs homotopy");
+            // println!("needs homotopy. p: {:?}", p);
             let mut a = 0.5;
             let mut best_a = 0.;
             while best_a < 1. {
@@ -182,11 +194,30 @@ impl Svf {
                     a = new_a;
                 }
             }
+            if self.solver.resmaxabs >= TOL {
+                println!("failed to converge. residue: {:?}", self.solver.residue);
+
+                for x in &self.solver.z {
+                    if !x.is_finite() || x.abs() > 1e100 {
+                        panic!("solution contains infinite/NaN/ extremely large value");
+                        
+                    }
+                }
+                for arr in &self.solver.j {
+                    for x in arr {
+                        if !x.is_finite() {
+                            panic!("solution contains infinite/NaN value");
+                            
+                        }
+                    }
+                }
+            }
+ 
         }
     }
 
     // uses newton's method to find the nonlinear contributions in the circuit. Not guaranteed to converge
-    fn nonlinear_contribs(&mut self, p: [f32; N_P]) {
+    fn nonlinear_contribs(&mut self, p: [f64; N_P]) {
         self.solver.set_p(p, &self.pexps);
 
         // self.solver.tmp_np[0] =  self.solver.tmp_np[0] - self.solver.last_p[0];
@@ -197,7 +228,7 @@ impl Svf {
         // dbg!(self.solver.tmp_nn);
         for i in 0..N_N {
             self.solver.tmp_nn[i] = 0.;
-            for j in 0..self.solver.tmp_np.len() {
+            for j in 0..N_P {
                 self.solver.tmp_nn[i] += self.solver.last_jp[i][j] * self.solver.tmp_np[j];
             }
         }
@@ -208,7 +239,7 @@ impl Svf {
         for i in 0..self.solver.z.len() {
             self.solver.z[i] = self.solver.last_z[i] - self.solver.tmp_nn[i];
         }
-        for _plsconverge in 0..500 {
+        for _plsconverge in 0..100 {
             self.evaluate_nonlinearities(self.solver.z, self.fq);
 
             self.solver.resmaxabs = 0.;
@@ -252,7 +283,7 @@ impl Svf {
         // return self.solver.z;
     }
 
-    fn evaluate_nonlinearities(&mut self, z: [f32; N_N], fq: [[f32; N_N]; P_LEN]) {
+    fn evaluate_nonlinearities(&mut self, z: [f64; N_N], fq: [[f64; N_N]; P_LEN]) {
         // TODO: better way of finding dot-product between fq and z
         let mut dot_p = [0.; P_LEN];
         let mut q = self.solver.p_full;
@@ -329,9 +360,9 @@ fn test_stepresponse() {
     filt.update_matrices();
     // println!("should be 1.5889e-04: {}", filt.fq[1][1]);
     let mut out = [0.; 10];
-    for i in 0..10 {
+    for i in 0..3 {
         println!("sample {i}");
-        filt.tick_dk(f32x4::splat(1.0));
+        filt.tick_dk(f32x4::splat(20.0));
         out[i] = filt.vout[0];
         // println!("val lp: {}", filt.vout[0]);
         // println!("filter state: {:?}", filt.s);

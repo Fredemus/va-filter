@@ -17,6 +17,7 @@ use nih_plug::{nih_export_vst3, prelude::*};
 // mod editor;
 // use editor::{EditorState, SVFPluginEditor};
 mod editor;
+mod build_lookup_table;
 use editor::*;
 mod parameter;
 #[allow(dead_code)]
@@ -104,8 +105,9 @@ impl Plugin for VaFilter {
         true
     }
     fn reset(&mut self) {
-        self.sallenkey.s = [0.; 2];
-        self.svf_new.s = [0.; 2];
+        println!("reset called");
+        self.sallenkey.reset();
+        self.svf_new.reset();
         self.ladder.s = [f32x4::splat(0.); 4];
     }
 
