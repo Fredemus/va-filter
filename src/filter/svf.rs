@@ -18,27 +18,27 @@ const P_LEN: usize = 8;
 const N_OUTS: usize = 2;
 const N_STATES: usize = 2;
 const TOL: f64 = 1e-5;
-/// 2-pole state-variable filter 
+/// 2-pole state-variable filter
 pub struct Svf {
     pub params: Arc<FilterParams>,
     pub vout: [f32; N_OUTS],
     pub s: [f32; N_STATES],
 
     // used to find the nonlinear contributions
-    dq: [[f32; 2]; N_P],
+    dq: [[f32; N_STATES]; N_P],
     eq: [f32; N_P],
     pub fq: [[f64; 4]; P_LEN],
     // dq, eq are actually much larger, pexps are used to reduce them
     pexps: [[f64; N_P]; P_LEN],
 
     // used to update the capacitor states
-    a: [[f32; 2]; N_STATES],
+    a: [[f32; N_STATES]; N_STATES],
     b: [f32; N_STATES],
     c: [[f32; 4]; N_STATES],
 
     // used to find the output values
     // dy: [[f32; 2]; 2],
-    dy: [[f32; 2]; N_OUTS],
+    dy: [[f32; N_STATES]; N_OUTS],
     ey: [f32; N_OUTS],
     fy: [[f32; 4]; N_OUTS],
 
@@ -52,7 +52,7 @@ impl Svf {
         let g = (std::f32::consts::PI * 1000. / (fs as f32)).tan();
         let res = 0.1;
         let g_f64 = g as f64;
-        let res_f64 =res as f64;
+        let res_f64 = res as f64;
 
         let pexps = [
             [1., 0., 0.],
@@ -117,7 +117,7 @@ impl Svf {
         let g = self.params.g.get();
         let res = self.params.zeta.get();
         let g_f64 = g as f64;
-        let res_f64 =res as f64;
+        let res_f64 = res as f64;
 
         self.fq[0][0] = 2. * g_f64;
         self.fq[2][1] = 2. * g_f64;
@@ -162,6 +162,7 @@ impl Svf {
             }
         }
         let out = self.get_output(input, self.params.zeta.get());
+        // let out = self._get_output_old(input, self.params.zeta.get());
         // let out = self.vout[0];
         f32x4::from_array([out, out, 0., 0.])
         // self.s = dot(a, s) + dot(b, input) + dot(c, self.solver.z);
@@ -200,19 +201,16 @@ impl Svf {
                 for x in &self.solver.z {
                     if !x.is_finite() || x.abs() > 1e100 {
                         panic!("solution contains infinite/NaN/ extremely large value");
-                        
                     }
                 }
                 for arr in &self.solver.j {
                     for x in arr {
                         if !x.is_finite() {
                             panic!("solution contains infinite/NaN value");
-                            
                         }
                     }
                 }
             }
- 
         }
     }
 
@@ -324,27 +322,15 @@ impl Svf {
         self.solver.residue = [res1, res2, res3, res4];
     }
     // highpass and notch doesn't work right, likely because `input` isn't quite defined right. Prolly doesn't need to be subtracted?
-    fn _get_output_old(&self, input: f32, k: f32) -> f32 {
-        match self.params.mode.value() {
-            SvfMode::LP => self.vout[0],                            // lowpass
-            SvfMode::HP => input - k * self.vout[1] - self.vout[0], // highpass
-            SvfMode::BP1 => self.vout[1],                           // bandpass
-            SvfMode::Notch => input - k * self.vout[1],             // notch
-            //3 => input - 2. * k * self.vout[1], // allpass
-            SvfMode::BP2 => k * self.vout[1], // bandpass (normalized peak gain)
-                                              // _ => input - f32x4::splat(2.) * self.vout[1] - k * self.vout[0], // peak / resonator thingy
-        }
-    }
-    // TODO: should prolly redo model to regain the nicer simpler equations here
     fn get_output(&self, input: f32, k: f32) -> f32 {
         match self.params.mode.value() {
-            SvfMode::LP => self.vout[0], // lowpass
-            SvfMode::HP => -0.5 * input - 0.5 * k * self.vout[1] - self.vout[0], // highpass
-            SvfMode::BP1 => self.vout[1], // bandpass
-            SvfMode::Notch => -0.5 * input - 0.5 * k * self.vout[1], // notch
-            //3 => input - 2. * k * self.vout[1], // allpass
+            SvfMode::LP => self.vout[0],                            // lowpass
+            SvfMode::HP => input + k * self.vout[1] + self.vout[0], // highpass
+            SvfMode::BP1 => self.vout[1],                           // bandpass
+            SvfMode::Notch => input + k * self.vout[1],             // notch
+            //3 => input + 2. * k * self.vout[1], // allpass
             SvfMode::BP2 => k * self.vout[1], // bandpass (normalized peak gain)
-                                              // _ => input - f32x4::splat(2.) * self.vout[1] - k * self.vout[0], // peak / resonator thingy
+                                              // _ => input + f32x4::splat(2.) * self.vout[1] + k * self.vout[0], // peak / resonator thingy
         }
     }
 }
