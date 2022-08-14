@@ -10,30 +10,31 @@ const N_P: usize = 2;
 const N_N: usize = 4;
 const P_LEN: usize = 8;
 const N_OUTS: usize = 1;
+const N_STATES: usize = 2;
 const TOL: f64 = 1e-5;
 
 pub struct SallenKey {
     pub params: Arc<FilterParams>,
     pub vout: [f32; N_OUTS],
-    pub s: [f32; 2],
+    pub s: [f32; N_STATES],
 
     // used to find the nonlinear contributions
-    dq: [[f32; 2]; N_P],
+    dq: [[f32; N_STATES]; N_P],
     eq: [f32; N_P],
     pub fq: [[f64; N_N]; P_LEN],
     // dq, eq are actually much larger, pexps are used to reduce them
     pexps: [[f64; N_P]; P_LEN],
 
     // used to update the capacitor states
-    a: [[f32; 2]; 2],
-    b: [f32; 2],
-    c: [[f32; 4]; 2],
+    a: [[f32; N_STATES]; N_STATES],
+    b: [f32; N_STATES],
+    c: [[f32; N_N]; N_STATES],
 
     // used to find the output values
     // dy: [[f32; 2]; 2],
-    dy: [[f32; 2]; N_OUTS],
+    dy: [[f32; N_STATES]; N_OUTS],
     ey: [f32; N_OUTS],
-    fy: [[f32; 4]; N_OUTS],
+    fy: [[f32; N_N]; N_OUTS],
 
     solver: DKSolver<N_N, N_P, P_LEN>,
 }
@@ -45,7 +46,7 @@ impl SallenKey {
         let g = (std::f32::consts::PI * 1000. / (fs as f32)).tan();
         let res = 0.1;
         let g_f64 = g as f64;
-        let res_f64 =res as f64;
+        let res_f64 = res as f64;
 
         let pexps = [
             [0., 0.],
@@ -103,7 +104,7 @@ impl SallenKey {
         let g = self.params.g.get();
         let res = (self.params.res.value * 0.8).clamp(0.01, 0.99);
         let g_f64 = g as f64;
-        let res_f64 =res as f64;
+        let res_f64 = res as f64;
         // println!("res: {res}");
         // println!("res: {g}");
         // TODO: no need to set the entire matrix but lazy rn
@@ -118,8 +119,8 @@ impl SallenKey {
             ],
             [(res_f64 - 1.) / (4. * res_f64) - 0.25, 0., 0., 0.],
             [-0.25, -1., -2. * g_f64 - 1., 0.],
-            [1.25, 1., 2.*g_f64 + 1., 1.],
-            [0.25, 1., 2.*g_f64 + 1., 0.],
+            [1.25, 1., 2. * g_f64 + 1., 1.],
+            [0.25, 1., 2. * g_f64 + 1., 0.],
             [0., 0., 0., 1.],
         ];
 
@@ -157,7 +158,7 @@ impl SallenKey {
 
         // self.vout[1] = self.dy[1][0] * self.s[0] + self.dy[1][1] * self.s[1] + self.ey[1] * input;
         for i in 0..N_OUTS {
-            for j in 0..4 {
+            for j in 0..N_N {
                 self.vout[i] += self.solver.z[j] as f32 * self.fy[i][j];
             }
         }
@@ -165,8 +166,8 @@ impl SallenKey {
         self.s[0] = self.a[0][0] * self.s[0] + self.a[0][1] * self.s[1] + self.b[0] * input;
         self.s[1] = s1_update + self.b[1] * input;
         // correct formula: self.s[1] = self.a[1][0] * self.s[0] + self.a[1][1] * self.s[1] +  self.b[1] * input + self.solver.z[1] * self.c[1][1]
-        for i in 0..2 {
-            for j in 0..4 {
+        for i in 0..N_STATES {
+            for j in 0..N_N {
                 self.s[i] += self.solver.z[j] as f32 * self.c[i][j];
             }
         }
@@ -209,7 +210,6 @@ impl SallenKey {
                 for x in &self.solver.z {
                     if !x.is_finite() {
                         panic!("solution contains infinite value");
-
                     }
                 }
             }

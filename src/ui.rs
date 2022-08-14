@@ -20,8 +20,8 @@ use vizia::*;
 // use vst::plugin::HostCallback;
 // use vst::plugin::PluginParameters;
 const ICON_DOWN_OPEN: &str = "\u{e75c}";
-
 use std::f32::consts::PI;
+use vizia::prelude::*;
 
 #[derive(Lens)]
 pub struct UiData {
@@ -43,7 +43,7 @@ pub enum ParamChangeEvent {
 }
 
 impl Model for UiData {
-    fn event(&mut self, _cx: &mut Context, event: &mut Event) {
+    fn event(&mut self, _cx: &mut EventContext, event: &mut Event) {
         // let setter = ParamSetter::new(self.gui_context.as_ref());
         event.map(|event, _| match event {
             ParamChangeEvent::SetParam(param_ptr, new_value) => {
@@ -136,7 +136,7 @@ pub fn plugin_gui(cx: &mut Context, params: Arc<FilterParams>, context: Arc<dyn 
                                         })
                                         .on_press(move |cx| {
                                             cx.emit(ParamChangeEvent::CircuitEvent(idx));
-                                            cx.emit(PopupEvent::Close);
+                                            cx.emit(views::PopupEvent::Close);
                                         });
                                 },
                             );
@@ -343,7 +343,6 @@ impl BodePlot {
 
 impl View for BodePlot {
     fn draw(&self, cx: &mut DrawContext<'_>, canvas: &mut Canvas) {
-        let current = cx.current();
         if let Some(ui_data) = cx.data::<UiData>() {
             let params = ui_data.params.clone();
 
@@ -418,8 +417,8 @@ impl View for BodePlot {
                 // TODO: should prolly cover SallenKey, has its own reso formula
             }
 
-            let bounds = cx.cache().get_bounds(current);
-
+            // let bounds = cx.cache.get_bounds(*current);
+            let bounds = cx.bounds();
             let image_id = if let Some(image_id) = *self.image.borrow() {
                 image_id
             } else {
@@ -437,12 +436,9 @@ impl View for BodePlot {
 
             canvas.set_render_target(RenderTarget::Image(image_id));
 
-            let background_color: femtovg::Color = cx
-                .background_color(current)
-                .cloned()
-                .unwrap_or_default()
-                .into();
-            let color: femtovg::Color = cx.font_color(current).cloned().unwrap_or_default().into();
+            let background_color: femtovg::Color =
+                cx.background_color().cloned().unwrap_or_default().into();
+            let color: femtovg::Color = cx.font_color().cloned().unwrap_or_default().into();
 
             // Fill background
             canvas.clear_rect(0, 0, width as u32, height as u32, background_color.into());

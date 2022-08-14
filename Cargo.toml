@@ -7,11 +7,14 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [lib]
 name = "va_filter"
-crate-type = ["cdylib"]
-
+path = "src/lib.rs"
+crate-type = ["cdylib","lib"]
+[[bin]]
+name = "va_filter_standalone"
+path = "src/main.rs"
 [dependencies]
 # vst = { git = "https://github.com/rust-dsp/rust-vst" }
-nih_plug = { git = "https://github.com/robbert-vdh/nih-plug", features = ["assert_process_allocs"] }
+nih_plug = { git = "https://github.com/robbert-vdh/nih-plug", features = ["assert_process_allocs", "standalone"] }
 # baseview = { git = "https://github.com/RustAudio/baseview.git", rev = "d399c1275522ae75f5a82caadd904df2685c8660" }
 baseview = { git = "https://github.com/RustAudio/baseview.git", rev = "b3712638bacb3fdf2883cb5aa3f6caed0e91ac8c"} # newest
 vizia = {git = "https://github.com/vizia/vizia", branch = "main", features = ["baseview"], default-features = false}

@@ -16,8 +16,8 @@ use nih_plug::{nih_export_vst3, prelude::*};
 
 // mod editor;
 // use editor::{EditorState, SVFPluginEditor};
-mod editor;
 mod build_lookup_table;
+mod editor;
 use editor::*;
 mod parameter;
 #[allow(dead_code)]
@@ -26,10 +26,10 @@ use utils::AtomicOps;
 mod filter_params_nih;
 use filter_params_nih::FilterParams;
 
-mod filter;
+pub mod filter;
 mod ui;
 
-pub(crate) struct VaFilter {
+pub struct VaFilter {
     // Store a handle to the plugin's parameter object.
     params: Arc<FilterParams>,
     ladder: filter::LadderFilter,
@@ -99,7 +99,7 @@ impl Plugin for VaFilter {
         &mut self,
         _bus_config: &BusConfig,
         _buffer_config: &BufferConfig,
-        _context: &mut impl ProcessContext,
+        _context: &mut impl InitContext,
     ) -> bool {
         self.params.sample_rate.set(_buffer_config.sample_rate);
         true
@@ -114,6 +114,7 @@ impl Plugin for VaFilter {
     fn process(
         &mut self,
         buffer: &mut Buffer,
+        _aux: &mut AuxiliaryBuffers,
         _context: &mut impl ProcessContext,
     ) -> ProcessStatus {
         for mut channel_samples in buffer.iter_samples() {

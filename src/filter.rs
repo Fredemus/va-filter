@@ -9,8 +9,8 @@ use std_float::*;
 mod solver;
 use solver::DKSolver;
 
-pub use self::sallen_key::SallenKey;
 pub mod sallen_key;
+pub use self::sallen_key::SallenKey;
 pub mod svf;
 pub use self::svf::Svf;
 
@@ -26,7 +26,6 @@ pub fn tanh_levien(x: f32x4) -> f32x4 {
     // println!("a: {:?}, b: {:?}", a, b);
     a / (f32x4::splat(1.0) + (a * a)).sqrt()
 }
-
 
 #[allow(dead_code)]
 #[derive(PartialEq, Clone, Copy)]

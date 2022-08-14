@@ -1,4 +1,3 @@
-
 #[inline]
 pub fn tanh_levien_nosimd(x: f64) -> f64 {
     let x2 = x * x;
@@ -195,7 +194,7 @@ impl<const N_N: usize, const N_P: usize, const P_LEN: usize> DKSolver<N_N, N_P, 
     // simple shockley diode equation
     pub fn eval_diode(&self, q: &[f64]) -> (f64, [f64; 2]) {
         // TODO: ideality factor is probably more like ~1.9 than 1
-        const ETA : f64 = 1.88;
+        const ETA: f64 = 1.88;
         // thermal voltage
         const V_T_INV: f64 = 1.0 / 25e-3;
         // the diode's saturation current. Could make this a function parameter to have slightly mismatched diodes or something
@@ -210,5 +209,4 @@ impl<const N_N: usize, const N_P: usize, const P_LEN: usize> DKSolver<N_N, N_P, 
 
         (residue, jacobian)
     }
-    
 }
