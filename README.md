@@ -1,5 +1,5 @@
 # va-filter
-Virtual analogue filters modelled with Topology Preserving Transforms and solved with Newton's method. implemented as a VST2 in Rust, using [Vizia](https://github.com/geom3trik/VIZIA) for the GUI.
+Virtual analogue filters. implemented as a VST3 and Clap plugin in Rust, using [Vizia](https://github.com/geom3trik/VIZIA) for the GUI.
 
 ## circuits
 This plugin currently has 3 circuit models:
