@@ -21,7 +21,7 @@ It's capable of outputting all basic filter modes (lowpass, highpass, bandpass, 
 OTA core, nonlinear op-amp buffers. The Osc Oscar has BJT but I haven't looked into how to model that (in a fast/simple way) yet.
 Resonance is limited by a diode clipper on the damping feedback, boosting it when gain is high and it'd otherwise disappear because of the OTA nonlinearities.
 
-Its convergence is generally good, but when both drive and cutoff is high it completely fails to converge because of the internal values of the diode models. I'm looking into a way to fix this.
+Its convergence is generally good.
 The convergence gets a lot better when oversampled 2x or more, which I recommend anyway since it distorts.
 
 
@@ -39,11 +39,13 @@ OTA core, nonlinear op-amp buffers.
 Resonance is limited by a diode clipper, but it disappears quite quickly at high drives.
 
 Its convergence is generally good, but sometimes, especially when cutoff, resonance and drive are all very high, homotopy is needed to converge which gets very slow. I'll look into speeding this up at some point. With 2x oversampling this isn't a problem.
-The parameter vector for the nonlinear contributions is just 2 entries long, meaning that it might be reasonable to create a lookup table to guarantee stable, fast runtime. 
+The parameter vector for the nonlinear contributions is just 2 entries long, meaning that it might be reasonable to create a lookup table to guarantee stable, fast runtime. <- not as reasonable as I thought, also needs entries for g and res
 
 Circuit solved by Holters & Zölzer's generalization of the DK-method.
 
 Mono and missing SIMD optimization currently 
+
+Both the svf and sallenkey filters are currently in a very un-optimized state. Right now they're set up for quick iteration/experimentation with the model. I'll work on speeding them up when I'm sure I'm happy with the models.
 
 # Build Instructions
 
