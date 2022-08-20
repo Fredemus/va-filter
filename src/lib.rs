@@ -54,7 +54,7 @@ impl Default for VaFilter {
         let svf_new = filter::Svf::new(params.clone());
         let ladder = LadderFilter::new(params.clone());
         Self {
-            params: params.clone(),
+            params,
             // svf,
             svf_new,
             sallenkey,

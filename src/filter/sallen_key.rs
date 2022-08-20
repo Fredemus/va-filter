@@ -180,7 +180,7 @@ impl SallenKey {
     fn homotopy_solver(&mut self, p: [f64; N_P]) {
         self.nonlinear_contribs(p);
         // if the newton solver failed to converge, apply homotopy
-        if !(self.solver.resmaxabs < TOL) {
+        if self.solver.resmaxabs >= TOL {
             // println!("needs homotopy. p: {:?}", p);
             let mut a = 0.5;
             let mut best_a = 0.;
@@ -293,8 +293,8 @@ impl SallenKey {
         let (res1, jq1) = self.solver.eval_opamp(&q[0..2]);
         let (res2, jq2) = self.solver.eval_opamp(&q[2..4]);
 
-        let (res3, jq3) = self.solver.eval_diode(&q[4..6]);
-        let (res4, jq4) = self.solver.eval_diode(&q[6..8]);
+        let (res3, jq3) = self.solver.eval_diode(&q[4..6], 1e-15, 1.5);
+        let (res4, jq4) = self.solver.eval_diode(&q[6..8], 1e-15, 1.5);
 
         // TODO: consider simplifying jq
         self.solver.jq[0][0] = jq1[0];
@@ -312,7 +312,7 @@ impl SallenKey {
         for i in 0..self.solver.jq.len() {
             for j in 0..N_N {
                 self.solver.j[i][j] = 0.;
-                for k in 0..8 {
+                for k in 0..P_LEN {
                     self.solver.j[i][j] += self.solver.jq[i][k] * fq[k][j];
                 }
             }
@@ -328,61 +328,4 @@ impl SallenKey {
         self.solver
             .set_extrapolation_origin([0.; N_P], [0.; N_N], self.solver.jp);
     }
-}
-
-#[test]
-fn test_stepresponse() {
-    let should_update_filter = Arc::new(std::sync::atomic::AtomicBool::new(false));
-    let params = Arc::new(FilterParams::new(should_update_filter.clone()));
-    // params.cutoff.set_plain_value(1000.);
-    params.sample_rate.set(44100.);
-    params.update_g(1000.);
-    params.zeta.set(0.1);
-    let mut filt = SallenKey::new(params.clone());
-    filt.update_matrices();
-    // println!("should be 1.5889e-04: {}", filt.fq[1][1]);
-    let mut out = [0.; 10];
-    for i in 0..10 {
-        println!("sample {i}");
-        filt.tick_dk(f32x4::splat(10.0));
-        out[i] = filt.vout[0];
-        // println!("val lp: {}", filt.vout[0]);
-        // println!("filter state: {:?}", filt.s);
-        // if filt.vout[0] < 0. {
-        //     panic!("sample {} got negative", i)
-        // }
-    }
-    dbg!(out);
-}
-#[test]
-fn test_sine() {
-    let should_update_filter = Arc::new(std::sync::atomic::AtomicBool::new(false));
-    let params = Arc::new(FilterParams::new(should_update_filter.clone()));
-    // params.cutoff.set_plain_value(1000.);
-    let fs = 44100.;
-    params.sample_rate.set(44100.);
-    params.update_g(1000.);
-    params.zeta.set(0.1);
-    let mut filt = SallenKey::new(params.clone());
-    filt.update_matrices();
-
-    let mut input = [0.; 10];
-    let freq = 500.;
-    for i in 0..input.len() {
-        let t = i as f32 / fs;
-        input[i] = (2. * std::f32::consts::PI * freq * t).cos();
-    }
-    // println!("should be 1.5889e-04: {}", filt.fq[1][1]);
-    let mut out = [0.; 10];
-    for i in 0..10 {
-        println!("sample {i}: input: {}", input[i]);
-        filt.tick_dk(f32x4::splat(input[i]));
-        out[i] = filt.vout[0];
-        // println!("val lp: {}", filt.vout[0]);
-        // println!("filter state: {:?}", filt.s);
-        // if filt.vout[0] < 0. {
-        //     panic!("sample {} got negative", i)
-        // }
-    }
-    dbg!(out);
 }

@@ -99,7 +99,7 @@ fn get_filter_bode(
             }
         }
     }
-    return array;
+    array
 }
 
 pub fn get_amplitude_response(

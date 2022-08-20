@@ -8,9 +8,7 @@ use core_simd::*;
 use std::sync::Arc;
 use std_float::*;
 
-// FIXME: something's wrong, reso doesn't do what it should huge DC offset
 
-use core_simd::f32x4;
 
 const N_P: usize = 3;
 const N_N: usize = 4;
@@ -27,20 +25,20 @@ pub struct Svf {
     // used to find the nonlinear contributions
     dq: [[f32; N_STATES]; N_P],
     eq: [f32; N_P],
-    pub fq: [[f64; 4]; P_LEN],
+    pub fq: [[f64; N_N]; P_LEN],
     // dq, eq are actually much larger, pexps are used to reduce them
     pexps: [[f64; N_P]; P_LEN],
 
     // used to update the capacitor states
     a: [[f32; N_STATES]; N_STATES],
     b: [f32; N_STATES],
-    c: [[f32; 4]; N_STATES],
+    c: [[f32; N_N]; N_STATES],
 
     // used to find the output values
     // dy: [[f32; 2]; 2],
     dy: [[f32; N_STATES]; N_OUTS],
     ey: [f32; N_OUTS],
-    fy: [[f32; 4]; N_OUTS],
+    fy: [[f32; N_N]; N_OUTS],
 
     solver: DKSolver<N_N, N_P, P_LEN>,
 }
@@ -142,22 +140,20 @@ impl Svf {
         // self.nonlinear_contribs(p);
         // find nonlinear contributions (solver.z), applying homotopy if it fails to converge
         self.homotopy_solver(p);
-        // self.vout = dot(dy, s) + dot(ey, input) + dot(fy, self.solver.z)
-        // TODO: add in fy * z
         self.vout[0] = self.dy[0][0] * self.s[0] + self.dy[0][1] * self.s[1] + self.ey[0] * input;
         self.vout[1] = self.dy[1][0] * self.s[0] + self.dy[1][1] * self.s[1] + self.ey[1] * input;
 
         // self.vout[1] = self.dy[1][0] * self.s[0] + self.dy[1][1] * self.s[1] + self.ey[1] * input;
         for i in 0..N_OUTS {
-            for j in 0..4 {
+            for j in 0..N_N {
                 self.vout[i] += self.solver.z[j] as f32 * self.fy[i][j];
             }
         }
         let s1_update = self.a[1][0] * self.s[0] + self.a[1][1] * self.s[1];
         self.s[0] = self.a[0][0] * self.s[0] + self.a[0][1] * self.s[1] + self.b[0] * input;
         self.s[1] = s1_update + self.b[1] * input;
-        for i in 0..2 {
-            for j in 0..4 {
+        for i in 0..N_STATES {
+            for j in 0..N_N {
                 self.s[i] += self.solver.z[j] as f32 * self.c[i][j];
             }
         }
@@ -197,7 +193,7 @@ impl Svf {
             }
             if self.solver.resmaxabs >= TOL {
                 println!("failed to converge. residue: {:?}", self.solver.residue);
-
+                println!("z: {:?}", self.solver.z);
                 for x in &self.solver.z {
                     if !x.is_finite() || x.abs() > 1e100 {
                         panic!("solution contains infinite/NaN/ extremely large value");
@@ -295,8 +291,9 @@ impl Svf {
         let (res1, jq1) = self.solver.eval_opamp(&q[0..2]);
         let (res2, jq2) = self.solver.eval_opamp(&q[2..4]);
 
-        let (res3, jq3) = self.solver.eval_diode(&q[4..6]);
-        let (res4, jq4) = self.solver.eval_diode(&q[6..8]);
+        let (res3, jq3) = self.solver.eval_diode(&q[4..6], 1e-15, 1.68);
+        let (res4, jq4) = self.solver.eval_diode(&q[6..8], 1e-15, 1.68);
+
 
         // TODO: consider simplifying jq
         self.solver.jq[0][0] = jq1[0];
@@ -333,28 +330,4 @@ impl Svf {
                                               // _ => input + f32x4::splat(2.) * self.vout[1] + k * self.vout[0], // peak / resonator thingy
         }
     }
-}
-#[test]
-fn test_stepresponse() {
-    let should_update_filter = Arc::new(std::sync::atomic::AtomicBool::new(false));
-    let params = Arc::new(FilterParams::new(should_update_filter.clone()));
-    // params.cutoff.set_plain_value(1000.);
-    params.sample_rate.set(44100.);
-    params.update_g(1000.);
-    params.zeta.set(0.1);
-    let mut filt = Svf::new(params.clone());
-    filt.update_matrices();
-    // println!("should be 1.5889e-04: {}", filt.fq[1][1]);
-    let mut out = [0.; 10];
-    for i in 0..3 {
-        println!("sample {i}");
-        filt.tick_dk(f32x4::splat(20.0));
-        out[i] = filt.vout[0];
-        // println!("val lp: {}", filt.vout[0]);
-        // println!("filter state: {:?}", filt.s);
-        // if filt.vout[0] < 0. {
-        //     panic!("sample {} got negative", i)
-        // }
-    }
-    dbg!(out);
 }

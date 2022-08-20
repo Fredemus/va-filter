@@ -127,7 +127,7 @@ pub fn plugin_gui(cx: &mut Context, params: Arc<FilterParams>, context: Arc<dyn 
                                 UiData::params.map(|p| p.filter_type.to_string()),
                                 move |cx, choice| {
                                     let selected = *item.get(cx) == *choice.get(cx);
-                                    Label::new(cx, &item.get(cx).to_string())
+                                    Label::new(cx, &item.get(cx))
                                         .width(Stretch(1.0))
                                         .background_color(if selected {
                                             Color::from("#c28919")
@@ -266,7 +266,7 @@ where
     .row_between(Pixels(10.0))
 }
 // using Knob::custom() to make a stepped knob with tickmarks indicating the steps
-fn make_steppy_knob<'a, P, F>(
+fn make_steppy_knob<P, F>(
     cx: &mut Context,
     steps: usize,
     arc_len: f32,
@@ -355,6 +355,7 @@ impl View for BodePlot {
             let min;
             //
             if ui_data.show_phase {
+                // FIXME: missing sallenkey
                 if params.filter_type.value() == Circuits::SVF {
                     let mode = params.mode.value() as usize;
                     amps = get_phase_response(
@@ -441,7 +442,7 @@ impl View for BodePlot {
             let color: femtovg::Color = cx.font_color().cloned().unwrap_or_default().into();
 
             // Fill background
-            canvas.clear_rect(0, 0, width as u32, height as u32, background_color.into());
+            canvas.clear_rect(0, 0, width as u32, height as u32, background_color);
 
             let mut path = Path::new();
             let amp = amps[0].clamp(min, max);
@@ -458,7 +459,7 @@ impl View for BodePlot {
 
             let mut path2 = path.clone();
             // Draw plot
-            let mut paint = Paint::color(color.into());
+            let mut paint = Paint::color(color);
             paint.set_line_width(line_width);
             paint.set_line_join(femtovg::LineJoin::Round);
             paint.set_line_cap(femtovg::LineCap::Square);
@@ -467,9 +468,9 @@ impl View for BodePlot {
             canvas.stroke_path(&mut path, paint);
 
             // making a cool background gradient
-            let mut mid_color = femtovg::Color::from(color);
+            let mut mid_color = color;
             mid_color.set_alpha(20);
-            let mut edge_color = femtovg::Color::from(color);
+            let mut edge_color = color;
             edge_color.set_alpha(64);
             // bg color is slightly less visible in the mid-point (0 dB) of the graph
             let bg = Paint::linear_gradient_stops(

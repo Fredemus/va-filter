@@ -4,9 +4,25 @@ pub fn tanh_levien_nosimd(x: f64) -> f64 {
     let x3 = x2 * x;
     let x5 = x3 * x2;
     let a = x + (0.16489087 * x3) + (0.00985468 * x5);
-    // println!("a: {:?}, b: {:?}", a, b);
     a / (1.0 + (a * a)).sqrt()
 }
+
+/// like rust's asinh, but a way that's less prone to overflow by switching to a formula using smaller values
+#[inline]
+#[allow(dead_code)]
+pub fn safe_asinh(x: f64) -> f64 {
+    const AH_LN2: f64 = 6.93147180559945286227e-01;
+    let x_abs = x.abs();
+    let w = if x_abs < 2.0_f64.powi(28) {
+        (x_abs + ((x * x) + 1.0).sqrt()).ln()
+    }
+    // if x is very high, use simpler formula (x * x in the formula above can make asinh go inf)
+    else {
+        x_abs.ln() + AH_LN2
+    };
+    w.copysign(x)
+}
+
 /// solves the nonlinear contributions in the SVF using Newton's method
 #[derive(Clone)]
 pub(crate) struct DKSolver<const N_N: usize, const N_P: usize, const P_LEN: usize> {
@@ -74,7 +90,6 @@ impl<const N_N: usize, const N_P: usize, const P_LEN: usize> DKSolver<N_N, N_P, 
     }
 
     pub fn set_jp(&mut self, pexps: &[[f64; N_P]; P_LEN]) {
-        // dbg!(self.jq);
         for i in 0..N_N {
             for j in 0..N_P {
                 self.jp[i][j] = 0.;
@@ -99,7 +114,7 @@ impl<const N_N: usize, const N_P: usize, const P_LEN: usize> DKSolver<N_N, N_P, 
         self.last_z = z;
     }
     // this entire function could be removed by just using a linearization directly but it would make updating the model(s) require a lot more manual work
-    pub fn set_lin_solver(&mut self, new_jacobian: [[f64; N_N]; N_N]) {
+    pub fn set_lin_solver(&mut self, new_jacobian: [[f64; N_N]; N_N]) -> bool {
         // const M: usize = N_N;
         // const N: usize = N_N;
 
@@ -132,7 +147,8 @@ impl<const N_N: usize, const N_P: usize, const P_LEN: usize> DKSolver<N_N, N_P, 
                     self.factors[i][k] *= self.factors[k][k];
                 }
             } else {
-                panic!("shouldn't happen");
+                // Jacobian for a nonlin element contains a 0 value, making it impossible to iterate with
+                return false;
             }
             // update rest of factors
             for j in k + 1..N_N {
@@ -141,6 +157,7 @@ impl<const N_N: usize, const N_P: usize, const P_LEN: usize> DKSolver<N_N, N_P, 
                 }
             }
         }
+        true
     }
     /// based on dgetrs, solve A * X = B with A being lower-upper factorized
     pub fn solve_linear_equation(&self, x: [f64; N_N]) -> [f64; N_N] {
@@ -192,20 +209,40 @@ impl<const N_N: usize, const N_P: usize, const P_LEN: usize> DKSolver<N_N, N_P, 
     }
     // TODO: the diodes end up throwing out absurdly large numbers, need f64 precision or some other way to model diode pairs
     // simple shockley diode equation
-    pub fn eval_diode(&self, q: &[f64]) -> (f64, [f64; 2]) {
+    pub fn eval_diode(&self, q: &[f64], i_s: f64, eta: f64) -> (f64, [f64; 2]) {
         // TODO: ideality factor is probably more like ~1.9 than 1
         const ETA: f64 = 1.88;
         // thermal voltage
-        const V_T_INV: f64 = 1.0 / 25e-3;
+        // const V_T_INV: f64 = 1.0 / 25e-3;
+        const V_T: f64 = 25e-3;
         // the diode's saturation current. Could make this a function parameter to have slightly mismatched diodes or something
-        const I_S: f64 = 1e-15;
+        // const I_S: f64 = 1e-6;
         // const I_S: f64 = 1e-12;
         let v_in = q[0];
         let i_out = q[1];
-        let ex = (v_in * V_T_INV).exp();
-        let residue = I_S * (ex - 1.) - i_out;
+        let ex = (v_in / (V_T * eta)).exp();
+        let residue = i_s * (ex - 1.) - i_out;
 
-        let jacobian = [I_S * V_T_INV * ex, -1.0];
+        let jacobian = [i_s / (V_T * eta) * ex, -1.0];
+
+        (residue, jacobian)
+    }
+    // inverse of diode clipper to try to avoid having residue/z go to extremely high values.
+    // Would likely allow for the solver to be single-precision
+    // Sadly has big convergence issues, not sure how to solve them currently,
+    pub fn eval_diode_clipper(&self, q: &[f64]) -> (f64, [f64; 2]) {
+        // const ETA: f64 = 1.48;
+        const ETA: f64 = 1.68;
+        const V_T: f64 = 25e-3 * ETA;
+        const I_S: f64 = 1e-15;
+        const I_S_2: f64 = I_S * I_S;
+
+        let v_in = q[0];
+        let i_out = q[1];
+        // let residue = V_T * (0.5 * i_out / I_S ).asinh() - v_in;
+        let residue = V_T * safe_asinh(0.5 * i_out / I_S) - v_in;
+
+        let jacobian = [-1.0, V_T / (I_S * ((i_out * i_out) / I_S_2 + 4.0).sqrt())];
 
         (residue, jacobian)
     }
