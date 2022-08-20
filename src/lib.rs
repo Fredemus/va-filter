@@ -73,8 +73,8 @@ impl Plugin for VaFilter {
 
     const VERSION: &'static str = "0.0.1";
 
-    const DEFAULT_NUM_INPUTS: u32 = 2;
-    const DEFAULT_NUM_OUTPUTS: u32 = 2;
+    const DEFAULT_INPUT_CHANNELS: u32 = 2;
+    const DEFAULT_OUTPUT_CHANNELS: u32 = 2;
 
     const MIDI_INPUT: MidiConfig = MidiConfig::None;
 
