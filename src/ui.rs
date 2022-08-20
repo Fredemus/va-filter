@@ -163,22 +163,22 @@ pub fn plugin_gui(cx: &mut Context, params: Arc<FilterParams>, context: Arc<dyn 
                 cx,
                 UiData::params.map(|params| params.filter_type.value() as usize),
                 move |cx, ft| {
-                    if ft.get(cx) == 0 {
-                        // let param = &UiData::params.get(cx).mode;
-                        // let steps = (param.max - param.min + 1.) as usize;
-                        let steps = 5;
-                        make_steppy_knob(cx, steps, 270., params.mode.as_ptr(), |params| {
-                            &params.mode
-                        });
-                    } else {
-                        let steps = 4;
-                        make_steppy_knob(cx, steps, 270., params.slope.as_ptr(), |params| {
-                            &params.slope
-                        });
-                        // let param = &UiData::params.get(cx).slope;
-                        // let steps = (param.max - param.min + 1.) as usize;
-                        // make_steppy_knob(cx, 5, steps, 270.);
+                    match ft.get(cx) {
+                        0 => {
+                            let steps = 5;
+                            make_steppy_knob(cx, steps, 270., params.mode.as_ptr(), |params| {
+                                &params.mode
+                            });
+                        },
+                        1 => {
+                            let steps = 4;
+                            make_steppy_knob(cx, steps, 270., params.slope.as_ptr(), |params| {
+                                &params.slope
+                            });
+                        },
+                        _ => (),
                     }
+                    
                 },
             );
         })
