@@ -11,8 +11,10 @@ use solver::DKSolver;
 
 pub mod sallen_key;
 pub use self::sallen_key::SallenKey;
+pub use self::sallen_key::SallenKeyFast;
 pub mod svf;
 pub use self::svf::Svf;
+
 
 /// cheap tanh to make the filter faster.
 // from a quick look it looks extremely good, max error of ~0.0002 or .02%

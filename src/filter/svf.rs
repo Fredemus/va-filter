@@ -164,7 +164,7 @@ impl Svf {
         // self.s = dot(a, s) + dot(b, input) + dot(c, self.solver.z);
     }
 
-    fn homotopy_solver(&mut self, p: [f64; N_P]) {
+    pub fn homotopy_solver(&mut self, p: [f64; N_P]) {
         self.nonlinear_contribs(p);
         // if the newton solver failed to converge, apply homotopy
         if !(self.solver.resmaxabs < TOL) {
@@ -227,7 +227,7 @@ impl Svf {
             }
         }
 
-        self.solver.tmp_nn = self.solver.solve_linear_equation(self.solver.tmp_nn);
+        self.solver.tmp_nn = self.solver.solve_linear_equations(self.solver.tmp_nn);
 
         // self.solver.z = self.solver.last_z - self.solver.tmp_nn;
         for i in 0..self.solver.z.len() {
@@ -257,7 +257,7 @@ impl Svf {
             }
 
             // update z with the linsolver according to the residue
-            self.solver.tmp_nn = self.solver.solve_linear_equation(self.solver.residue);
+            self.solver.tmp_nn = self.solver.solve_linear_equations(self.solver.residue);
 
             for i in 0..self.solver.z.len() {
                 self.solver.z[i] = self.solver.z[i] - self.solver.tmp_nn[i];

@@ -34,7 +34,7 @@ pub(crate) struct DKSolver<const N_N: usize, const N_P: usize, const P_LEN: usiz
     // p-vector expanded to the pins of the nonlinear elements
     pub p_full: [f64; P_LEN],
 
-    // last value of jacobian * p
+    // last value of jacobian * p(?)
     pub last_jp: [[f64; N_P]; N_N],
 
     // temporary storage. Evaluate if necessary
@@ -119,7 +119,7 @@ impl<const N_N: usize, const N_P: usize, const P_LEN: usize> DKSolver<N_N, N_P, 
         // const N: usize = N_N;
 
         self.factors = new_jacobian;
-        // sort of a lower-upper factorization
+        // sort of a lower-upper factorization, but storing inverses on the diagonal. Don't remember why
         for k in 0..N_N {
             let mut kp = k;
             let mut amax = 0.0;
@@ -141,7 +141,6 @@ impl<const N_N: usize, const N_P: usize, const P_LEN: usize> DKSolver<N_N, N_P, 
                     }
                 }
                 // scale first column
-                // let fkk_inv =  1. / self.factors[k][k];
                 self.factors[k][k] = 1. / self.factors[k][k];
                 for i in k + 1..N_N {
                     self.factors[i][k] *= self.factors[k][k];
@@ -160,8 +159,8 @@ impl<const N_N: usize, const N_P: usize, const P_LEN: usize> DKSolver<N_N, N_P, 
         true
     }
     /// based on dgetrs, solve A * X = B with A being lower-upper factorized
-    pub fn solve_linear_equation(&self, x: [f64; N_N]) -> [f64; N_N] {
-        let mut x_temp = x;
+    pub fn solve_linear_equations(&self, b: [f64; N_N]) -> [f64; N_N] {
+        let mut x_temp = b;
         for i in 0..N_N {
             // x[i], x[self.ipiv[i]] =
             x_temp.swap(i, self.ipiv[i]);
@@ -172,8 +171,6 @@ impl<const N_N: usize, const N_P: usize, const P_LEN: usize> DKSolver<N_N, N_P, 
                 x_temp[i] -= self.factors[i][j] * xj;
             }
         }
-        // This loop is wrong somehow
-        // TODO: verify this range, should be 3-2-1-0
         for j in (0..N_N).rev() {
             x_temp[j] = self.factors[j][j] * x_temp[j];
             for i in 0..j {
@@ -198,7 +195,6 @@ impl<const N_N: usize, const N_P: usize, const P_LEN: usize> DKSolver<N_N, N_P, 
     pub fn eval_opamp(&self, q: &[f64]) -> (f64, [f64; 2]) {
         let v_in = q[0];
         let v_out = q[1];
-        // TODO: switch to tanh approximation
         let tanh_vin = tanh_levien_nosimd(v_in);
         // let tanh_vin = v_in.tanh();
         let residue = tanh_vin - v_out;
@@ -206,6 +202,59 @@ impl<const N_N: usize, const N_P: usize, const P_LEN: usize> DKSolver<N_N, N_P, 
         let jacobian = [(1. - tanh_vin * tanh_vin), -1.0];
 
         (residue, jacobian)
+    }
+
+    // testing if the tuple is slow
+    pub fn eval_opamp_arr(&self, q: &[f64]) -> [f64; 2] {
+        let v_in = q[0];
+        let v_out = q[1];
+        let tanh_vin = tanh_levien_nosimd(v_in);
+        // let tanh_vin = v_in.tanh();
+        let residue = tanh_vin - v_out;
+        // just a thought: could it be "helped along" by `if jacobian[0] == 0. { jacobian[0] = v_in.signum() * 1e-6}`?
+        let mut jacobian = 1. - tanh_vin * tanh_vin;
+        if jacobian == 0.0 {
+            jacobian = v_in.signum() * 1e-6;
+        }
+        [residue, jacobian]
+    }
+    pub fn eval_diode_arr(&self, q: &[f64], i_s: f64, eta: f64) -> [f64; 2] {
+        // const V_T_INV: f64 = 1.0 / 25e-3;
+        // thermal voltage
+        const V_T: f64 = 25e-3;
+        // the diode's saturation current. Could make this a function parameter to have slightly mismatched diodes or something
+        // const I_S: f64 = 1e-6;
+        // const I_S: f64 = 1e-12;
+        let v_in = q[0];
+        let i_out = q[1];
+        let ex = (v_in / (V_T * eta)).exp();
+        let residue = i_s * (ex - 1.) - i_out;
+
+        let jacobian = i_s / (V_T * eta) * ex;
+
+        [residue, jacobian]
+    }
+    // TODO: evaluate if clamping to f32::MAX * 1e-4 or smth would make single-precision solver possible
+    pub fn eval_diodepair_arr(&self, q: &[f64], i_s: f64, eta: f64) -> [f64; 2] {
+        // the diode's saturation current. Could make this a function parameter to have slightly mismatched diodes or something
+        // const I_S: f64 = 1e-6;
+        // const I_S: f64 = 1e-12;
+
+        const V_T: f64 = 25e-3;
+        let v_t_inv = 1.0 / (V_T * eta);
+        let v_in = q[0];
+        let i_out = q[1];
+
+        let x = v_in * v_t_inv;
+        let ex1 = (x).exp();
+        let ex2 = (-x).exp();
+        let sinh_vin = i_s * (ex1 - ex2);
+        let cosh_vin = i_s * (ex1 + ex2);
+
+        // clamp sinh and cosh since it can go infinite at high drives
+        let residue = sinh_vin.clamp(-1e200, 1e200) - i_out;
+        let jacobian = cosh_vin.clamp(-1e200, 1e200) * v_t_inv;
+        [residue, jacobian]
     }
     // TODO: the diodes end up throwing out absurdly large numbers, need f64 precision or some other way to model diode pairs
     // simple shockley diode equation

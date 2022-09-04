@@ -21,9 +21,9 @@ mod editor;
 use editor::*;
 mod parameter;
 #[allow(dead_code)]
-mod utils;
+pub mod utils;
 use utils::AtomicOps;
-mod filter_params_nih;
+pub mod filter_params_nih;
 use filter_params_nih::FilterParams;
 
 pub mod filter;
@@ -36,7 +36,7 @@ pub struct VaFilter {
     // svf: filter::SVF,
     svf_new: filter::Svf,
 
-    sallenkey: filter::SallenKey,
+    sallenkey: filter::SallenKeyFast,
     // used for constructing the editor in get_editor
     // host: Option<HostCallback>,
     /// If this is set at the start of the processing cycle, then the filter coefficients should be
@@ -50,7 +50,7 @@ impl Default for VaFilter {
         let should_update_filter = Arc::new(std::sync::atomic::AtomicBool::new(false));
         let params = Arc::new(FilterParams::new(should_update_filter.clone()));
         // let svf = SVF::new(params.clone());
-        let sallenkey = filter::SallenKey::new(params.clone());
+        let sallenkey = filter::SallenKeyFast::new(params.clone());
         let svf_new = filter::Svf::new(params.clone());
         let ladder = LadderFilter::new(params.clone());
         Self {

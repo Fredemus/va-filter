@@ -33,6 +33,11 @@ std_float = { git = "https://github.com/rust-lang/portable-simd" }
 # serde = { version = "1.0.130", features = ["derive"] }
 bincode = "1.3.3"
 
+[dev-dependencies]
+criterion = "0.3"
+[[bench]]
+name = "benchmark"
+harness = false
 
 [workspace]
 members = ["xtask"]
