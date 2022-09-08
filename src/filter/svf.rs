@@ -8,11 +8,9 @@ use core_simd::*;
 use std::sync::Arc;
 use std_float::*;
 
-
-
 const N_P: usize = 3;
-const N_N: usize = 4;
-const P_LEN: usize = 8;
+const N_N: usize = 3;
+const P_LEN: usize = 6;
 const N_OUTS: usize = 2;
 const N_STATES: usize = 2;
 const TOL: f64 = 1e-5;
@@ -59,18 +57,14 @@ impl Svf {
             [0., 0., 0.],
             [0., 0., 0.],
             [0., 0., 1.],
-            [0., 0., 0.],
-            [0., 0., 0.],
         ];
         let fq = [
-            [2. * g_f64, -1., 0., 0.],
-            [0., 1., 0., 0.],
-            [0., 2. * g_f64, -1., 0.],
-            [0., 0., 1., 0.],
-            [0., -1., 0., 0.],
-            [1., res_f64, 1., 1.],
-            [0., 1., 0., 0.],
-            [0., 0., 0., 1.],
+            [2. * g_f64, -1., 0.],
+            [0., 1., 0.],
+            [0., 2. * g_f64, -1.],
+            [0., 0., 1.],
+            [0., -1., 0.],
+            [1., res_f64, 1.],
         ];
         let mut a = Self {
             params,
@@ -84,11 +78,11 @@ impl Svf {
 
             a: [[1., 0.], [0., 1.]],
             b: [0., 0.],
-            c: [[-4. * g, 0., 0., 0.], [0., -4. * g, 0., 0.]],
+            c: [[-4. * g, 0., 0.], [0., -4. * g, 0.]],
 
             dy: [[0., 0.], [0., 0.]],
             ey: [0., 0.],
-            fy: [[0., 0., 1., 0.], [0., 1., 0., 0.]],
+            fy: [[0., 0., 1.], [0., 1., 0.]],
 
             solver: DKSolver::new(),
         };
@@ -97,7 +91,7 @@ impl Svf {
         a.solver.set_lin_solver(a.solver.j);
         a.solver.set_jp(&pexps);
         a.solver
-            .set_extrapolation_origin([0.; N_P], [0.; N_N], a.solver.jp);
+            .set_extrapolation_origin([0.; N_P], [0.; N_N]);
 
         a
     }
@@ -108,7 +102,7 @@ impl Svf {
         self.solver.set_lin_solver(self.solver.j);
         self.solver.set_jp(&self.pexps);
         self.solver
-            .set_extrapolation_origin([0.; N_P], [0.; N_N], self.solver.jp);
+            .set_extrapolation_origin([0.; N_P], [0.; N_N]);
     }
     pub fn update_matrices(&mut self) {
         // let fs = self.params.sample_rate.get();
@@ -223,7 +217,7 @@ impl Svf {
         for i in 0..N_N {
             self.solver.tmp_nn[i] = 0.;
             for j in 0..N_P {
-                self.solver.tmp_nn[i] += self.solver.last_jp[i][j] * self.solver.tmp_np[j];
+                self.solver.tmp_nn[i] += self.solver.jp[i][j] * self.solver.tmp_np[j];
             }
         }
 
@@ -268,7 +262,7 @@ impl Svf {
         if self.solver.resmaxabs < TOL {
             self.solver.set_jp(&self.pexps);
             self.solver
-                .set_extrapolation_origin(p, self.solver.z, self.solver.jp);
+                .set_extrapolation_origin(p, self.solver.z);
         }
         // else {
         // panic!("failed to converge. residue: {:?}", self.solver.residue);
@@ -291,9 +285,11 @@ impl Svf {
         let (res1, jq1) = self.solver.eval_opamp(&q[0..2]);
         let (res2, jq2) = self.solver.eval_opamp(&q[2..4]);
 
-        let (res3, jq3) = self.solver.eval_diode(&q[4..6], 1e-15, 1.68);
-        let (res4, jq4) = self.solver.eval_diode(&q[6..8], 1e-15, 1.68);
-
+        // let (res3, jq3) = self.solver.eval_diode(&q[4..6], 1e-12, 1.48);
+        // let (res4, jq4) = self.solver.eval_diode(&q[6..8], 1e-12, 1.48);
+        let (res3, jq3) = self.solver.eval_diode(&q[4..6], self.params.diode_is.value as f64, 1.48);
+        // let (res3, jq3) = self.solver.eval_diode(&q[4..6], self.params.diode_is.value as f64, 1.48);
+        // let (res4, jq4) = self.solver.eval_diode(&q[6..8], self.params.diode_is.value as f64, 1.48);
 
         // TODO: consider simplifying jq
         self.solver.jq[0][0] = jq1[0];
@@ -304,8 +300,6 @@ impl Svf {
 
         self.solver.jq[2][4] = jq3[0];
         self.solver.jq[2][5] = jq3[1];
-        self.solver.jq[3][6] = jq4[0];
-        self.solver.jq[3][7] = jq4[1];
 
         // update j to the matrix product fq * jq
         for i in 0..self.solver.jq.len() {
@@ -316,7 +310,7 @@ impl Svf {
                 }
             }
         }
-        self.solver.residue = [res1, res2, res3, res4];
+        self.solver.residue = [res1, res2, res3];
     }
     // highpass and notch doesn't work right, likely because `input` isn't quite defined right. Prolly doesn't need to be subtracted?
     fn get_output(&self, input: f32, k: f32) -> f32 {
@@ -330,4 +324,61 @@ impl Svf {
                                               // _ => input + f32x4::splat(2.) * self.vout[1] + k * self.vout[0], // peak / resonator thingy
         }
     }
+}
+#[test]
+fn test_stepresponse() {
+    let should_update_filter = Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let params = Arc::new(FilterParams::new(should_update_filter.clone()));
+    // params.cutoff.set_plain_value(1000.);
+    params.sample_rate.set(44100.);
+    params.update_g(10000.);
+    params.zeta.set(0.1);
+    let mut filt = Svf::new(params.clone());
+    filt.update_matrices();
+    // println!("should be 1.5889e-04: {}", filt.fq[1][1]);
+    let mut out = [0.; 10];
+    for i in 0..10 {
+        println!("sample {i}");
+        filt.tick_dk(f32x4::splat(25.0));
+        out[i] = filt.vout[0];
+        // println!("val lp: {}", filt.vout[0]);
+        // println!("filter state: {:?}", filt.s);
+        // if filt.vout[0] < 0. {
+        //     panic!("sample {} got negative", i)
+        // }
+    }
+    dbg!(out);
+}
+
+#[test]
+fn test_sine() {
+    let should_update_filter = Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let params = Arc::new(FilterParams::new(should_update_filter.clone()));
+    // params.cutoff.set_plain_value(1000.);
+    let fs = 44100.;
+    params.sample_rate.set(44100.);
+    params.update_g(10000.);
+    params.zeta.set(0.1);
+    let mut filt = Svf::new(params.clone());
+    filt.update_matrices();
+
+    let mut input = [0.; 10];
+    let freq = 50.;
+    for i in 0..input.len() {
+        let t = i as f32 / fs;
+        input[i] = 30. * (2. * std::f32::consts::PI * freq * t).cos();
+    }
+    // println!("should be 1.5889e-04: {}", filt.fq[1][1]);
+    let mut out = [0.; 10];
+    for i in 0..input.len() {
+        println!("sample {i}: input: {}", input[i]);
+        filt.tick_dk(f32x4::splat(input[i]));
+        out[i] = filt.vout[0];
+        // println!("val lp: {}", filt.vout[0]);
+        // println!("filter state: {:?}", filt.s);
+        // if filt.vout[0] < 0. {
+        //     panic!("sample {} got negative", i)
+        // }
+    }
+    dbg!(out);
 }

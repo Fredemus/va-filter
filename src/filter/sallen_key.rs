@@ -105,34 +105,22 @@ impl SallenKey {
         let res = (self.params.res.value * 0.8).clamp(0.01, 0.99);
         let g_f64 = g as f64;
         let res_f64 = res as f64;
-        // println!("res: {res}");
-        // println!("res: {g}");
-        // TODO: no need to set the entire matrix but lazy rn
-        self.fq = [
-            [0., 1., 0., 0.],
-            [0., 0., 1., 0.],
-            [
-                -4. * g_f64 * ((res_f64 - 1.) / (4. * res_f64) - 0.25) * (1. / (4. * g_f64) + 0.5),
-                0.,
-                4. * g_f64 * (1. / (4. * g_f64) + 0.5) - 1.,
-                0.,
-            ],
-            [(res_f64 - 1.) / (4. * res_f64) - 0.25, 0., 0., 0.],
-            [-0.25, -1., -2. * g_f64 - 1., 0.],
-            [1.25, 1., 2. * g_f64 + 1., 1.],
-            [0.25, 1., 2. * g_f64 + 1., 0.],
-            [0., 0., 0., 1.],
-        ];
+
+        self.fq[3][0] = -0.25 / res_f64;
+        self.fq[2][2] = 2. * g_f64;
+        self.fq[2][0] = (0.25 + 0.5 * g_f64) / res_f64;
+        self.fq[4][2] = 2. * g_f64 + 1.;
+        self.fq[5][2] = -(2. * g_f64 + 1.);
 
         self.b[0] = 4. * g;
 
         self.c[0][2] = -4. * g;
-        self.c[1][0] = -4. * g * ((res - 1.) / (4. * res) - 0.25);
+        self.c[1][0] = g / res;
         self.c[1][2] = 4. * g;
 
-        self.eq[1] = -2. * g;
+        self.eq[1] = 2. * g;
 
-        self.fy[0][0] = (res - 1.) / (4. * res) - 0.25;
+        self.fy[0][0] = -0.25 / res;
     }
 
     pub fn tick_dk(&mut self, input: f32x4) -> f32x4 {
@@ -226,7 +214,7 @@ impl SallenKey {
         for i in 0..N_N {
             self.solver.tmp_nn[i] = 0.;
             for j in 0..N_P {
-                self.solver.tmp_nn[i] += self.solver.last_jp[i][j] * self.solver.tmp_np[j];
+                self.solver.tmp_nn[i] += self.solver.jp[i][j] * self.solver.tmp_np[j];
             }
         }
 
@@ -269,7 +257,7 @@ impl SallenKey {
         if self.solver.resmaxabs < TOL {
             self.solver.set_jp(&self.pexps);
             self.solver
-                .set_extrapolation_origin(p, self.solver.z, self.solver.jp);
+                .set_extrapolation_origin(p, self.solver.z);
         } else {
             // panic!("failed to converge. residue: {:?}", self.solver.residue);
             // println!("failed to converge. residue: {:?}", self.solver.residue);
@@ -324,34 +312,30 @@ impl SallenKey {
         self.solver.set_lin_solver(self.solver.j);
         self.solver.set_jp(&self.pexps);
         self.solver
-            .set_extrapolation_origin([0.; N_P], [0.; N_N], self.solver.jp);
+            .set_extrapolation_origin([0.; N_P], [0.; N_N]);
     }
 }
 
 const N_P2: usize = 2;
 const N_N2: usize = 3;
 const P_LEN2: usize = 6;
+/// this does the same as `SallenKey`, but with most equations simplified to make it a lot faster
 pub struct SallenKeyFast {
     pub params: Arc<FilterParams>,
     pub vout: [f32; N_OUTS],
     pub s: [f32; N_STATES],
 
     // used to find the nonlinear contributions
-    dq: [[f32; N_STATES]; N_P2],
     eq: [f32; N_P2],
     pub fq: [[f64; N_N2]; P_LEN2],
     // dq, eq are actually much larger, pexps are used to reduce them
     pexps: [[f64; N_P2]; P_LEN2],
 
     // used to update the capacitor states
-    a: [[f32; N_STATES]; N_STATES],
     b: [f32; N_STATES],
     c: [[f32; N_N2]; N_STATES],
 
     // used to find the output values
-    // dy: [[f32; 2]; 2],
-    dy: [[f32; N_STATES]; N_OUTS],
-    ey: [f32; N_OUTS],
     fy: [[f32; N_N2]; N_OUTS],
 
     solver: DKSolver<N_N2, N_P2, P_LEN2>,
@@ -359,7 +343,6 @@ pub struct SallenKeyFast {
 // here we flatten a bunch of stuff to hopefully make it faster
 impl SallenKeyFast {
     pub fn new(params: Arc<FilterParams>) -> Self {
-        // TODO: pass in proper params
         let fs = params.sample_rate.get();
         let g = (std::f32::consts::PI * 1000. / (fs as f32)).tan();
         let res = 0.1;
@@ -380,21 +363,17 @@ impl SallenKeyFast {
             vout: [0.; 1],
             s: [0.; 2],
 
-            dq: [[0., 1.], [1., 0.]],
             eq: [0., 2. * g],
             fq,
             pexps,
 
-            a: [[1., 0.], [0., 1.]],
             b: [4. * g, 0.],
             c: [
                 [0., 0., -4. * g],
-                [-4. * g * ((res - 1.) / (4. * res) - 0.25), 0., 4. * g],
+                [g / res, 0., 4. * g],
             ],
 
-            dy: [[0., 0.]],
-            ey: [0.],
-            fy: [[(res - 1.) / (4. * res) - 0.25, 0., 0.]],
+            fy: [[-0.25 / res, 0., 0.]],
 
             solver: DKSolver::new(),
         };
@@ -422,7 +401,7 @@ impl SallenKeyFast {
 
         self.eq[1] = 2. * g;
 
-        self.fy[0][0] = (res - 1.) / (4. * res) - 0.25;
+        self.fy[0][0] = -0.25 / res;
     }
 
     pub fn tick_dk(&mut self, input: f32x4) -> f32x4 {
@@ -432,35 +411,20 @@ impl SallenKeyFast {
         // let p = dot(dq, s) + dot(eq, input);
         let mut p = [0f64; 2];
         // find the
-        p[0] = (self.dq[0][0] * self.s[0] + self.dq[0][1] * self.s[1] + self.eq[0] * input) as f64;
-        p[1] = (self.dq[1][0] * self.s[0] + self.dq[1][1] * self.s[1] + self.eq[1] * input) as f64;
-        // p[2] = self.dq[2][0] * self.s[0] + self.dq[2][1] * self.s[1] + self.eq[2] * input;
+        p[0] = self.s[1] as f64;
+        p[1] = (self.s[0] + self.eq[1] * input) as f64;
 
-        //
         // self.nonlinear_contribs(p);
-        // find nonlinear contributions (solver.z), applying homotopy if it fails to converge
+        // find nonlinear contributions (values for solver.z that falls in the null-space described by fq), applying homotopy if it fails to converge
         self.homotopy_solver(p);
-        self.vout[0] = self.dy[0][0] * self.s[0] + self.dy[0][1] * self.s[1] + self.ey[0] * input;
-
-        // self.vout[1] = self.dy[1][0] * self.s[0] + self.dy[1][1] * self.s[1] + self.ey[1] * input;
-        for i in 0..N_OUTS {
-            for j in 0..N_N2 {
-                self.vout[i] += self.solver.z[j] as f32 * self.fy[i][j];
-            }
-        }
-        let s1_update = self.a[1][0] * self.s[0] + self.a[1][1] * self.s[1];
-        self.s[0] = self.a[0][0] * self.s[0] + self.a[0][1] * self.s[1] + self.b[0] * input;
-        self.s[1] = s1_update + self.b[1] * input;
+        // find output voltage(s)
+        self.vout[0] = self.fy[0][0] * self.solver.z[0] as f32;
+        // update states
+        self.s[0] = self.s[0] + self.b[0] * input + self.solver.z[2] as f32 * self.c[0][2];
+        self.s[1] = self.s[1] + self.solver.z[0] as f32 * self.c[1][0] + self.solver.z[2] as f32 * self.c[1][2];
         // correct formula: self.s[1] = self.a[1][0] * self.s[0] + self.a[1][1] * self.s[1] +  self.b[1] * input + self.solver.z[1] * self.c[1][1]
-        for i in 0..N_STATES {
-            for j in 0..N_N2 {
-                self.s[i] += self.solver.z[j] as f32 * self.c[i][j];
-            }
-        }
-        // let out = self.get_output(input, self.params.zeta.get());
         let out = self.vout[0];
         f32x4::from_array([out, out, 0., 0.])
-        // self.s = dot(a, s) + dot(b, input) + dot(c, self.solver.z);
     }
 
     pub fn homotopy_solver(&mut self, p: [f64; N_P2]) {
@@ -490,15 +454,16 @@ impl SallenKeyFast {
                     a = new_a;
                 }
             }
-            if self.solver.resmaxabs >= TOL {
-                println!("failed to converge. residue: {:?}", self.solver.residue);
+            // this doesn't seem to ever happen anymore
+            // if self.solver.resmaxabs >= TOL {
+            //     // println!("failed to converge. residue: {:?}", self.solver.residue);
 
-                for x in &self.solver.z {
-                    if !x.is_finite() {
-                        panic!("solution contains infinite value");
-                    }
-                }
-            }
+            //     for x in &self.solver.z {
+            //         if !x.is_finite() {
+            //             panic!("solution contains infinite value");
+            //         }
+            //     }
+            // }
         }
     }
 
@@ -513,7 +478,7 @@ impl SallenKeyFast {
         for i in 0..N_N2 {
             self.solver.tmp_nn[i] = 0.;
             for j in 0..N_P2 {
-                self.solver.tmp_nn[i] += self.solver.last_jp[i][j] * self.solver.tmp_np[j];
+                self.solver.tmp_nn[i] += self.solver.jp[i][j] * self.solver.tmp_np[j];
             }
         }
         self.solve_lin_equations_new(self.solver.tmp_nn);
@@ -531,6 +496,7 @@ impl SallenKeyFast {
                         self.solver.resmaxabs = x.abs();
                     }
                 } else {
+                    println!("happens");
                     // if any of the residue have become NaN/inf, stop early with big residue
                     self.solver.resmaxabs = 1000.;
                     return self.solver.z;
@@ -552,7 +518,7 @@ impl SallenKeyFast {
         if self.solver.resmaxabs < TOL {
             self.solver.set_jp(&self.pexps);
             self.solver
-                .set_extrapolation_origin(p, self.solver.z, self.solver.jp);
+                .set_extrapolation_origin(p, self.solver.z);
         } else {
             // panic!("failed to converge. residue: {:?}", self.solver.residue);
             // println!("failed to converge. residue: {:?}", self.solver.residue);
@@ -564,7 +530,6 @@ impl SallenKeyFast {
         let j = self.solver.j;
         let mut x = [0.; 3];
         // if j[1][2] == 0.0 || j[0][1] == 0.0 || x0_den == 0.0 {
-        //     // dbg!("bad denom");
         //     // Jacobian for a nonlin opamp contains a 0 value, making it impossible to iterate with
         //     // something else must be done, reuse old solution or maybe end nonlin_contribs and fallback to homotopy
         //     // ^ no longer relevant after changes to jacobians
@@ -631,10 +596,10 @@ impl SallenKeyFast {
         self.s = [0.; 2];
         self.solver.set_p([0.; N_P2], &self.pexps);
         self.evaluate_nonlinearities([0.; N_N2]);
-        self.solver.set_lin_solver(self.solver.j);
+        // self.solver.set_lin_solver(self.solver.j);
         self.solver.set_jp(&self.pexps);
         self.solver
-            .set_extrapolation_origin([0.; N_P2], [0.; N_N2], self.solver.jp);
+            .set_extrapolation_origin([0.; N_P2], [0.; N_N2]);
     }
 }
 
@@ -648,7 +613,6 @@ fn test_stepresponse() {
     params.zeta.set(0.1);
     let mut filt = SallenKeyFast::new(params.clone());
     filt.update_matrices();
-    // println!("should be 1.5889e-04: {}", filt.fq[1][1]);
     let mut out = [0.; 10];
     for i in 0..10 {
         println!("sample {i}");

@@ -34,8 +34,6 @@ pub(crate) struct DKSolver<const N_N: usize, const N_P: usize, const P_LEN: usiz
     // p-vector expanded to the pins of the nonlinear elements
     pub p_full: [f64; P_LEN],
 
-    // last value of jacobian * p(?)
-    pub last_jp: [[f64; N_P]; N_N],
 
     // temporary storage. Evaluate if necessary
     pub tmp_nn: [f64; N_N],
@@ -66,7 +64,6 @@ impl<const N_N: usize, const N_P: usize, const P_LEN: usize> DKSolver<N_N, N_P, 
             z: [0.; N_N],
             last_z: [0.; N_N],
             last_p: [0.; N_P],
-            last_jp: [[0.; N_P]; N_N],
             tmp_nn: [0.; N_N],
             tmp_np: [0.; N_P],
             factors: [[0.; N_N]; N_N],
@@ -107,9 +104,9 @@ impl<const N_N: usize, const N_P: usize, const P_LEN: usize> DKSolver<N_N, N_P, 
         &mut self,
         p: [f64; N_P],
         z: [f64; N_N],
-        jp: [[f64; N_P]; N_N],
+        // jp: [[f64; N_P]; N_N],
     ) {
-        self.last_jp = jp;
+        // self.last_jp = jp;
         self.last_p = p;
         self.last_z = z;
     }
@@ -255,6 +252,28 @@ impl<const N_N: usize, const N_P: usize, const P_LEN: usize> DKSolver<N_N, N_P, 
         let residue = sinh_vin.clamp(-1e200, 1e200) - i_out;
         let jacobian = cosh_vin.clamp(-1e200, 1e200) * v_t_inv;
         [residue, jacobian]
+    }
+    // TODO: evaluate if clamping to f32::MAX * 1e-4 or smth would make single-precision solver possible
+    pub fn eval_diodepair(&self, q: &[f64], i_s: f64, eta: f64) -> (f64, f64) {
+        // the diode's saturation current. Could make this a function parameter to have slightly mismatched diodes or something
+        // const I_S: f64 = 1e-6;
+        // const I_S: f64 = 1e-12;
+
+        const V_T: f64 = 25e-3;
+        let v_t_inv = 1.0 / (V_T * eta);
+        let v_in = q[0];
+        let i_out = q[1];
+
+        let x = v_in * v_t_inv;
+        let ex1 = (x).exp();
+        let ex2 = (-x).exp();
+        let sinh_vin = i_s * (ex1 - ex2);
+        let cosh_vin = i_s * (ex1 + ex2);
+
+        // clamp sinh and cosh since it can go infinite at high drives
+        let residue = sinh_vin.clamp(-1e200, 1e200) - i_out;
+        let jacobian = cosh_vin.clamp(-1e200, 1e200) * v_t_inv;
+        (residue, jacobian)
     }
     // TODO: the diodes end up throwing out absurdly large numbers, need f64 precision or some other way to model diode pairs
     // simple shockley diode equation
