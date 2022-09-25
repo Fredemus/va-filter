@@ -1,4 +1,4 @@
-use crate::{filter::DKSolver, filter_params_nih::FilterParams, utils::AtomicOps};
+use crate::{filter::DKSolver, filter_params::FilterParams, utils::AtomicOps};
 // use packed_simd::f32x4;
 // use core_simd::*;
 // use std_float::*;
@@ -128,7 +128,7 @@ impl SallenKeyCore {
     pub fn update_matrices(&mut self) {
         let g = self.params.g.get();
         // the model starts to self-oscillate at 0.8
-        let res = (self.params.res.value * 0.79).clamp(0.01, 0.99);
+        let res = (self.params.res.value() * 0.79).clamp(0.01, 0.99);
         let g_f64 = g as f64;
         let res_f64 = res as f64;
 
@@ -160,7 +160,7 @@ impl SallenKeyCore {
     }
 
     pub fn tick_dk(&mut self, input: f32) -> f32 {
-        let input = input * (self.params.drive.value);
+        let input = input * (self.params.drive.value());
 
         let mut p = [0f64; 2];
 
@@ -403,7 +403,7 @@ impl SallenKeyCoreFast {
     }
     pub fn update_matrices(&mut self) {
         let g = self.params.g.get();
-        let res = (self.params.res.value * 0.79).clamp(0.01, 0.99);
+        let res = (self.params.res.value() * 0.79).clamp(0.01, 0.99);
         let g_f64 = g as f64;
         let res_f64 = res as f64;
 
@@ -425,7 +425,7 @@ impl SallenKeyCoreFast {
     }
 
     pub fn tick_dk(&mut self, input: f32) -> f32 {
-        let input = input * (self.params.drive.value);
+        let input = input * (self.params.drive.value());
 
         // let p = dot(dq, s) + dot(eq, input);
         let mut p = [0f64; 2];

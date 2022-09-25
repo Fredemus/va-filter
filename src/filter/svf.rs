@@ -1,6 +1,6 @@
 use crate::{
     filter::DKSolver,
-    filter_params_nih::{FilterParams, SvfMode},
+    filter_params::{FilterParams, SvfMode},
     utils::AtomicOps,
 };
 use std::f32::consts::{FRAC_1_SQRT_2, SQRT_2};
@@ -166,7 +166,7 @@ impl SvfCore {
     // TODO: pls roll the updates into for loops
     pub fn tick_dk(&mut self, input: f32) -> f32 {
         // -input since the svf inverts it
-        let input = -input * (self.params.drive.value);
+        let input = -input * (self.params.drive.value());
 
         // let p = dot(dq, s) + dot(eq, input);
         let mut p = [0.; N_P];
@@ -427,7 +427,7 @@ impl SvfCoreFast {
     }
     pub fn tick_dk(&mut self, input: f32) -> f32 {
         // - input since the svf inverts the signal
-        let input = (-input * self.params.drive.value).clamp(-10., 10.);
+        let input = (-input * self.params.drive.value()).clamp(-10., 10.);
 
         let mut p = [0.; N_P];
         p[0] = (self.c1 * self.s[0]) as f64;

@@ -1,6 +1,6 @@
 // use crate::filter_parameters::FilterParameters;
 // use crate::filter_params_nih::{FilterParams, SvfMode};
-use crate::{filter_params_nih::FilterParams, utils::AtomicOps};
+use crate::{filter_params::FilterParams, utils::AtomicOps};
 // use packed_simd::f32x4;
 use core_simd::*;
 use std::sync::Arc;
@@ -213,15 +213,15 @@ impl LadderFilter {
     // performs a complete filter process (newton-raphson method)
     pub fn tick_newton(&mut self, input: f32x4) -> f32x4 {
         // perform filter process
-        let out = self.run_filter_newton(input * f32x4::splat(self.params.drive.value));
+        let out = self.run_filter_newton(input * f32x4::splat(self.params.drive.value()));
         // update ic1eq and ic2eq for next sample
         self.update_state();
-        out * f32x4::splat((1. + self.params.k_ladder.get()) / (self.params.drive.value * 0.5))
+        out * f32x4::splat((1. + self.params.k_ladder.get()) / (self.params.drive.value() * 0.5))
     }
     // performs a complete filter process (newton-raphson method)
     pub fn tick_pivotal(&mut self, input: f32x4) -> f32x4 {
         // perform filter process
-        let out = self.run_filter_pivotal(input * f32x4::splat(self.params.drive.value));
+        let out = self.run_filter_pivotal(input * f32x4::splat(self.params.drive.value()));
         // update ic1eq and ic2eq for next sample
         self.update_state();
         out

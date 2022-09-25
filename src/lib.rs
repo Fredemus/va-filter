@@ -11,8 +11,8 @@ use editor::*;
 #[allow(dead_code)]
 pub mod utils;
 use utils::AtomicOps;
-pub mod filter_params_nih;
-use filter_params_nih::FilterParams;
+pub mod filter_params;
+use filter_params::FilterParams;
 
 mod resampling;
 use resampling::HalfbandFilter;
@@ -128,8 +128,8 @@ impl Plugin for VaFilter {
             )
             .is_ok()
         {
-            self.params.update_g(self.params.cutoff.value);
-            self.params.set_resonances(self.params.res.value);
+            self.params.update_g(self.params.cutoff.value());
+            self.params.set_resonances(self.params.res.value());
 
             self.sallenkey_stereo.update();
             self.svf_stereo.update();
@@ -167,12 +167,12 @@ impl Plugin for VaFilter {
                     // perform filtering with the cool filters
                     let filter_out = match self.params.filter_type.value() {
                         // filter_params_nih::Circuits::SVF => self.svf.tick_newton(frame),
-                        filter_params_nih::Circuits::SallenKey => {
+                        filter_params::Circuits::SallenKey => {
                             let out = self.sallenkey_stereo.process([in_l, in_r]);
 
                             f32x4::from_array([out[0], out[1], 0., 0.])
                         }
-                        filter_params_nih::Circuits::SVF => {
+                        filter_params::Circuits::SVF => {
                             let out = self.svf_stereo.process([in_l, in_r]);
 
                             f32x4::from_array([out[0], out[1], 0., 0.])
@@ -186,12 +186,12 @@ impl Plugin for VaFilter {
                 processed = output;
             } else {
                 processed = match self.params.filter_type.value() {
-                    filter_params_nih::Circuits::SallenKey => {
+                    filter_params::Circuits::SallenKey => {
                         let out = self.sallenkey_stereo.process([in_l, in_r]);
 
                         f32x4::from_array([out[0], out[1], 0., 0.])
                     }
-                    filter_params_nih::Circuits::SVF => {
+                    filter_params::Circuits::SVF => {
                         let out = self.svf_stereo.process([in_l, in_r]);
 
                         f32x4::from_array([out[0], out[1], 0., 0.])

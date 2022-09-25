@@ -14,11 +14,10 @@ name = "va_filter_standalone"
 path = "src/main.rs"
 [dependencies]
 # vst = { git = "https://github.com/rust-dsp/rust-vst" }
-nih_plug = { git = "https://github.com/robbert-vdh/nih-plug", features = ["assert_process_allocs", "standalone"] }
+nih_plug = { git = "https://github.com/robbert-vdh/nih-plug", rev = "fae7050113dff12db6b9800f876d27496e3d4e85", features = ["assert_process_allocs", "standalone"] }
 # baseview = { git = "https://github.com/RustAudio/baseview.git", rev = "d399c1275522ae75f5a82caadd904df2685c8660" }
-baseview = { git = "https://github.com/RustAudio/baseview.git", rev = "b3712638bacb3fdf2883cb5aa3f6caed0e91ac8c"} # newest
-vizia = {git = "https://github.com/vizia/vizia", branch = "main", features = ["baseview"], default-features = false}
-femtovg = {git = "https://github.com/femtovg/femtovg", rev = "87fe627794f3f793d8e3a338c838a2f8e8a8aa9d", default-features = false }
+baseview = { git = "https://github.com/RustAudio/baseview.git", rev = "eae4033e7d2cc9c31ccaa2794d5d08eedf2f510c", features = ["opengl"] }
+vizia = {git = "https://github.com/vizia/vizia", rev = "676afdf46ca73365e34f0c6d9cb838cc5b778e0b", features = ["baseview"], default-features = false}
 
 raw-window-handle = "0.3"
 num = "0.4.0"
@@ -27,11 +26,6 @@ rand = "0.8.4"
 # simd optimizations
 core_simd = { git = "https://github.com/rust-lang/portable-simd" }
 std_float = { git = "https://github.com/rust-lang/portable-simd" }
-# packed_simd = { version = "0.3.6", package = "packed_simd_2" }
-
-# data serialization for presets 
-# serde = { version = "1.0.130", features = ["derive"] }
-bincode = "1.3.3"
 
 [dev-dependencies]
 criterion = "0.3"

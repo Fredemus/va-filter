@@ -3,7 +3,7 @@ use num::complex::Complex;
 
 use std::f32::consts::PI;
 
-use crate::filter_params_nih::Circuits;
+use crate::filter_params::Circuits;
 
 pub fn lin_to_db(gain: f32) -> f32 {
     gain.log10() * 20.0

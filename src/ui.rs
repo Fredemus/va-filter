@@ -1,16 +1,16 @@
 // use crate::editor::EditorState;
 mod plot;
-use crate::filter_params_nih::Circuits;
+use crate::filter_params::Circuits;
 use nih_plug::context::GuiContext;
 use nih_plug::param::internals::ParamPtr;
 use plot::{get_amplitude_response, get_phase_response};
 // use crate::editor::{get_amplitude_response, get_phase_response};
 use crate::utils::*;
 use crate::FilterParams;
-use femtovg::ImageFlags;
-use femtovg::ImageId;
-use femtovg::RenderTarget;
-use femtovg::{Paint, Path};
+use vizia::vg::ImageFlags;
+use vizia::vg::ImageId;
+use vizia::vg::RenderTarget;
+use vizia::vg::{Paint, Path};
 use nih_plug::prelude::Param;
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -356,7 +356,7 @@ impl View for BodePlot {
                 if params.filter_type.value() == Circuits::SVF {
                     let mode = params.mode.value() as usize;
                     amps = get_phase_response(
-                        params.cutoff.value,
+                        params.cutoff.value(),
                         params.zeta.get(),
                         mode,
                         params.filter_type.value(),
@@ -375,7 +375,7 @@ impl View for BodePlot {
                     }
                 } else {
                     amps = get_phase_response(
-                        params.cutoff.value,
+                        params.cutoff.value(),
                         // 2.,
                         params.k_ladder.get(),
                         params.slope.value() as usize,
@@ -396,7 +396,7 @@ impl View for BodePlot {
                 max = 40.0;
                 if params.filter_type.value() == Circuits::Ladder {
                     amps = get_amplitude_response(
-                        params.cutoff.value,
+                        params.cutoff.value(),
                         // 2.,
                         params.k_ladder.get(),
                         params.slope.value() as usize,
@@ -405,7 +405,7 @@ impl View for BodePlot {
                     );
                 } else {
                     amps = get_amplitude_response(
-                        params.cutoff.value,
+                        params.cutoff.value(),
                         params.zeta.get(),
                         params.mode.value() as usize,
                         params.filter_type.value(),
@@ -423,7 +423,7 @@ impl View for BodePlot {
                     .create_image_empty(
                         width,
                         height,
-                        femtovg::PixelFormat::Rgb8,
+                        vizia::vg::PixelFormat::Rgb8,
                         ImageFlags::FLIP_Y,
                     )
                     .expect("Failed to create image")
@@ -433,9 +433,9 @@ impl View for BodePlot {
 
             canvas.set_render_target(RenderTarget::Image(image_id));
 
-            let background_color: femtovg::Color =
+            let background_color: vizia::vg::Color =
                 cx.background_color().cloned().unwrap_or_default().into();
-            let color: femtovg::Color = cx.font_color().cloned().unwrap_or_default().into();
+            let color: vizia::vg::Color = cx.font_color().cloned().unwrap_or_default().into();
 
             // Fill background
             canvas.clear_rect(0, 0, width as u32, height as u32, background_color);
@@ -457,8 +457,8 @@ impl View for BodePlot {
             // Draw plot
             let mut paint = Paint::color(color);
             paint.set_line_width(line_width);
-            paint.set_line_join(femtovg::LineJoin::Round);
-            paint.set_line_cap(femtovg::LineCap::Square);
+            paint.set_line_join(vizia::vg::LineJoin::Round);
+            paint.set_line_cap(vizia::vg::LineCap::Square);
             canvas.save();
             canvas.reset_scissor();
             canvas.stroke_path(&mut path, paint);
