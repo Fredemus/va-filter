@@ -1,30 +1,21 @@
 #![feature(portable_simd)]
-// #[macro_use]
-// extern crate vst;
 use filter::LadderFilter;
-// use packed_simd::f32x4;
 use core_simd::f32x4;
-// use vst::buffer::AudioBuffer;
-// use vst::editor::Editor;
-// use vst::plugin::{CanDo, Category, HostCallback, Info, Plugin, PluginParameters};
 
-// use vst::api::Events;
-// use vst::event::Event;
 use std::sync::Arc;
 
 use nih_plug::{nih_export_vst3, prelude::*};
 
-// mod editor;
-// use editor::{EditorState, SVFPluginEditor};
-mod build_lookup_table;
 mod editor;
 use editor::*;
-mod parameter;
 #[allow(dead_code)]
 pub mod utils;
 use utils::AtomicOps;
 pub mod filter_params_nih;
 use filter_params_nih::FilterParams;
+
+mod resampling;
+use resampling::HalfbandFilter;
 
 pub mod filter;
 mod ui;
@@ -33,34 +24,38 @@ pub struct VaFilter {
     // Store a handle to the plugin's parameter object.
     params: Arc<FilterParams>,
     ladder: filter::LadderFilter,
-    // svf: filter::SVF,
-    svf_new: filter::Svf,
 
-    sallenkey: filter::SallenKeyFast,
-    // used for constructing the editor in get_editor
-    // host: Option<HostCallback>,
-    /// If this is set at the start of the processing cycle, then the filter coefficients should be
-    /// updated. For the regular filter parameters we can look at the smoothers, but this is needed
-    /// when changing the number of active filters.
+    svf_stereo: filter::svf::Svf,
+    sallenkey_stereo: filter::sallen_key::SallenKey,
+
     should_update_filter: Arc<std::sync::atomic::AtomicBool>,
+
+    upsampler: HalfbandFilter,
+    downsampler: HalfbandFilter,
+
+    oversample_factor: usize,
 }
 
 impl Default for VaFilter {
     fn default() -> Self {
         let should_update_filter = Arc::new(std::sync::atomic::AtomicBool::new(false));
         let params = Arc::new(FilterParams::new(should_update_filter.clone()));
-        // let svf = SVF::new(params.clone());
-        let sallenkey = filter::SallenKeyFast::new(params.clone());
-        let svf_new = filter::Svf::new(params.clone());
+
         let ladder = LadderFilter::new(params.clone());
+        let svf_stereo = filter::svf::Svf::new(params.clone());
+        let sallenkey_stereo = filter::sallen_key::SallenKey::new(params.clone());
+
         Self {
             params,
-            // svf,
-            svf_new,
-            sallenkey,
-            ladder,
             should_update_filter,
-            // host: None,
+
+            svf_stereo,
+            sallenkey_stereo,
+            ladder,
+
+            upsampler: HalfbandFilter::new(8, true),
+            downsampler: HalfbandFilter::new(8, true),
+            oversample_factor: 2,
         }
     }
 }
@@ -68,7 +63,7 @@ impl Default for VaFilter {
 impl Plugin for VaFilter {
     const NAME: &'static str = "Va Filter";
     const VENDOR: &'static str = "???";
-    const URL: &'static str = "???";
+    const URL: &'static str = "github.com/fredemus/va-filter";
     const EMAIL: &'static str = "???";
 
     const VERSION: &'static str = "0.0.1";
@@ -101,13 +96,19 @@ impl Plugin for VaFilter {
         _buffer_config: &BufferConfig,
         _context: &mut impl InitContext,
     ) -> bool {
-        self.params.sample_rate.set(_buffer_config.sample_rate);
+        let fs = _buffer_config.sample_rate;
+        if fs >= 88200. {
+            self.params.sample_rate.set(fs);
+            self.oversample_factor = 1;
+        } else {
+            self.params.sample_rate.set(2. * fs);
+            self.oversample_factor = 2;
+        }
         true
     }
     fn reset(&mut self) {
-        println!("reset called");
-        self.sallenkey.reset();
-        self.svf_new.reset();
+        self.sallenkey_stereo.reset();
+        self.svf_stereo.reset();
         self.ladder.s = [f32x4::splat(0.); 4];
     }
 
@@ -117,51 +118,88 @@ impl Plugin for VaFilter {
         _aux: &mut AuxiliaryBuffers,
         _context: &mut impl ProcessContext,
     ) -> ProcessStatus {
+        if self
+            .should_update_filter
+            .compare_exchange(
+                true,
+                false,
+                std::sync::atomic::Ordering::Acquire,
+                std::sync::atomic::Ordering::Relaxed,
+            )
+            .is_ok()
+        {
+            self.params.update_g(self.params.cutoff.value);
+            self.params.set_resonances(self.params.res.value);
+
+            self.sallenkey_stereo.update();
+            self.svf_stereo.update();
+        }
         for mut channel_samples in buffer.iter_samples() {
-            if self
-                .should_update_filter
-                .compare_exchange(
-                    true,
-                    false,
-                    std::sync::atomic::Ordering::Acquire,
-                    std::sync::atomic::Ordering::Relaxed,
-                )
-                .is_ok()
-            {
-                self.params.update_g(self.params.cutoff.value);
-                self.params.set_resonances(self.params.res.value);
-            }
             if self.params.cutoff.smoothed.is_smoothing() {
                 let cut_smooth = self.params.cutoff.smoothed.next();
                 self.params.update_g(cut_smooth);
-                self.sallenkey.update_matrices();
-                self.svf_new.update_matrices();
+
+                self.sallenkey_stereo.update();
+                self.svf_stereo.update();
             }
             if self.params.res.smoothed.is_smoothing() {
                 let res_smooth = self.params.res.smoothed.next();
                 self.params.set_resonances(res_smooth);
-                self.sallenkey.update_matrices();
-                self.svf_new.update_matrices();
+
+                self.sallenkey_stereo.update();
+                self.svf_stereo.update();
             }
 
             // channel_samples[0];
-            let frame = f32x4::from_array([
-                *channel_samples.get_mut(0).unwrap(),
-                *channel_samples.get_mut(1).unwrap(),
-                0.0,
-                0.0,
-            ]);
-            // let mut samples = unsafe { channel_samples.to_simd_unchecked() };
-            let processed = match self.params.filter_type.value() {
-                // filter_params_nih::Circuits::SVF => self.svf.tick_newton(frame),
-                filter_params_nih::Circuits::SallenKey => self.sallenkey.tick_dk(frame),
-                filter_params_nih::Circuits::SVF => self.svf_new.tick_dk(frame),
-                filter_params_nih::Circuits::Ladder => self.ladder.tick_newton(frame),
-            };
+            let in_l = *channel_samples.get_mut(0).unwrap();
+            let in_r = *channel_samples.get_mut(1).unwrap();
+            let frame = f32x4::from_array([in_l, in_r, 0.0, 0.0]);
+            let processed;
+            if self.oversample_factor == 2 {
+                // zero-stuff input
+                let input = [frame, f32x4::splat(0.)];
+                let mut output = f32x4::splat(0.);
+                for i in 0..2 {
+                    // run input audio through a half-band filter
+                    // multiply by oversample factor (2) to avoid the volume loss from zero-stuffing
+                    let frame = self.upsampler.process(f32x4::splat(2.) * input[i]);
 
-            // let processed = self.ladder.tick_linear(frame);
+                    // perform filtering with the cool filters
+                    let filter_out = match self.params.filter_type.value() {
+                        // filter_params_nih::Circuits::SVF => self.svf.tick_newton(frame),
+                        filter_params_nih::Circuits::SallenKey => {
+                            let out = self.sallenkey_stereo.process([in_l, in_r]);
+
+                            f32x4::from_array([out[0], out[1], 0., 0.])
+                        }
+                        filter_params_nih::Circuits::SVF => {
+                            let out = self.svf_stereo.process([in_l, in_r]);
+
+                            f32x4::from_array([out[0], out[1], 0., 0.])
+                        }
+                        _ => self.ladder.tick_newton(frame),
+                    };
+
+                    // downsample filter, removing frequencies above nyquist
+                    output = self.downsampler.process(filter_out);
+                }
+                processed = output;
+            } else {
+                processed = match self.params.filter_type.value() {
+                    filter_params_nih::Circuits::SallenKey => {
+                        let out = self.sallenkey_stereo.process([in_l, in_r]);
+
+                        f32x4::from_array([out[0], out[1], 0., 0.])
+                    }
+                    filter_params_nih::Circuits::SVF => {
+                        let out = self.svf_stereo.process([in_l, in_r]);
+
+                        f32x4::from_array([out[0], out[1], 0., 0.])
+                    }
+                    _ => self.ladder.tick_newton(frame),
+                };
+            }
             let frame_out = *processed.as_array();
-            // let frame_out = *frame.as_array();
             *channel_samples.get_mut(0).unwrap() = frame_out[0];
             *channel_samples.get_mut(1).unwrap() = frame_out[1];
         }

@@ -162,23 +162,20 @@ pub fn plugin_gui(cx: &mut Context, params: Arc<FilterParams>, context: Arc<dyn 
             Binding::new(
                 cx,
                 UiData::params.map(|params| params.filter_type.value() as usize),
-                move |cx, ft| {
-                    match ft.get(cx) {
-                        0 => {
-                            let steps = 5;
-                            make_steppy_knob(cx, steps, 270., params.mode.as_ptr(), |params| {
-                                &params.mode
-                            });
-                        },
-                        1 => {
-                            let steps = 4;
-                            make_steppy_knob(cx, steps, 270., params.slope.as_ptr(), |params| {
-                                &params.slope
-                            });
-                        },
-                        _ => (),
+                move |cx, ft| match ft.get(cx) {
+                    0 => {
+                        let steps = 5;
+                        make_steppy_knob(cx, steps, 270., params.mode.as_ptr(), |params| {
+                            &params.mode
+                        });
                     }
-                    
+                    1 => {
+                        let steps = 4;
+                        make_steppy_knob(cx, steps, 270., params.slope.as_ptr(), |params| {
+                            &params.slope
+                        });
+                    }
+                    _ => (),
                 },
             );
         })
@@ -418,7 +415,6 @@ impl View for BodePlot {
                 // TODO: should prolly cover SallenKey, has its own reso formula
             }
 
-            // let bounds = cx.cache.get_bounds(*current);
             let bounds = cx.bounds();
             let image_id = if let Some(image_id) = *self.image.borrow() {
                 image_id
@@ -450,7 +446,7 @@ impl View for BodePlot {
 
             path.move_to(-10.0, height as f32 - y + 1.0);
             let line_width = 5.0;
-            for i in 0..360 {
+            for i in 0..width {
                 let amp = amps[i].clamp(min, max);
                 let y = height as f32 * ((amp - min) / (max - min));
 
@@ -478,8 +474,6 @@ impl View for BodePlot {
                 0.0,
                 0.0,
                 height as f32,
-                // femtovg::Color::rgba(0, 160, 192, 0),
-                // femtovg::Color::rgba(0, 160, 192, 64),
                 &[(0.0, edge_color), (0.4, mid_color), (1.0, edge_color)],
             );
             // Making the background fill be contained by a line through the mid-point of the graph

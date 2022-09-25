@@ -10,11 +10,7 @@ mod solver;
 use solver::DKSolver;
 
 pub mod sallen_key;
-pub use self::sallen_key::SallenKey;
-pub use self::sallen_key::SallenKeyFast;
 pub mod svf;
-pub use self::svf::Svf;
-
 
 /// cheap tanh to make the filter faster.
 // from a quick look it looks extremely good, max error of ~0.0002 or .02%
@@ -186,8 +182,6 @@ impl LadderFilter {
             let j22 = -j32 - one;
             let j33 = -g * (one - tanh_y4_est * tanh_y4_est) - one;
 
-            // this one is disgustingly huge, but couldn't find a way to avoid that. Look into inverting matrix
-            // maybe try replacing j_m_n with the expressions and simplify in maple? <- didn't help
             temp[0] = (((j22 * residue[3] - j32 * residue[2]) * j11
                 + j21 * j32 * (-j10 * v_est[0] + residue[1]))
                 * j03
