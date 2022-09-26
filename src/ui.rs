@@ -1,16 +1,16 @@
 // use crate::editor::EditorState;
 mod plot;
-use crate::filter_params_nih::Circuits;
+use crate::filter_params::Circuits;
 use nih_plug::context::GuiContext;
 use nih_plug::param::internals::ParamPtr;
 use plot::{get_amplitude_response, get_phase_response};
 // use crate::editor::{get_amplitude_response, get_phase_response};
 use crate::utils::*;
 use crate::FilterParams;
-use femtovg::ImageFlags;
-use femtovg::ImageId;
-use femtovg::RenderTarget;
-use femtovg::{Paint, Path};
+use vizia::vg::ImageFlags;
+use vizia::vg::ImageId;
+use vizia::vg::RenderTarget;
+use vizia::vg::{Paint, Path};
 use nih_plug::prelude::Param;
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -20,8 +20,8 @@ use vizia::*;
 // use vst::plugin::HostCallback;
 // use vst::plugin::PluginParameters;
 const ICON_DOWN_OPEN: &str = "\u{e75c}";
-
 use std::f32::consts::PI;
+use vizia::prelude::*;
 
 #[derive(Lens)]
 pub struct UiData {
@@ -29,7 +29,6 @@ pub struct UiData {
     params: Arc<FilterParams>,
     // host: Option<HostCallback>,
     filter_circuits: Vec<String>,
-    choice: String,
     show_phase: bool,
 }
 
@@ -39,12 +38,12 @@ pub enum ParamChangeEvent {
     EndSet(ParamPtr),
     SetParam(ParamPtr, f32),
 
-    CircuitEvent(String),
+    CircuitEvent(usize),
     ChangeBodeView(),
 }
 
 impl Model for UiData {
-    fn event(&mut self, _cx: &mut Context, event: &mut Event) {
+    fn event(&mut self, _cx: &mut EventContext, event: &mut Event) {
         // let setter = ParamSetter::new(self.gui_context.as_ref());
         event.map(|event, _| match event {
             ParamChangeEvent::SetParam(param_ptr, new_value) => {
@@ -60,20 +59,23 @@ impl Model for UiData {
             ParamChangeEvent::EndSet(param_ptr) => {
                 unsafe { self.gui_context.raw_end_set_parameter(*param_ptr) };
             }
-            ParamChangeEvent::CircuitEvent(circuit_name) => {
-                self.choice = circuit_name.to_owned();
-                if circuit_name == "SVF" {
-                    unsafe {
-                        self.gui_context
-                            .raw_set_parameter_normalized(self.params.filter_type.as_ptr(), 0.)
-                    };
-                } else {
-                    // self.params.set_parameter(3, 1.);
-                    unsafe {
-                        self.gui_context
-                            .raw_set_parameter_normalized(self.params.filter_type.as_ptr(), 1.)
-                    };
-                }
+            ParamChangeEvent::CircuitEvent(idx) => {
+                // self.choice = self
+                // self.choice = circuit_name.to_owned();
+                unsafe {
+                    self.gui_context
+                        .raw_begin_set_parameter(self.params.filter_type.as_ptr())
+                };
+                unsafe {
+                    self.gui_context.raw_set_parameter_normalized(
+                        self.params.filter_type.as_ptr(),
+                        *idx as f32 / 2.,
+                    )
+                };
+                unsafe {
+                    self.gui_context
+                        .raw_end_set_parameter(self.params.filter_type.as_ptr())
+                };
             }
             ParamChangeEvent::ChangeBodeView() => {
                 self.show_phase = !self.show_phase;
@@ -83,16 +85,22 @@ impl Model for UiData {
 }
 
 pub fn plugin_gui(cx: &mut Context, params: Arc<FilterParams>, context: Arc<dyn GuiContext>) {
+    // let _shutup = crate::filter::NewSVF::new(params.clone());
+
     UiData {
         gui_context: context.clone(),
         params: params.clone(),
         // host: state.host,
-        filter_circuits: vec!["SVF".to_string(), "Transistor Ladder".to_string()],
-        choice: if params.filter_type.value() == Circuits::SVF {
-            "SVF".to_string()
-        } else {
-            "Transistor Ladder".to_string()
-        },
+        filter_circuits: vec![
+            "SVF".to_string(),
+            "Transistor Ladder".to_string(),
+            "SallenKey".to_string(),
+        ],
+        // choice: if params.filter_type.value() == Circuits::SVF {
+        //     "SVF".to_string()
+        // } else {
+        //     "Transistor Ladder".to_string()
+        // },
         show_phase: false,
     }
     .build(cx);
@@ -107,29 +115,31 @@ pub fn plugin_gui(cx: &mut Context, params: Arc<FilterParams>, context: Arc<dyn 
                 move |cx|
                 // A Label and an Icon
                 HStack::new(cx, move |cx|{
-                    Label::new(cx, UiData::choice).left(Auto);
+                    Label::new(cx, UiData::params.map(|p| p.filter_type.to_string())).left(Auto);
                     Label::new(cx, ICON_DOWN_OPEN).class("arrow");
                 }).class("title"),
                 move |cx| {
                     // List of options
-                    List::new(cx, UiData::filter_circuits, move |cx, _, item| {
+                    List::new(cx, UiData::filter_circuits, move |cx, idx, item| {
                         VStack::new(cx, move |cx| {
-                            Binding::new(cx, UiData::choice, move |cx, choice| {
-                                let selected = *item.get(cx) == *choice.get(cx);
-                                Label::new(cx, &item.get(cx).to_string())
-                                    .width(Stretch(1.0))
-                                    .background_color(if selected {
-                                        Color::from("#c28919")
-                                    } else {
-                                        Color::transparent()
-                                    })
-                                    .on_press(move |cx| {
-                                        cx.emit(ParamChangeEvent::CircuitEvent(
-                                            item.get(cx).clone(),
-                                        ));
-                                        cx.emit(PopupEvent::Close);
-                                    });
-                            });
+                            Binding::new(
+                                cx,
+                                UiData::params.map(|p| p.filter_type.to_string()),
+                                move |cx, choice| {
+                                    let selected = *item.get(cx) == *choice.get(cx);
+                                    Label::new(cx, &item.get(cx))
+                                        .width(Stretch(1.0))
+                                        .background_color(if selected {
+                                            Color::from("#c28919")
+                                        } else {
+                                            Color::transparent()
+                                        })
+                                        .on_press(move |cx| {
+                                            cx.emit(ParamChangeEvent::CircuitEvent(idx));
+                                            cx.emit(views::PopupEvent::Close);
+                                        });
+                                },
+                            );
                         });
                     });
                 },
@@ -152,23 +162,20 @@ pub fn plugin_gui(cx: &mut Context, params: Arc<FilterParams>, context: Arc<dyn 
             Binding::new(
                 cx,
                 UiData::params.map(|params| params.filter_type.value() as usize),
-                move |cx, ft| {
-                    if ft.get(cx) == 0 {
-                        // let param = &UiData::params.get(cx).mode;
-                        // let steps = (param.max - param.min + 1.) as usize;
+                move |cx, ft| match ft.get(cx) {
+                    0 => {
                         let steps = 5;
                         make_steppy_knob(cx, steps, 270., params.mode.as_ptr(), |params| {
                             &params.mode
                         });
-                    } else {
+                    }
+                    1 => {
                         let steps = 4;
                         make_steppy_knob(cx, steps, 270., params.slope.as_ptr(), |params| {
                             &params.slope
                         });
-                        // let param = &UiData::params.get(cx).slope;
-                        // let steps = (param.max - param.min + 1.) as usize;
-                        // make_steppy_knob(cx, 5, steps, 270.);
                     }
+                    _ => (),
                 },
             );
         })
@@ -256,7 +263,7 @@ where
     .row_between(Pixels(10.0))
 }
 // using Knob::custom() to make a stepped knob with tickmarks indicating the steps
-fn make_steppy_knob<'a, P, F>(
+fn make_steppy_knob<P, F>(
     cx: &mut Context,
     steps: usize,
     arc_len: f32,
@@ -333,7 +340,6 @@ impl BodePlot {
 
 impl View for BodePlot {
     fn draw(&self, cx: &mut DrawContext<'_>, canvas: &mut Canvas) {
-        let current = cx.current();
         if let Some(ui_data) = cx.data::<UiData>() {
             let params = ui_data.params.clone();
 
@@ -346,13 +352,14 @@ impl View for BodePlot {
             let min;
             //
             if ui_data.show_phase {
+                // FIXME: missing sallenkey
                 if params.filter_type.value() == Circuits::SVF {
                     let mode = params.mode.value() as usize;
                     amps = get_phase_response(
-                        params.cutoff.value,
+                        params.cutoff.value(),
                         params.zeta.get(),
                         mode,
-                        params.filter_type.value() as usize,
+                        params.filter_type.value(),
                         width,
                     );
                     if mode == 0 {
@@ -368,11 +375,11 @@ impl View for BodePlot {
                     }
                 } else {
                     amps = get_phase_response(
-                        params.cutoff.value,
+                        params.cutoff.value(),
                         // 2.,
                         params.k_ladder.get(),
                         params.slope.value() as usize,
-                        params.filter_type.value() as usize,
+                        params.filter_type.value(),
                         width,
                     );
                     if params.slope.value() as usize > 1 {
@@ -387,28 +394,28 @@ impl View for BodePlot {
                 // min and max amplitude values that will be rendered
                 min = -60.0;
                 max = 40.0;
-                if params.filter_type.value() == Circuits::SVF {
+                if params.filter_type.value() == Circuits::Ladder {
                     amps = get_amplitude_response(
-                        params.cutoff.value,
-                        params.zeta.get(),
-                        params.mode.value() as usize,
-                        params.filter_type.value() as usize,
+                        params.cutoff.value(),
+                        // 2.,
+                        params.k_ladder.get(),
+                        params.slope.value() as usize,
+                        params.filter_type.value(),
                         width,
                     );
                 } else {
                     amps = get_amplitude_response(
-                        params.cutoff.value,
-                        // 2.,
-                        params.k_ladder.get(),
-                        params.slope.value() as usize,
-                        params.filter_type.value() as usize,
+                        params.cutoff.value(),
+                        params.zeta.get(),
+                        params.mode.value() as usize,
+                        params.filter_type.value(),
                         width,
                     );
                 }
+                // TODO: should prolly cover SallenKey, has its own reso formula
             }
 
-            let bounds = cx.cache().get_bounds(current);
-
+            let bounds = cx.bounds();
             let image_id = if let Some(image_id) = *self.image.borrow() {
                 image_id
             } else {
@@ -416,7 +423,7 @@ impl View for BodePlot {
                     .create_image_empty(
                         width,
                         height,
-                        femtovg::PixelFormat::Rgb8,
+                        vizia::vg::PixelFormat::Rgb8,
                         ImageFlags::FLIP_Y,
                     )
                     .expect("Failed to create image")
@@ -426,15 +433,12 @@ impl View for BodePlot {
 
             canvas.set_render_target(RenderTarget::Image(image_id));
 
-            let background_color: femtovg::Color = cx
-                .background_color(current)
-                .cloned()
-                .unwrap_or_default()
-                .into();
-            let color: femtovg::Color = cx.font_color(current).cloned().unwrap_or_default().into();
+            let background_color: vizia::vg::Color =
+                cx.background_color().cloned().unwrap_or_default().into();
+            let color: vizia::vg::Color = cx.font_color().cloned().unwrap_or_default().into();
 
             // Fill background
-            canvas.clear_rect(0, 0, width as u32, height as u32, background_color.into());
+            canvas.clear_rect(0, 0, width as u32, height as u32, background_color);
 
             let mut path = Path::new();
             let amp = amps[0].clamp(min, max);
@@ -442,7 +446,7 @@ impl View for BodePlot {
 
             path.move_to(-10.0, height as f32 - y + 1.0);
             let line_width = 5.0;
-            for i in 0..360 {
+            for i in 0..width {
                 let amp = amps[i].clamp(min, max);
                 let y = height as f32 * ((amp - min) / (max - min));
 
@@ -451,18 +455,18 @@ impl View for BodePlot {
 
             let mut path2 = path.clone();
             // Draw plot
-            let mut paint = Paint::color(color.into());
+            let mut paint = Paint::color(color);
             paint.set_line_width(line_width);
-            paint.set_line_join(femtovg::LineJoin::Round);
-            paint.set_line_cap(femtovg::LineCap::Square);
+            paint.set_line_join(vizia::vg::LineJoin::Round);
+            paint.set_line_cap(vizia::vg::LineCap::Square);
             canvas.save();
             canvas.reset_scissor();
             canvas.stroke_path(&mut path, paint);
 
             // making a cool background gradient
-            let mut mid_color = femtovg::Color::from(color);
+            let mut mid_color = color;
             mid_color.set_alpha(20);
-            let mut edge_color = femtovg::Color::from(color);
+            let mut edge_color = color;
             edge_color.set_alpha(64);
             // bg color is slightly less visible in the mid-point (0 dB) of the graph
             let bg = Paint::linear_gradient_stops(
@@ -470,8 +474,6 @@ impl View for BodePlot {
                 0.0,
                 0.0,
                 height as f32,
-                // femtovg::Color::rgba(0, 160, 192, 0),
-                // femtovg::Color::rgba(0, 160, 192, 64),
                 &[(0.0, edge_color), (0.4, mid_color), (1.0, edge_color)],
             );
             // Making the background fill be contained by a line through the mid-point of the graph

@@ -16,7 +16,7 @@ pub const WINDOW_HEIGHT: u32 = 512;
 #[allow(dead_code)]
 pub fn create_vizia_editor<U>(update: U) -> Option<Box<dyn Editor>>
 where
-    U: Fn(&mut Context, Arc<dyn GuiContext>) + 'static + Send + Sync,
+    U: Fn(&mut prelude::Context, Arc<dyn GuiContext>) + 'static + Send + Sync,
 {
     Some(Box::new(ViziaEditor {
         update: Arc::new(update),
@@ -24,7 +24,7 @@ where
 }
 
 pub struct ViziaEditor {
-    update: Arc<dyn Fn(&mut Context, Arc<dyn GuiContext>) + 'static + Send + Sync>,
+    update: Arc<dyn Fn(&mut prelude::Context, Arc<dyn GuiContext>) + 'static + Send + Sync>,
 }
 
 impl Editor for ViziaEditor {
@@ -52,11 +52,12 @@ impl Editor for ViziaEditor {
     }
 
     fn set_scale_factor(&self, _factor: f32) -> bool {
-        todo!()
+        true
+        // todo!()
     }
 
     fn param_values_changed(&self) {
-        todo!()
+        // todo!()
     }
 }
 
