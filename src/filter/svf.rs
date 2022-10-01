@@ -138,7 +138,7 @@ impl SvfCore {
     pub fn update_matrices(&mut self) {
         // let fs = self.params.sample_rate.get();
 
-        let g = self.params.g.get();
+        let g = self.params.g.get() * 2.;
         let res = self.params.zeta.get() - 1.0;
         let g_f64 = g as f64;
         let res_f64 = res as f64;
@@ -408,7 +408,7 @@ impl SvfCoreFast {
         self.solver.set_extrapolation_origin([0.; N_P], [0.; N_N]);
     }
     pub fn update_matrices(&mut self) {
-        let g = self.params.g.get();
+        let g = self.params.g.get()  * 2.;
         let res = self.params.zeta.get();
         let g_f64 = g as f64;
         let res_f64 = res as f64;
