@@ -1,6 +1,6 @@
 #![feature(portable_simd)]
-use filter::LadderFilter;
 use core_simd::f32x4;
+use filter::LadderFilter;
 
 use std::sync::Arc;
 
@@ -8,7 +8,6 @@ use nih_plug::{nih_export_vst3, prelude::*};
 
 mod editor;
 use editor::*;
-#[allow(dead_code)]
 pub mod utils;
 use utils::AtomicOps;
 pub mod filter_params;

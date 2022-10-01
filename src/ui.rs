@@ -7,14 +7,14 @@ use plot::{get_amplitude_response, get_phase_response};
 // use crate::editor::{get_amplitude_response, get_phase_response};
 use crate::utils::*;
 use crate::FilterParams;
-use vizia::vg::ImageFlags;
-use vizia::vg::ImageId;
-use vizia::vg::RenderTarget;
-use vizia::vg::{Paint, Path};
 use nih_plug::prelude::Param;
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::Arc;
+use vizia::vg::ImageFlags;
+use vizia::vg::ImageId;
+use vizia::vg::RenderTarget;
+use vizia::vg::{Paint, Path};
 use vizia::*;
 // use vst::host::Host;
 // use vst::plugin::HostCallback;
@@ -373,7 +373,7 @@ impl View for BodePlot {
                         max = PI / 2.;
                         min = -PI / 2.;
                     }
-                } else {
+                } else if params.filter_type.value() == Circuits::Ladder {
                     amps = get_phase_response(
                         params.cutoff.value(),
                         // 2.,
@@ -389,6 +389,17 @@ impl View for BodePlot {
                         max = PI / 2.;
                         min = -PI;
                     }
+                } else {
+                    amps = get_phase_response(
+                        params.cutoff.value(),
+                        // 2.,
+                        params.res.value().clamp(0.01, 0.9875) * 2.,
+                        params.slope.value() as usize,
+                        params.filter_type.value(),
+                        width,
+                    );
+                    max = PI / 2.;
+                    min = -PI;
                 };
             } else {
                 // min and max amplitude values that will be rendered
@@ -403,7 +414,7 @@ impl View for BodePlot {
                         params.filter_type.value(),
                         width,
                     );
-                } else {
+                } else if params.filter_type.value() == Circuits::SVF {
                     amps = get_amplitude_response(
                         params.cutoff.value(),
                         params.zeta.get(),
@@ -411,8 +422,15 @@ impl View for BodePlot {
                         params.filter_type.value(),
                         width,
                     );
+                } else {
+                    amps = get_amplitude_response(
+                        params.cutoff.value(),
+                        params.res.value().clamp(0.01, 0.9875) * 2.,
+                        params.mode.value() as usize,
+                        params.filter_type.value(),
+                        width,
+                    );
                 }
-                // TODO: should prolly cover SallenKey, has its own reso formula
             }
 
             let bounds = cx.bounds();

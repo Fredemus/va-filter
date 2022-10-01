@@ -95,7 +95,7 @@ fn get_filter_bode(
         Circuits::SallenKey => {
             for i in 0..len {
                 curr_s = frequencies[i] * j;
-                array[i] = g.powi(2) / ((curr_s).powi(2) + k * g * curr_s + g.powi(2));
+                array[i] = g.powi(2) / ((curr_s).powi(2) - (k - 2.) * g * curr_s + g.powi(2));
             }
         }
     }
