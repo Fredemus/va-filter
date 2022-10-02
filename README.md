@@ -1,5 +1,5 @@
 # va-filter
-Virtual analogue filters. implemented as a VST3 and Clap plugin in Rust, using [Vizia](https://github.com/geom3trik/VIZIA) for the GUI.
+Virtual analogue filters. implemented as a VST3 and Clap plugin in Rust, using [Vizia](https://github.com/geom3trik/VIZIA) for the GUI and [nih-plug](https://github.com/robbert-vdh/nih-plug) for all the plugin boilerplate stuff.
 
 ## circuits
 This plugin currently has 3 circuit models:
@@ -59,5 +59,5 @@ The plugin is then saved in the `target/bundled` folder
 
 A standalone version can be run in jack:
 ```bash
-cargo +nightly run
+cargo +nightly run --release
 ```
