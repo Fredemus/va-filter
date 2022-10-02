@@ -166,16 +166,9 @@ impl Plugin for VaFilter {
                     // perform filtering with the cool filters
                     let filter_out = match self.params.filter_type.value() {
                         // filter_params_nih::Circuits::SVF => self.svf.tick_newton(frame),
-                        filter_params::Circuits::SallenKey => {
-                            let out = self.sallenkey_stereo.process([in_l, in_r]);
+                        filter_params::Circuits::SallenKey => self.sallenkey_stereo.process(frame),
+                        filter_params::Circuits::SVF => self.svf_stereo.process(frame),
 
-                            f32x4::from_array([out[0], out[1], 0., 0.])
-                        }
-                        filter_params::Circuits::SVF => {
-                            let out = self.svf_stereo.process([in_l, in_r]);
-
-                            f32x4::from_array([out[0], out[1], 0., 0.])
-                        }
                         _ => self.ladder.tick_newton(frame),
                     };
 
@@ -185,16 +178,8 @@ impl Plugin for VaFilter {
                 processed = output;
             } else {
                 processed = match self.params.filter_type.value() {
-                    filter_params::Circuits::SallenKey => {
-                        let out = self.sallenkey_stereo.process([in_l, in_r]);
-
-                        f32x4::from_array([out[0], out[1], 0., 0.])
-                    }
-                    filter_params::Circuits::SVF => {
-                        let out = self.svf_stereo.process([in_l, in_r]);
-
-                        f32x4::from_array([out[0], out[1], 0., 0.])
-                    }
+                    filter_params::Circuits::SallenKey => self.sallenkey_stereo.process(frame),
+                    filter_params::Circuits::SVF => self.svf_stereo.process(frame),
                     _ => self.ladder.tick_newton(frame),
                 };
             }

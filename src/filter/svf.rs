@@ -1,3 +1,5 @@
+use core_simd::f32x4;
+
 use crate::{
     filter::DKSolver,
     filter_params::{FilterParams, SvfMode},
@@ -17,11 +19,13 @@ impl Svf {
             filters: [SvfCoreFast::new(params.clone()), SvfCoreFast::new(params)],
         }
     }
-    pub fn process(&mut self, input: [f32; 2]) -> [f32; 2] {
-        [
+    pub fn process(&mut self, input: f32x4) -> f32x4 {
+        f32x4::from_array([
             self.filters[0].tick_dk(input[0]),
             self.filters[1].tick_dk(input[1]),
-        ]
+            0.,
+            0.,
+        ])
     }
     pub fn update(&mut self) {
         self.filters[0].update_matrices();
