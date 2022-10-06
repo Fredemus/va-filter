@@ -11,6 +11,7 @@ use solver::DKSolver;
 
 pub mod sallen_key;
 pub mod svf;
+pub mod preprocess;
 
 /// cheap tanh to make the filter faster.
 // from a quick look it looks extremely good, max error of ~0.0002 or .02%
@@ -139,6 +140,7 @@ impl LadderFilter {
         self.vout[self.params.slope.value() as usize]
     }
     pub fn run_filter_newton(&mut self, input: f32x4) -> f32x4 {
+        // dbg!(input);
         // ---------- setup ----------
         // load in g and k from parameters
         let g = f32x4::splat(self.params.g.get());
@@ -205,7 +207,6 @@ impl LadderFilter {
                 g * (tanh_y2_est - tanh_y3_est) + self.s[2] - v_est[2],
                 g * (tanh_y3_est - tanh_y4_est) + self.s[3] - v_est[3],
             ];
-            // n_iterations += 1;
         }
         self.vout = v_est;
         self.vout[self.params.slope.value() as usize]

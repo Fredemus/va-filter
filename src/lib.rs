@@ -1,6 +1,6 @@
 #![feature(portable_simd)]
 use core_simd::f32x4;
-use filter::LadderFilter;
+use filter::{LadderFilter, preprocess};
 
 use std::sync::Arc;
 
@@ -31,6 +31,7 @@ pub struct VaFilter {
 
     upsampler: HalfbandFilter,
     downsampler: HalfbandFilter,
+    dc_filter: preprocess::DcFilter,
 
     oversample_factor: usize,
 }
@@ -54,6 +55,7 @@ impl Default for VaFilter {
 
             upsampler: HalfbandFilter::new(8, true),
             downsampler: HalfbandFilter::new(8, true),
+            dc_filter: preprocess::DcFilter::default(),
             oversample_factor: 2,
         }
     }
@@ -152,7 +154,11 @@ impl Plugin for VaFilter {
             // channel_samples[0];
             let in_l = *channel_samples.get_mut(0).unwrap();
             let in_r = *channel_samples.get_mut(1).unwrap();
-            let frame = f32x4::from_array([in_l, in_r, 0.0, 0.0]);
+            let mut frame = f32x4::from_array([in_l, in_r, 0.0, 0.0]);
+            
+            // filter before oversampling to remove dc-offset, since offsets can make the models behave weirdly
+            frame = self.dc_filter.process(frame);
+
             let processed;
             if self.oversample_factor == 2 {
                 // zero-stuff input
@@ -168,7 +174,6 @@ impl Plugin for VaFilter {
                         // filter_params_nih::Circuits::SVF => self.svf.tick_newton(frame),
                         filter_params::Circuits::SallenKey => self.sallenkey_stereo.process(frame),
                         filter_params::Circuits::SVF => self.svf_stereo.process(frame),
-
                         _ => self.ladder.tick_newton(frame),
                     };
 
