@@ -506,7 +506,8 @@ impl SvfCoreFast {
         q[4] += self.c1 * z[2] - z[3];
         q[5] += z[3];
         q[6] += -z[0] - z[2];
-        q[7] += 3. * z[0] + z[1] + self.c2 * z[2] + z[3];
+        q[7] += 4. * z[0] + z[1] + self.c2 * z[2] + 2. * z[3];
+        // q[7] += 3. * z[0] + z[1] + self.c2 * z[2] + z[3];
 
         let (res1, jq1) = self.solver.eval_opamp(q[0], q[1]);
         let (res2, jq2) = self.solver.eval_opamp(q[2], q[3]);
@@ -529,20 +530,25 @@ impl SvfCoreFast {
         let j12 = -self.jq[2] - 1.;
         let j22 = self.jq[4] * self.c1;
         let j23 = -self.jq[4] - 1.;
-        let j30 = -self.jq[6] + -3.;
-        let j32 = -self.jq[6] + -1. * self.c2;
-
+        // let j30 = -self.jq[6] + -3.;
+        // let j32 = -self.jq[6] + -1. * self.c2;
+        let j30 = -self.jq[6] - 4.;
+        let j32 = -self.jq[6] - self.c2;
         let mut x = [0.; N_N];
 
-        x[0] = (((-b[0] + b[3]) * j12 - j32 * (b[0] * j11 + b[1])) * j23 + b[2] * j12
-            - j22 * (b[0] * j11 + b[1]))
-            / (((-j00 + j30) * j12 - j32 * j00 * j11) * j23 - j00 * j11 * j22);
+        // x[0] = (((-b[0] + b[3]) * j12 - j32 * (b[0] * j11 + b[1])) * j23 + b[2] * j12
+        //     - j22 * (b[0] * j11 + b[1]))
+        //     / (((-j00 + j30) * j12 - j32 * j00 * j11) * j23 - j00 * j11 * j22);
+        // x[1] = j00 * x[0] - b[0];
+        // x[2] = (-j11 * x[1] + b[1]) / j12;
+        // x[3] = j30 * x[0] + j32 * x[2] - b[3] - x[1];
 
+        x[0] = (((-b[0] + b[3]) * j12 - j32 * (b[0] * j11 + b[1])) * j23 + 2. * b[2] * j12
+            - 2. * j22 * (b[0] * j11 + b[1]))
+            / (((j30 - j00) * j12 - j32 * j00 * j11) * j23 - 2. * j00 * j11 * j22);
         x[1] = j00 * x[0] - b[0];
-
         x[2] = (-j11 * x[1] + b[1]) / j12;
-
-        x[3] = j30 * x[0] + j32 * x[2] - b[3] - x[1];
+        x[3] = 0.5 * (j30 * x[0] + j32 * x[2] - b[3] - x[1]);
         x
     }
     pub fn reset(&mut self) {
