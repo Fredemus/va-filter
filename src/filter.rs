@@ -9,9 +9,9 @@ use std_float::*;
 mod solver;
 use solver::DKSolver;
 
+pub mod preprocess;
 pub mod sallen_key;
 pub mod svf;
-pub mod preprocess;
 
 /// cheap tanh to make the filter faster.
 // from a quick look it looks extremely good, max error of ~0.0002 or .02%
@@ -236,4 +236,28 @@ impl LadderFilter {
         self.update_state();
         out
     }
+}
+
+#[test]
+fn break_ladder() {
+    use rand::Rng;
+    let mut params = FilterParams::new(Arc::new(std::sync::atomic::AtomicBool::new(false)));
+
+    params.sample_rate.set(44100.);
+    params.update_g(20000.);
+    params.drive = nih_plug::prelude::FloatParam::new(
+        "drive",
+        24.,
+        nih_plug::prelude::FloatRange::Linear { min: 0., max: 24. },
+    );
+    params.k_ladder.set(0.);
+    dbg!(params.g.get());
+    let mut filt = LadderFilter::new(Arc::new(params));
+
+    let mut rng = rand::thread_rng();
+    for _i in 0..100 {
+        let x: f32 = rng.gen();
+        filt.tick_newton(f32x4::splat(x));
+    }
+    // filt.run_filter_newton(f32x4::splat(1.));
 }

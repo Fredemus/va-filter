@@ -1,6 +1,6 @@
 #![feature(portable_simd)]
 use core_simd::f32x4;
-use filter::{LadderFilter, preprocess};
+use filter::{preprocess, LadderFilter};
 
 use std::sync::Arc;
 
@@ -151,11 +151,10 @@ impl Plugin for VaFilter {
                 self.svf_stereo.update();
             }
 
-            // channel_samples[0];
             let in_l = *channel_samples.get_mut(0).unwrap();
             let in_r = *channel_samples.get_mut(1).unwrap();
             let mut frame = f32x4::from_array([in_l, in_r, 0.0, 0.0]);
-            
+
             // filter before oversampling to remove dc-offset, since offsets can make the models behave weirdly
             frame = self.dc_filter.process(frame);
 

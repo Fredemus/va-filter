@@ -53,7 +53,6 @@ pub struct DKSolver<const N_N: usize, const N_P: usize, const P_LEN: usize> {
     pub residue: [f64; N_N],
     pub resmaxabs: f64,
 }
-// #[allow(dead_code)]
 impl<const N_N: usize, const N_P: usize, const P_LEN: usize> DKSolver<N_N, N_P, P_LEN> {
     pub fn new() -> Self {
         Self {
@@ -186,6 +185,7 @@ impl<const N_N: usize, const N_P: usize, const P_LEN: usize> DKSolver<N_N, N_P, 
     // TODO: evaluate if clamping to f32::MAX * 1e-4 or smth would make single-precision solver possible
     // looks like the svf at least gets much worse convergence when using a single-precision solver
     /// 2 shockley diodes, with the + pin of one connected to the other's - pin and vice versa
+    #[inline(always)]
     pub fn eval_diodepair(&self, v_in: f64, i_out: f64, i_s: f64, eta: f64) -> (f64, [f64; 2]) {
         // the diode's saturation current. Could make this a function parameter to have slightly mismatched diodes or something
         // const I_S: f64 = 1e-6;

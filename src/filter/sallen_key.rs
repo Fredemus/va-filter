@@ -365,7 +365,7 @@ pub struct SallenKeyCoreFast {
     // used to find the output values
     fy: [[f32; N_N2]; N_OUTS],
 
-    jq: [f64; 6],
+    jq: [f64; P_LEN2],
 
     solver: DKSolver<N_N2, N_P2, P_LEN2>,
 }
@@ -431,7 +431,6 @@ impl SallenKeyCoreFast {
     pub fn tick_dk(&mut self, input: f32) -> f32 {
         let input = input * (self.params.drive.value());
 
-        // let p = dot(dq, s) + dot(eq, input);
         let mut p = [0f64; 2];
         p[0] = self.s[1] as f64;
         p[1] = (self.s[0] + self.eq[1] * input) as f64;
