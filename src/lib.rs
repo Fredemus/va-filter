@@ -1,5 +1,5 @@
 #![feature(portable_simd)]
-use core_simd::f32x4;
+use core_simd::simd::f32x4;
 use filter::{preprocess, LadderFilter};
 
 use std::sync::Arc;
