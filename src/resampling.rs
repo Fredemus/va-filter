@@ -1,4 +1,4 @@
-use core_simd::f32x4;
+use core_simd::simd::f32x4;
 // use std::simd::f32x4;
 
 // below is a polyphase iir halfband filter (cutoff at fs/4) consisting of cascades of allpasses

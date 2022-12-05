@@ -1,5 +1,4 @@
-
-use core_simd::f32x4;
+use core_simd::simd::f32x4;
 
 // basic DC-filter from Understanding Digital Signal Processing by Richard Lyons
 pub struct DcFilter {
@@ -22,7 +21,6 @@ impl Default for DcFilter {
 
 impl DcFilter {
     pub fn process(&mut self, input: f32x4) -> f32x4 {
-        
         let y_new = input - self.x0 + self.alpha * self.y0;
         self.x0 = input;
         self.y0 = y_new;

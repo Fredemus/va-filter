@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use core_simd::f32x4;
+use core_simd::simd::f32x4;
 
 use crate::filter_params::{FilterParams, SvfMode};
 use crate::utils::AtomicOps;

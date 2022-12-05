@@ -2,7 +2,7 @@
 // use crate::filter_params_nih::{FilterParams, SvfMode};
 use crate::{filter_params::FilterParams, utils::AtomicOps};
 // use packed_simd::f32x4;
-use core_simd::*;
+use core_simd::simd::*;
 use std::sync::Arc;
 use std_float::*;
 
