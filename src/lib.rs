@@ -201,4 +201,18 @@ impl Vst3Plugin for VaFilter {
     const VST3_CATEGORIES: &'static str = "Fx|Filter";
 }
 
+impl ClapPlugin for VaFilter {
+    const CLAP_ID: &'static str = "https://github.com/Fredemus/va-filter/";
+    const CLAP_DESCRIPTION: Option<&'static str> = Some("Va filter");
+    const CLAP_MANUAL_URL: Option<&'static str> = Some(Self::URL);
+    const CLAP_SUPPORT_URL: Option<&'static str> = None;
+    const CLAP_FEATURES: &'static [ClapFeature] = &[
+        ClapFeature::AudioEffect,
+        ClapFeature::Stereo,
+        ClapFeature::Mono,
+        ClapFeature::Utility,
+    ];
+}
+
 nih_export_vst3!(VaFilter);
+nih_export_clap!(VaFilter);
