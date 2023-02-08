@@ -13,9 +13,10 @@ pub mod preprocess;
 pub mod sallen_key;
 pub mod svf;
 
-/// cheap tanh to make the filter faster.
-// from a quick look it looks extremely good, max error of ~0.0002 or .02%
-// the error of 1 - tanh_levien^2 as the derivative is about .06%
+/// Cheap tanh to make the filter faster.
+///
+/// From a quick look it looks extremely good, max error of ~0.0002 or .02%  
+/// The error of 1 - tanh_levien^2 as the derivative is about .06%
 #[inline]
 pub fn tanh_levien(x: f32x4) -> f32x4 {
     let x2 = x * x;
@@ -119,7 +120,8 @@ impl LadderFilter {
 
         self.vout[self.params.slope.value() as usize]
     }
-    // linear version without distortion
+
+    /// Linear version without distortion.
     pub fn run_filter_linear(&mut self, input: f32x4) -> f32x4 {
         // denominators of solutions of individual stages. Simplifies the math a bit
         let g = f32x4::splat(self.params.g.get());
@@ -211,7 +213,8 @@ impl LadderFilter {
         self.vout = v_est;
         self.vout[self.params.slope.value() as usize]
     }
-    // performs a complete filter process (newton-raphson method)
+
+    /// Performs a complete filter process (newton-raphson method).
     pub fn tick_newton(&mut self, input: f32x4) -> f32x4 {
         // perform filter process
         let out = self.run_filter_newton(input * f32x4::splat(self.params.drive.value()));
@@ -219,7 +222,8 @@ impl LadderFilter {
         self.update_state();
         out * f32x4::splat((1. + self.params.k_ladder.get()) / (self.params.drive.value() * 0.5))
     }
-    // performs a complete filter process (newton-raphson method)
+
+    /// Performs a complete filter process (newton-raphson method).
     pub fn tick_pivotal(&mut self, input: f32x4) -> f32x4 {
         // perform filter process
         let out = self.run_filter_pivotal(input * f32x4::splat(self.params.drive.value()));
@@ -227,7 +231,8 @@ impl LadderFilter {
         self.update_state();
         out
     }
-    // performs a complete filter process (newton-raphson method)
+
+    /// Performs a complete filter process (newton-raphson method).
     pub fn tick_linear(&mut self, input: f32x4) -> f32x4 {
         // perform filter process
         // let out = self.run_filter_linear(input * f32x4::splat(self.params.drive.value));

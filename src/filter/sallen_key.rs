@@ -341,7 +341,8 @@ impl SallenKeyCore {
 const N_P2: usize = 2;
 const N_N2: usize = 3;
 const P_LEN2: usize = 6;
-/// this does the same as `SallenKeyCore`, but with most equations simplified to make it faster
+
+/// This does the same as `SallenKeyCore`, but with most equations simplified to make it faster.
 pub struct SallenKeyCoreFast {
     pub params: Arc<FilterParams>,
     pub vout: [f32; N_OUTS],
