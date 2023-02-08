@@ -141,6 +141,8 @@ impl LadderFilter {
         self.vout[2] = g0 * (g * self.vout[1] + self.s[2]);
         self.vout[self.params.slope.value() as usize]
     }
+
+    /// Newton-raphson method version.
     pub fn run_filter_newton(&mut self, input: f32x4) -> f32x4 {
         // dbg!(input);
         // ---------- setup ----------
