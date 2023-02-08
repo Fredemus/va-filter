@@ -1,6 +1,6 @@
 #![feature(portable_simd)]
 #![allow(dead_code)]
-use core_simd::f32x4;
+use core_simd::simd::f32x4;
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use std::sync::Arc;
 use va_filter::filter::svf::SvfCoreFast;
